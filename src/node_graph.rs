@@ -16,6 +16,7 @@ pub enum PinKind {
 pub struct Pin {
     pub id: PinId,
     pub label: String,
+    #[allow(dead_code)]
     pub kind: PinKind,
 }
 
@@ -65,7 +66,19 @@ impl NodeGraph {
             &["Código Fuente"],
         );
         if let Some(node) = graph.node_mut(asm_node_id) {
-            node.code = "section .text\nglobal _start\n\n_start:\n    mov eax, 1\n    mov ebx, 42\n    int 0x80".to_string();
+            node.code = "default rel\nsection .text\nglobal main\nextern printf\nextern exit\n\nmain:\n    sub rsp, 40\n    mov rcx, msg\n    xor eax, eax\n    call printf\n    add rsp, 40\n    ret\n\nsection .data\n    msg db 'Hola ASM desde Ultra Omega!', 10, 0".to_string();
+        }
+
+        // Node 3: Base C
+        let c_node_id = graph.add_node(
+            "Base C",
+            pos2(100.0, 280.0),
+            Color32::from_rgb(0x00, 0x59, 0x9C), // C++ Blue-ish
+            &[],
+            &["Código C"],
+        );
+        if let Some(node) = graph.node_mut(c_node_id) {
+            node.code = "#include <stdio.h>\n\nint main() {\n    printf(\"Hola desde C en Ultra Omega!\\n\");\n    return 0;\n}".to_string();
         }
 
         // Node 2: Constructor / Visualizador
@@ -129,18 +142,6 @@ impl NodeGraph {
         });
 
         id
-    }
-
-    pub fn add_default_node(&mut self, position: Pos2) -> NodeId {
-        let palette = [
-            Color32::from_rgb(0x9f, 0x7a, 0xff),
-            Color32::from_rgb(0x58, 0xb0, 0xf6),
-            Color32::from_rgb(0xff, 0x8c, 0x64),
-            Color32::from_rgb(0x65, 0xf2, 0xb3),
-        ];
-        let color = palette[self.nodes.len() % palette.len()];
-        let title = format!("Nodo {}", self.nodes.len() + 1);
-        self.add_node(title, position, color, &["Entrada"], &["Salida"])
     }
 
     pub fn add_link(&mut self, from: PinId, to: PinId, color: Color32) {
