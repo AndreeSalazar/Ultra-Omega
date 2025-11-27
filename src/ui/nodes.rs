@@ -8,7 +8,7 @@ pub const HEADER_HEIGHT: f32 = 36.0;
 pub const PIN_SPACING: f32 = 26.0;
 pub const NODE_WIDTH: f32 = 240.0; // Slightly wider for "Professional" look
 pub const CONTENT_PADDING: f32 = 14.0;
-const PIN_RADIUS: f32 = 5.0;
+const PIN_RADIUS: f32 = 7.0; // Más grande para mejor visibilidad
 const PIN_TEXT_GAP: f32 = 10.0;
 
 pub fn draw_node(
@@ -17,6 +17,7 @@ pub fn draw_node(
     rect: Rect, // Pre-calculated screen rect
     zoom: f32,
     selected: bool,
+    is_inherited: bool,
     _visuals: &Visuals,
 ) {
     let rounding = egui::Rounding::same(12.0 * zoom);
@@ -28,6 +29,16 @@ pub fn draw_node(
             glow_rect,
             rounding,
             Stroke::new(2.0 * zoom, Color32::from_rgb(255, 200, 50)), // Golden highlight
+        );
+    }
+
+    // 0.5. Inheritance Highlight (Green Glow)
+    if is_inherited {
+        let glow_rect = rect.expand(6.0 * zoom);
+        painter.rect_stroke(
+            glow_rect,
+            rounding,
+            Stroke::new(3.0 * zoom, Color32::from_rgb(89, 185, 89)), // Green highlight for inheritance
         );
     }
 
@@ -135,11 +146,18 @@ fn draw_pin(
 ) {
     let radius = PIN_RADIUS * zoom;
     
-    // Pin Hole (Darker center)
-    painter.circle_filled(center, radius, Color32::BLACK);
+    // Área de hover más grande (invisible pero ayuda con el hit test visual)
+    let hover_radius = radius * 2.5;
+    painter.circle_filled(center, hover_radius, Color32::from_black_alpha(0));
     
-    // Pin Rim (Colored or Grey)
-    painter.circle_stroke(center, radius, Stroke::new(2.0 * zoom, Color32::from_gray(150)));
+    // Pin Hole (Darker center) - más visible
+    painter.circle_filled(center, radius * 0.6, Color32::from_rgb(30, 30, 30));
+    
+    // Pin Rim (Colored or Grey) - más grueso y visible
+    painter.circle_stroke(center, radius, Stroke::new(2.5 * zoom, Color32::from_rgb(200, 200, 200)));
+    
+    // Outer glow para mejor visibilidad
+    painter.circle_stroke(center, radius * 1.3, Stroke::new(1.0 * zoom, Color32::from_rgba_unmultiplied(200, 200, 200, 80)));
 
     // Label
     let text_pos = center + Vec2::new(direction * (radius + PIN_TEXT_GAP * zoom), 0.0);
@@ -148,7 +166,7 @@ fn draw_pin(
         align,
         &pin.label,
         font.clone(),
-        Color32::from_gray(220), // Off-white text
+        Color32::from_rgb(212, 212, 212),
     );
 }
 

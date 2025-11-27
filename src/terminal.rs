@@ -1,5 +1,5 @@
 use std::process::Command;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub struct TerminalManager {
     pub asm_output: String,
@@ -45,7 +45,7 @@ pub enum Language {
 }
 
 impl TerminalManager {
-    pub fn run_code(&mut self, code: &str, lang: Language) {
+    pub fn run_code(&mut self, code: &str, lang: Language, workspace_path: Option<&PathBuf>) {
         self.visible = true;
         self.hide_timer = 10.0; // Show for 10 seconds
         
@@ -60,20 +60,28 @@ impl TerminalManager {
         output_buffer.clear();
         output_buffer.push_str(">>> Iniciando compilación...\n");
 
+        // Determinar el directorio de trabajo
+        let work_dir = workspace_path
+            .map(|p| p.clone())
+            .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+        
         let exe_file = "program.exe";
-        let exe_path = std::env::current_dir().unwrap_or_default().join(exe_file);
+        let exe_path = work_dir.join(exe_file);
 
         match lang {
-            Language::Nasm => Self::compile_nasm(code, exe_file, output_buffer),
-            Language::C => Self::compile_c(code, exe_file, output_buffer),
-            Language::Cpp => Self::compile_cpp(code, exe_file, output_buffer),
-            Language::Rust => Self::compile_rust(code, exe_file, output_buffer),
+            Language::Nasm => Self::compile_nasm(code, &work_dir, exe_file, output_buffer),
+            Language::C => Self::compile_c(code, &work_dir, exe_file, output_buffer),
+            Language::Cpp => Self::compile_cpp(code, &work_dir, exe_file, output_buffer),
+            Language::Rust => Self::compile_rust(code, &work_dir, exe_file, output_buffer),
         }
 
         // Run if compiled
-        if Path::new(exe_file).exists() {
+        if exe_path.exists() {
             output_buffer.push_str(">>> Ejecutando...\n\n");
-            match Command::new(exe_path).output() {
+            match Command::new(&exe_path)
+                .current_dir(&work_dir)
+                .output()
+            {
                 Ok(run_out) => {
                     output_buffer.push_str("--- SALIDA DEL PROGRAMA ---\n");
                     output_buffer.push_str(&String::from_utf8_lossy(&run_out.stdout));
@@ -88,49 +96,55 @@ impl TerminalManager {
         }
     }
 
-    fn compile_c(code: &str, exe_file: &str, output: &mut String) {
-        let temp_file = "temp.c";
-        if let Err(e) = std::fs::write(temp_file, code) {
+    fn compile_c(code: &str, work_dir: &Path, exe_file: &str, output: &mut String) {
+        let temp_file = work_dir.join("temp.c");
+        if let Err(e) = std::fs::write(&temp_file, code) {
             output.push_str(&format!("Error guardando archivo: {}\n", e));
             return;
         }
 
+        let exe_path = work_dir.join(exe_file);
         let cmd_output = Command::new("gcc")
-            .args(&[temp_file, "-o", exe_file])
+            .current_dir(work_dir)
+            .args(&[temp_file.file_name().unwrap().to_str().unwrap(), "-o", exe_file])
             .output();
 
-        Self::handle_compile_output(cmd_output, "GCC", exe_file, output);
+        Self::handle_compile_output(cmd_output, "GCC", &exe_path, output);
     }
 
-    fn compile_cpp(code: &str, exe_file: &str, output: &mut String) {
-        let temp_file = "temp.cpp";
-        if let Err(e) = std::fs::write(temp_file, code) {
+    fn compile_cpp(code: &str, work_dir: &Path, exe_file: &str, output: &mut String) {
+        let temp_file = work_dir.join("temp.cpp");
+        if let Err(e) = std::fs::write(&temp_file, code) {
             output.push_str(&format!("Error guardando archivo: {}\n", e));
             return;
         }
 
+        let exe_path = work_dir.join(exe_file);
         let cmd_output = Command::new("g++")
-            .args(&[temp_file, "-o", exe_file])
+            .current_dir(work_dir)
+            .args(&[temp_file.file_name().unwrap().to_str().unwrap(), "-o", exe_file])
             .output();
 
-        Self::handle_compile_output(cmd_output, "G++", exe_file, output);
+        Self::handle_compile_output(cmd_output, "G++", &exe_path, output);
     }
 
-    fn compile_rust(code: &str, exe_file: &str, output: &mut String) {
-        let temp_file = "temp.rs";
-        if let Err(e) = std::fs::write(temp_file, code) {
+    fn compile_rust(code: &str, work_dir: &Path, exe_file: &str, output: &mut String) {
+        let temp_file = work_dir.join("temp.rs");
+        if let Err(e) = std::fs::write(&temp_file, code) {
             output.push_str(&format!("Error guardando archivo: {}\n", e));
             return;
         }
 
+        let exe_path = work_dir.join(exe_file);
         let cmd_output = Command::new("rustc")
-            .args(&[temp_file, "-o", exe_file])
+            .current_dir(work_dir)
+            .args(&[temp_file.file_name().unwrap().to_str().unwrap(), "-o", exe_file])
             .output();
 
-        Self::handle_compile_output(cmd_output, "Rustc", exe_file, output);
+        Self::handle_compile_output(cmd_output, "Rustc", &exe_path, output);
     }
 
-    fn handle_compile_output(result: std::io::Result<std::process::Output>, name: &str, exe_file: &str, output: &mut String) {
+    fn handle_compile_output(result: std::io::Result<std::process::Output>, name: &str, exe_file: &Path, output: &mut String) {
         match result {
             Ok(out) => {
                 let stderr = String::from_utf8_lossy(&out.stderr);
@@ -151,18 +165,20 @@ impl TerminalManager {
         }
     }
 
-    fn compile_nasm(code: &str, exe_file: &str, output: &mut String) {
-        let temp_asm = "temp.asm";
-        let temp_obj = "temp.obj";
+    fn compile_nasm(code: &str, work_dir: &Path, exe_file: &str, output: &mut String) {
+        let temp_asm = work_dir.join("temp.asm");
+        let temp_obj = work_dir.join("temp.obj");
+        let exe_path = work_dir.join(exe_file);
 
-        if let Err(e) = std::fs::write(temp_asm, code) {
+        if let Err(e) = std::fs::write(&temp_asm, code) {
             output.push_str(&format!("Error guardando archivo: {}\n", e));
             return;
         }
 
         // NASM
         match Command::new("nasm")
-            .args(&["-f", "win64", temp_asm, "-o", temp_obj])
+            .current_dir(work_dir)
+            .args(&["-f", "win64", temp_asm.file_name().unwrap().to_str().unwrap(), "-o", temp_obj.file_name().unwrap().to_str().unwrap()])
             .output()
         {
             Ok(out) => {
@@ -184,7 +200,8 @@ impl TerminalManager {
 
         // Link with GCC
         match Command::new("gcc")
-            .args(&[temp_obj, "-o", exe_file])
+            .current_dir(work_dir)
+            .args(&[temp_obj.file_name().unwrap().to_str().unwrap(), "-o", exe_file])
             .output()
         {
             Ok(out) => {
@@ -197,7 +214,7 @@ impl TerminalManager {
                     output.push_str(">>> Linker: Éxito.\n");
                 } else {
                     output.push_str(">>> Linker: Error.\n");
-                    let _ = std::fs::remove_file(exe_file);
+                    let _ = std::fs::remove_file(&exe_path);
                 }
             }
             Err(e) => {

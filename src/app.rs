@@ -24,6 +24,9 @@ pub struct InteractionState {
     pub selected_nodes: std::collections::HashSet<NodeId>,
     pub box_selection_start: Option<Pos2>,
     pub box_selection_current: Option<Pos2>,
+    pub connecting_from: Option<PinId>,
+    pub viewing_inheritance: Option<NodeId>,
+    pub cut_tool: crate::ui::cut::CutTool,
 }
 
 #[derive(Clone, Copy)]
@@ -139,6 +142,39 @@ impl eframe::App for NodeGraphApp {
             }
         }
 
+        // Handle Delete key to remove selected nodes
+        if ctx.input(|i| i.key_pressed(egui::Key::Delete) || i.key_pressed(egui::Key::Backspace)) {
+            if !self.interaction.selected_nodes.is_empty() {
+                // Don't delete if editing a node
+                if self.interaction.editing_node.is_none() {
+                    self.graph.remove_nodes(&self.interaction.selected_nodes);
+                    self.interaction.selected_nodes.clear();
+                    // Auto-save after deletion
+                    self.check_and_auto_save();
+                }
+            }
+        }
+
+        // Handle Y key for cut tool (Houdini style) - toggle mode
+        // Usar key_pressed para toggle, pero verificar que no haya click simultáneo
+        if ctx.input(|i| i.key_pressed(egui::Key::Y) && !i.pointer.primary_down()) {
+            self.interaction.cut_tool.active = !self.interaction.cut_tool.active;
+            if !self.interaction.cut_tool.active {
+                // Desactivar: limpiar línea y cancelar cualquier operación en curso
+                self.interaction.cut_tool.line_start = None;
+                self.interaction.cut_tool.line_end = None;
+                // También limpiar selección/drag si estaban activos
+                self.interaction.dragging_node = None;
+                self.interaction.box_selection_start = None;
+                self.interaction.box_selection_current = None;
+            } else {
+                // Al activar, limpiar cualquier selección/drag en curso
+                self.interaction.dragging_node = None;
+                self.interaction.box_selection_start = None;
+                self.interaction.box_selection_current = None;
+            }
+        }
+
         // Auto-save and file change detection
         self.check_and_auto_save();
         self.check_file_changes();
@@ -162,6 +198,7 @@ impl eframe::App for NodeGraphApp {
         // 5. Overlays
         self.editor_ui(ctx);
         self.node_menu_ui(ctx);
+        self.inheritance_view_ui(ctx);
     }
 }
 
@@ -220,7 +257,8 @@ impl NodeGraphApp {
     fn add_template_node(&mut self, ctx: &egui::Context, title: &str, code: &str, color: Color32) {
         let world_pos = self.viewport.screen_to_world(self.node_menu_pos, Rect::from_min_size(Pos2::ZERO, Vec2::new(10000.0, 10000.0)));
         
-        let id = self.graph.add_node(title, world_pos, color, &[], &["Código"]);
+        // Todos los nodos tienen una entrada "Entrada" y una salida "Código"
+        let id = self.graph.add_node(title, world_pos, color, &["Entrada"], &["Código"]);
         if let Some(node) = self.graph.node_mut(id) {
              node.code = code.to_string();
         }
@@ -390,6 +428,27 @@ impl NodeGraphApp {
                     ui.allocate_painter(ui.available_size(), Sense::click_and_drag());
                 let rect = response.rect;
 
+                // Verificar estado de Y en tiempo real para forzar modo de corte
+                let y_key_down = ui.input(|i| i.key_down(egui::Key::Y));
+                
+                // Si Y NO está presionado y el modo de corte está activo, desactivarlo
+                if !y_key_down && self.interaction.cut_tool.active {
+                    // Solo desactivar si no hay una línea de corte en progreso
+                    if self.interaction.cut_tool.line_start.is_none() {
+                        self.interaction.cut_tool.active = false;
+                    }
+                }
+                
+                // Si Y está presionado pero el modo no está activo, activarlo inmediatamente
+                if y_key_down && !self.interaction.cut_tool.active {
+                    self.interaction.cut_tool.active = true;
+                    // Limpiar cualquier estado de selección/drag en curso
+                    self.interaction.dragging_node = None;
+                    self.interaction.box_selection_start = None;
+                    self.interaction.box_selection_current = None;
+                    // NO limpiar selected_nodes aquí para mantener selección existente
+                }
+
                 let input = ui.input(|i| PointerSnapshot {
                     pos: i.pointer.interact_pos(),
                     delta: i.pointer.delta(),
@@ -415,9 +474,38 @@ impl NodeGraphApp {
                 self.paint_grid(&painter, rect, ui.visuals());
                 self.paint_links(&painter, rect, ui.ctx().input(|i| i.time));
                 self.paint_nodes(&painter, rect, ui.visuals());
-                self.draw_box_selection(&painter);
-
-                self.handle_node_dragging(&input, rect);
+                
+                // Manejar herramientas en orden de prioridad
+                let time = ui.ctx().input(|i| i.time);
+                self.draw_connecting_line(&painter, rect, input.pos, time);
+                
+                // PRIORIDAD ABSOLUTA: Verificar Y en tiempo real y modo de corte
+                // Si Y está presionado O el modo de corte está activo, forzar modo de corte
+                let force_cut_mode = y_key_down || self.interaction.cut_tool.active;
+                
+                if force_cut_mode {
+                    // Asegurar que el modo de corte esté activo
+                    if !self.interaction.cut_tool.active {
+                        self.interaction.cut_tool.active = true;
+                    }
+                    
+                    // Limpiar estado de selección/drag para prevenir interferencias
+                    self.interaction.dragging_node = None;
+                    self.interaction.box_selection_start = None;
+                    self.interaction.box_selection_current = None;
+                    // Limpiar selected_nodes solo cuando se hace click en modo de corte
+                    if input.primary_pressed {
+                        self.interaction.selected_nodes.clear();
+                    }
+                    
+                    // Manejar solo el modo de corte
+                    self.handle_cut_tool(&painter, &input, rect);
+                } else {
+                    // Solo manejar drag/selección si el modo de corte NO está activo
+                    // NO limpiar selected_nodes aquí - permitir selección normal
+                    self.draw_box_selection(&painter);
+                    self.handle_node_dragging(&input, rect);
+                }
 
                 // Request repaint for animations (connectors pulse)
                 ctx.request_repaint();
@@ -427,6 +515,11 @@ impl NodeGraphApp {
     fn editor_ui(&mut self, ctx: &egui::Context) {
         let mut open = self.interaction.editing_node.is_some();
         let node_id = self.interaction.editing_node;
+
+        // Check for Esc key to close editor
+        if open && ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+            open = false;
+        }
 
         if open {
             let mut should_close = false;
@@ -443,6 +536,10 @@ impl NodeGraphApp {
                         color: egui::Color32::from_black_alpha(200),
                     }))
                 .show(ctx, |ui| {
+                    // Check Esc key inside the window too
+                    if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+                        should_close = true;
+                    }
                     if let Some(id) = node_id {
                         if let Some(node) = self.graph.node_mut(id) {
                             ui.horizontal(|ui| {
@@ -461,7 +558,8 @@ impl NodeGraphApp {
                                         } else {
                                             crate::terminal::Language::C
                                         };
-                                        self.terminal.run_code(&node.code, lang);
+                                        let workspace_path = self.workspace.root_path.as_ref();
+                                        self.terminal.run_code(&node.code, lang, workspace_path);
                                     }
                                 });
                             });
@@ -513,6 +611,62 @@ impl NodeGraphApp {
         
         // Auto-save after editing (check if graph changed)
         self.check_and_auto_save();
+    }
+
+    fn inheritance_view_ui(&mut self, ctx: &egui::Context) {
+        if let Some(node_id) = self.interaction.viewing_inheritance {
+            let mut should_close = false;
+            egui::Window::new("Herencia de Código")
+                .open(&mut true)
+                .resizable(true)
+                .default_size([600.0, 400.0])
+                .frame(egui::Frame::window(&ctx.style())
+                    .fill(egui::Color32::from_rgb(37, 37, 38))
+                    .shadow(egui::epaint::Shadow {
+                        offset: egui::vec2(0.0, 4.0),
+                        blur: 12.0,
+                        spread: 0.0,
+                        color: egui::Color32::from_black_alpha(200),
+                    }))
+                .show(ctx, |ui| {
+                    if let Some(node) = self.graph.nodes().iter().find(|n| n.id == node_id) {
+                        ui.heading(egui::RichText::new(&node.title).color(egui::Color32::from_rgb(212, 212, 212)));
+                        ui.separator();
+                        
+                        if let Some(parent_id) = self.graph.get_parent_node(node_id) {
+                            if let Some(parent) = self.graph.nodes().iter().find(|n| n.id == parent_id) {
+                                ui.label(egui::RichText::new("Hereda de:").strong().color(egui::Color32::from_rgb(89, 185, 89)));
+                                ui.label(egui::RichText::new(&parent.title).color(egui::Color32::from_rgb(89, 185, 89)));
+                                ui.add_space(8.0);
+                                
+                                ui.label(egui::RichText::new("Código heredado:").strong().color(egui::Color32::from_rgb(212, 212, 212)));
+                                ui.separator();
+                                
+                                let mut code_display = parent.code.clone();
+                                egui::ScrollArea::vertical().show(ui, |ui| {
+                                    ui.add(
+                                        egui::TextEdit::multiline(&mut code_display)
+                                            .font(egui::TextStyle::Monospace)
+                                            .desired_width(f32::INFINITY)
+                                            .interactive(false),
+                                    );
+                                });
+                            }
+                        } else {
+                            ui.label(egui::RichText::new("Este nodo no hereda de ningún otro nodo.").color(egui::Color32::from_rgb(128, 128, 128)));
+                        }
+                        
+                        ui.add_space(8.0);
+                        if ui.button("Cerrar").clicked() {
+                            should_close = true;
+                        }
+                    }
+                });
+            
+            if should_close {
+                self.interaction.viewing_inheritance = None;
+            }
+        }
     }
 
     // --- Painting Helpers (Moved from old main) ---
@@ -582,24 +736,60 @@ impl NodeGraphApp {
     }
 
     fn paint_nodes(&self, painter: &egui::Painter, rect: Rect, visuals: &Visuals) {
+        // Obtener nodos que están siendo heredados (para resaltarlos en verde)
+        let inherited_nodes: std::collections::HashSet<NodeId> = if let Some(viewing_id) = self.interaction.viewing_inheritance {
+            self.graph.get_parent_node(viewing_id).into_iter().collect()
+        } else {
+            std::collections::HashSet::new()
+        };
+
         for node in self.graph.nodes() {
             let node_rect = self.node_rect(node, rect);
             let selected = self.interaction.selected_nodes.contains(&node.id);
-            crate::ui::nodes::draw_node(painter, node, node_rect, self.viewport.zoom, selected, visuals);
+            let is_inherited = inherited_nodes.contains(&node.id);
+            crate::ui::nodes::draw_node(painter, node, node_rect, self.viewport.zoom, selected, is_inherited, visuals);
         }
     }
 
     fn handle_node_dragging(&mut self, input: &PointerSnapshot, rect: Rect) {
+        // PRIORIDAD ABSOLUTA: Si el modo de corte está activo, no hacer NADA aquí
+        // Esto previene cualquier interferencia con la selección
+        if self.interaction.cut_tool.active {
+            // Limpiar cualquier estado de drag/selección si el modo de corte está activo
+            self.interaction.dragging_node = None;
+            self.interaction.box_selection_start = None;
+            self.interaction.box_selection_current = None;
+            return;
+        }
+
         if let Some(pointer_pos) = input.pos {
-            // 1. Node Interaction
+            // 0. PRIORIDAD: Verificar si se hace click en un pin ANTES de cualquier otra cosa
             if input.primary_pressed {
-                if let Some(node_id) = self.hit_test(pointer_pos, rect) {
-                    // Node clicked
-                    if !input.modifiers.ctrl && !self.interaction.selected_nodes.contains(&node_id) {
-                        self.interaction.selected_nodes.clear();
+                // Primero verificar si hay un pin bajo el cursor
+                if let Some((pin_id, _pin_kind)) = self.hit_test_pin(pointer_pos, rect) {
+                    if let Some(addr) = self.graph.locate_pin(pin_id) {
+                        if addr.kind == PinKind::Output {
+                            // Iniciar conexión desde pin de salida
+                            self.interaction.connecting_from = Some(pin_id);
+                            // NO activar drag de nodo si estamos conectando
+                            return;
+                        }
                     }
-                    self.interaction.selected_nodes.insert(node_id);
-                    self.interaction.dragging_node = Some(node_id);
+                }
+            }
+
+            // 1. Node Interaction (solo si no estamos conectando)
+            if input.primary_pressed && self.interaction.connecting_from.is_none() {
+                if let Some(node_id) = self.hit_test(pointer_pos, rect) {
+                    // Verificar que no sea un pin antes de activar drag
+                    if self.hit_test_pin(pointer_pos, rect).is_none() {
+                        // Node clicked (no pin)
+                        if !input.modifiers.ctrl && !self.interaction.selected_nodes.contains(&node_id) {
+                            self.interaction.selected_nodes.clear();
+                        }
+                        self.interaction.selected_nodes.insert(node_id);
+                        self.interaction.dragging_node = Some(node_id);
+                    }
                 } else {
                     // Background clicked -> Start Box Select
                     if !input.modifiers.ctrl {
@@ -661,14 +851,62 @@ impl NodeGraphApp {
 
             if input.secondary_pressed && rect.contains(pointer_pos) {
                 if let Some(node_id) = self.hit_test(pointer_pos, rect) {
-                    self.interaction.editing_node = Some(node_id);
-                    self.interaction.selected_nodes.insert(node_id); // Select on right click too
+                    if input.modifiers.ctrl {
+                        // Ctrl + Click derecho: Ver herencia
+                        self.interaction.viewing_inheritance = Some(node_id);
+                    } else {
+                        // Click derecho normal: Editar
+                        self.interaction.editing_node = Some(node_id);
+                        self.interaction.selected_nodes.insert(node_id);
+                    }
+                }
+            }
+
+            // Sistema de conexión de nodos - Completar conexión al soltar
+            if let Some(pointer_pos) = input.pos {
+                // Soltar en pin de entrada para completar conexión (con snap)
+                if !input.primary_down && self.interaction.connecting_from.is_some() {
+                    let from_pin = self.interaction.connecting_from;
+                    
+                    // Primero intentar snap
+                    if let Some((snap_pin_id, _snap_pos, snap_kind)) = self.find_nearest_snap_pin(pointer_pos, rect, from_pin) {
+                        if snap_kind == PinKind::Input {
+                            if let Some(from_pin_id) = from_pin {
+                                // Crear conexión con snap
+                                self.graph.add_link(from_pin_id, snap_pin_id, Color32::from_rgb(100, 200, 255));
+                                // Aplicar herencia de código
+                                self.apply_inheritance();
+                                self.check_and_auto_save();
+                            }
+                        }
+                    } else {
+                        // Si no hay snap, intentar hit test normal
+                        if let Some((pin_id, _kind)) = self.hit_test_pin(pointer_pos, rect) {
+                            if let Some(addr) = self.graph.locate_pin(pin_id) {
+                                if addr.kind == PinKind::Input {
+                                    if let Some(from_pin_id) = from_pin {
+                                        // Crear conexión
+                                        self.graph.add_link(from_pin_id, pin_id, Color32::from_rgb(100, 200, 255));
+                                        // Aplicar herencia de código
+                                        self.apply_inheritance();
+                                        self.check_and_auto_save();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    self.interaction.connecting_from = None;
                 }
             }
         }
     }
     
     fn draw_box_selection(&self, painter: &egui::Painter) {
+        // NO dibujar selección de caja si el modo de corte está activo
+        if self.interaction.cut_tool.active {
+            return;
+        }
+        
         if let (Some(start), Some(current)) = (self.interaction.box_selection_start, self.interaction.box_selection_current) {
             let rect = Rect::from_two_pos(start, current);
             painter.rect(
@@ -677,6 +915,21 @@ impl NodeGraphApp {
                 Color32::from_rgba_unmultiplied(100, 200, 255, 30),
                 Stroke::new(1.0, Color32::from_rgb(100, 200, 255)),
             );
+        }
+    }
+
+    fn draw_connecting_line(&self, painter: &egui::Painter, canvas: Rect, pointer_pos: Option<Pos2>, time: f64) {
+        if let (Some(from_pin), Some(pointer)) = (self.interaction.connecting_from, pointer_pos) {
+            if let Some(start_pos) = self.pin_screen_position(from_pin, canvas) {
+                crate::ui::connectors::draw_connection(
+                    painter,
+                    start_pos,
+                    pointer,
+                    Color32::from_rgb(100, 200, 255),
+                    self.viewport.zoom,
+                    time,
+                );
+            }
         }
     }
 
@@ -725,6 +978,105 @@ impl NodeGraphApp {
         let address = self.graph.locate_pin(pin_id)?;
         let node = &self.graph.nodes()[address.node_index];
         Some(self.pin_slot_position(node, canvas, address.kind, address.slot))
+    }
+
+    fn hit_test_pin(&self, pointer: Pos2, canvas: Rect) -> Option<(PinId, PinKind)> {
+        // Área de detección más grande para facilitar el agarre
+        // Usar distancia en píxeles de pantalla (no escalada por zoom) para mejor UX
+        const PIN_HIT_RADIUS: f32 = 20.0; // Píxeles de pantalla
+        let mut closest: Option<(PinId, PinKind, f32)> = None;
+        
+        for node in self.graph.nodes() {
+            // Check input pins
+            for (idx, pin) in node.inputs.iter().enumerate() {
+                let pin_pos = self.pin_slot_position(node, canvas, PinKind::Input, idx);
+                let distance = (pin_pos - pointer).length();
+                // Usar distancia en píxeles de pantalla directamente
+                if distance < PIN_HIT_RADIUS {
+                    if closest.is_none() || distance < closest.unwrap().2 {
+                        closest = Some((pin.id, PinKind::Input, distance));
+                    }
+                }
+            }
+            
+            // Check output pins
+            for (idx, pin) in node.outputs.iter().enumerate() {
+                let pin_pos = self.pin_slot_position(node, canvas, PinKind::Output, idx);
+                let distance = (pin_pos - pointer).length();
+                // Usar distancia en píxeles de pantalla directamente
+                if distance < PIN_HIT_RADIUS {
+                    if closest.is_none() || distance < closest.unwrap().2 {
+                        closest = Some((pin.id, PinKind::Output, distance));
+                    }
+                }
+            }
+        }
+        
+        closest.map(|(id, kind, _)| (id, kind))
+    }
+
+    // Encontrar el pin más cercano para snap
+    fn find_nearest_snap_pin(&self, pointer: Pos2, canvas: Rect, from_pin: Option<PinId>) -> Option<(PinId, Pos2, PinKind)> {
+        const SNAP_DISTANCE: f32 = 30.0; // Distancia de snap
+        let mut nearest: Option<(PinId, Pos2, PinKind, f32)> = None;
+        
+        for node in self.graph.nodes() {
+            // Check input pins (solo si estamos conectando desde una salida)
+            if from_pin.is_some() {
+                for (idx, pin) in node.inputs.iter().enumerate() {
+                    let pin_pos = self.pin_slot_position(node, canvas, PinKind::Input, idx);
+                    let distance = (pin_pos - pointer).length();
+                    
+                    if distance < SNAP_DISTANCE * self.viewport.zoom {
+                        if nearest.is_none() || distance < nearest.unwrap().3 {
+                            nearest = Some((pin.id, pin_pos, PinKind::Input, distance));
+                        }
+                    }
+                }
+            }
+            
+            // Check output pins (solo si no estamos conectando)
+            if from_pin.is_none() {
+                for (idx, pin) in node.outputs.iter().enumerate() {
+                    let pin_pos = self.pin_slot_position(node, canvas, PinKind::Output, idx);
+                    let distance = (pin_pos - pointer).length();
+                    
+                    if distance < SNAP_DISTANCE * self.viewport.zoom {
+                        if nearest.is_none() || distance < nearest.unwrap().3 {
+                            nearest = Some((pin.id, pin_pos, PinKind::Output, distance));
+                        }
+                    }
+                }
+            }
+        }
+        
+        nearest.map(|(id, pos, kind, _)| (id, pos, kind))
+    }
+
+    fn apply_inheritance(&mut self) {
+        // Aplicar herencia de código a todos los nodos que tienen padre
+        // Primero recolectar los IDs y códigos heredados
+        let inheritance_map: Vec<(NodeId, String)> = self.graph.nodes()
+            .iter()
+            .filter_map(|node| {
+                self.graph.get_inherited_code(node.id)
+                    .map(|code| (node.id, code))
+            })
+            .collect();
+        
+        // Luego aplicar los cambios
+        for (node_id, inherited_code) in inheritance_map {
+            if let Some(node_mut) = self.graph.node_mut(node_id) {
+                // Combinar código heredado con código propio
+                if !node_mut.code.is_empty() && !inherited_code.is_empty() {
+                    // Si ya tiene código, agregar el heredado al inicio
+                    node_mut.code = format!("{}\n\n{}", inherited_code, node_mut.code);
+                } else if node_mut.code.is_empty() {
+                    // Si no tiene código, usar solo el heredado
+                    node_mut.code = inherited_code;
+                }
+            }
+        }
     }
 
     pub fn save_current_graph(&mut self) -> Result<(), String> {
@@ -791,6 +1143,97 @@ impl NodeGraphApp {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    fn handle_cut_tool(&mut self, painter: &egui::Painter, input: &PointerSnapshot, rect: Rect) {
+        if !self.interaction.cut_tool.active {
+            return;
+        }
+
+        // LIMPIEZA PREVENTIVA: Asegurar que no haya estado de selección activo
+        // Esto previene cualquier interferencia visual o funcional
+        self.interaction.dragging_node = None;
+        self.interaction.box_selection_start = None;
+        self.interaction.box_selection_current = None;
+
+        // Dibujar línea de corte si ya existe
+        if self.interaction.cut_tool.line_start.is_some() {
+            self.interaction.cut_tool.draw_cut_line(painter);
+        }
+
+        if let Some(pointer_pos) = input.pos {
+            // Iniciar línea de corte al hacer click
+            if input.primary_pressed {
+                // LIMPIAR INMEDIATAMENTE cualquier selección previa al iniciar corte
+                // Esto previene que aparezca la selección de caja incluso con clicks rápidos
+                self.interaction.selected_nodes.clear();
+                self.interaction.dragging_node = None;
+                self.interaction.box_selection_start = None;
+                self.interaction.box_selection_current = None;
+                
+                // Si no hay línea activa, iniciar una nueva
+                if self.interaction.cut_tool.line_start.is_none() {
+                    self.interaction.cut_tool.line_start = Some(pointer_pos);
+                    self.interaction.cut_tool.line_end = Some(pointer_pos);
+                }
+            }
+
+            // Actualizar línea mientras se arrastra
+            if input.primary_down && self.interaction.cut_tool.line_start.is_some() {
+                self.interaction.cut_tool.line_end = Some(pointer_pos);
+            }
+
+            // Completar corte al soltar el mouse
+            // Verificar que el mouse se soltó (primary_down pasó de true a false)
+            if !input.primary_down && self.interaction.cut_tool.line_start.is_some() {
+                // Solo procesar si hay una línea válida
+                if let (Some(start), Some(end)) = (self.interaction.cut_tool.line_start, self.interaction.cut_tool.line_end) {
+                    // Verificar que la línea tenga una longitud mínima
+                    if start.distance(end) > 5.0 {
+                        // Encontrar y eliminar conexiones que intersectan
+                        let links_to_remove: Vec<crate::node_graph::Link> = self.graph.links()
+                            .iter()
+                            .filter_map(|link| {
+                                let Some(link_start) = self.pin_screen_position(link.from, rect) else {
+                                    return None;
+                                };
+                                let Some(link_end) = self.pin_screen_position(link.to, rect) else {
+                                    return None;
+                                };
+
+                                // Obtener puntos de la curva Bézier
+                                let dist = link_start.distance(link_end);
+                                let control_dist = dist.min(100.0 * self.viewport.zoom) * 0.5;
+                                let bezier_points = [
+                                    link_start,
+                                    link_start + Vec2::new(control_dist, 0.0),
+                                    link_end - Vec2::new(control_dist, 0.0),
+                                    link_end,
+                                ];
+
+                                if self.interaction.cut_tool.check_intersection_with_bezier(bezier_points) {
+                                    Some(link.clone())
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect();
+
+                        // Eliminar conexiones que intersectan
+                        if !links_to_remove.is_empty() {
+                            for link in &links_to_remove {
+                                self.graph.remove_link(link.from, link.to);
+                            }
+                            self.check_and_auto_save();
+                        }
+                    }
+                }
+
+                // Limpiar línea de corte después de procesar
+                self.interaction.cut_tool.line_start = None;
+                self.interaction.cut_tool.line_end = None;
             }
         }
     }

@@ -15,7 +15,8 @@ pub fn draw_run_menu(ui: &mut egui::Ui, _ctx: &egui::Context, app: &mut NodeGrap
                     } else {
                         crate::terminal::Language::C
                     };
-                    app.terminal.run_code(&node.code, lang);
+                    let workspace_path = app.workspace.root_path.as_ref();
+                    app.terminal.run_code(&node.code, lang, workspace_path);
                 }
             }
             ui.close_menu();

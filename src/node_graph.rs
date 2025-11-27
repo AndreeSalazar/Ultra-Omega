@@ -139,6 +139,12 @@ impl NodeGraph {
         &self.links
     }
 
+    pub fn remove_link(&mut self, from: PinId, to: PinId) -> bool {
+        let initial_len = self.links.len();
+        self.links.retain(|link| !(link.from == from && link.to == to));
+        initial_len > self.links.len()
+    }
+
     // Recalculate ID counters after deserialization
     pub fn recalculate_ids(&mut self) {
         self.next_node_id = self.nodes.iter().map(|n| n.id.0).max().unwrap_or(0) + 1;
@@ -151,6 +157,45 @@ impl NodeGraph {
 
     pub fn node_mut(&mut self, id: NodeId) -> Option<&mut Node> {
         self.nodes.iter_mut().find(|node| node.id == id)
+    }
+
+    #[allow(dead_code)] // Available for single node deletion if needed
+    pub fn remove_node(&mut self, id: NodeId) -> bool {
+        let initial_len = self.nodes.len();
+        self.nodes.retain(|node| node.id != id);
+        
+        // Remove links connected to this node
+        if initial_len != self.nodes.len() {
+            let node_pin_ids: std::collections::HashSet<PinId> = self.nodes.iter()
+                .flat_map(|n| n.inputs.iter().chain(n.outputs.iter()))
+                .map(|p| p.id)
+                .collect();
+            
+            self.links.retain(|link| {
+                node_pin_ids.contains(&link.from) && node_pin_ids.contains(&link.to)
+            });
+            
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn remove_nodes(&mut self, ids: &std::collections::HashSet<NodeId>) {
+        let initial_len = self.nodes.len();
+        self.nodes.retain(|node| !ids.contains(&node.id));
+        
+        // Remove links connected to removed nodes
+        if initial_len != self.nodes.len() {
+            let node_pin_ids: std::collections::HashSet<PinId> = self.nodes.iter()
+                .flat_map(|n| n.inputs.iter().chain(n.outputs.iter()))
+                .map(|p| p.id)
+                .collect();
+            
+            self.links.retain(|link| {
+                node_pin_ids.contains(&link.from) && node_pin_ids.contains(&link.to)
+            });
+        }
     }
 
     pub fn add_node(
@@ -184,9 +229,57 @@ impl NodeGraph {
         id
     }
 
-    #[allow(dead_code)] // Se usará cuando se implemente la conexión manual de nodos
     pub fn add_link(&mut self, from: PinId, to: PinId, color: Color32) {
-        self.links.push(Link { from, to, color });
+        // Evitar conexiones duplicadas
+        if !self.links.iter().any(|l| l.from == from && l.to == to) {
+            self.links.push(Link { from, to, color });
+        }
+    }
+
+    // Obtener el nodo padre (del que hereda) para un nodo dado
+    pub fn get_parent_node(&self, node_id: NodeId) -> Option<NodeId> {
+        // Buscar un link que conecte a una entrada de este nodo
+        for link in &self.links {
+            if let Some(to_addr) = self.locate_pin(link.to) {
+                if self.nodes[to_addr.node_index].id == node_id && to_addr.kind == PinKind::Input {
+                    // Encontrar el nodo que tiene el pin de salida
+                    if let Some(from_addr) = self.locate_pin(link.from) {
+                        return Some(self.nodes[from_addr.node_index].id);
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    // Obtener todos los nodos que heredan de un nodo dado
+    #[allow(dead_code)] // Available for future use
+    pub fn get_children_nodes(&self, node_id: NodeId) -> Vec<NodeId> {
+        let mut children = Vec::new();
+        // Buscar el pin de salida del nodo
+        if let Some(node) = self.nodes.iter().find(|n| n.id == node_id) {
+            for output_pin in &node.outputs {
+                // Buscar links que salen de este pin
+                for link in &self.links {
+                    if link.from == output_pin.id {
+                        if let Some(to_addr) = self.locate_pin(link.to) {
+                            children.push(self.nodes[to_addr.node_index].id);
+                        }
+                    }
+                }
+            }
+        }
+        children
+    }
+
+    // Obtener el código heredado (del nodo padre)
+    pub fn get_inherited_code(&self, node_id: NodeId) -> Option<String> {
+        if let Some(parent_id) = self.get_parent_node(node_id) {
+            if let Some(parent) = self.nodes.iter().find(|n| n.id == parent_id) {
+                return Some(parent.code.clone());
+            }
+        }
+        None
     }
 
     pub fn locate_pin(&self, pin_id: PinId) -> Option<PinAddress> {
