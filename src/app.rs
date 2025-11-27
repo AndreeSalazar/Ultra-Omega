@@ -17,6 +17,10 @@ pub struct NodeGraphApp {
     pub last_save_hash: u64,
     pub last_save_time: Option<std::time::Instant>,
     pub channel_manager: crate::expressions::ChannelManager, // Sistema de canales para ch()
+    // Menú de búsqueda F3 estilo Blender
+    pub show_search_menu: bool,
+    pub search_query: String,
+    pub selected_category: Option<String>,
 }
 
 #[derive(Default)]
@@ -89,6 +93,9 @@ impl NodeGraphApp {
             last_save_hash: 0,
             last_save_time: None,
             channel_manager: crate::expressions::ChannelManager::new(),
+            show_search_menu: false,
+            search_query: String::new(),
+            selected_category: None,
         };
         
         // Load workspace if configured
@@ -145,8 +152,20 @@ impl eframe::App for NodeGraphApp {
         // Handle global shortcuts
         if ctx.input(|i| i.key_pressed(egui::Key::Tab)) {
             self.show_node_menu = !self.show_node_menu;
+            self.show_search_menu = false;
             if self.show_node_menu {
                 self.node_menu_pos = ctx.pointer_hover_pos().unwrap_or(pos2(200.0, 200.0));
+                self.selected_category = None;
+            }
+        }
+
+        // F3 para búsqueda rápida estilo Blender
+        if ctx.input(|i| i.key_pressed(egui::Key::F3)) {
+            self.show_search_menu = !self.show_search_menu;
+            self.show_node_menu = false;
+            if self.show_search_menu {
+                self.node_menu_pos = ctx.pointer_hover_pos().unwrap_or(pos2(200.0, 200.0));
+                self.search_query.clear();
             }
         }
 
@@ -418,9 +437,14 @@ impl NodeGraphApp {
     }
 
     fn node_menu_ui(&mut self, ctx: &egui::Context) {
+        // ═══════════════════════════════════════════════════════════════
+        // MENÚ TAB - Estilo Blender con categorías y subcategorías
+        // ═══════════════════════════════════════════════════════════════
         if self.show_node_menu {
             let mut close_menu = false;
-             egui::Area::new("node_menu_area".into())
+            let mut template_to_add: Option<crate::templates::Template> = None;
+            
+            egui::Area::new("node_menu_area".into())
                 .fixed_pos(self.node_menu_pos)
                 .order(egui::Order::Foreground)
                 .show(ctx, |ui| {
@@ -432,105 +456,161 @@ impl NodeGraphApp {
                             color: Color32::from_black_alpha(120),
                         })
                         .rounding(egui::Rounding::same(8.0))
-                        .inner_margin(egui::Margin::same(12.0));
+                        .inner_margin(egui::Margin::same(8.0));
                         
                     frame.show(ui, |ui| {
-                        ui.set_width(200.0);
-                        
                         ui.horizontal(|ui| {
-                            ui.label(egui::RichText::new("➕").color(Color32::from_rgb(100, 200, 255)));
-                            ui.heading("Agregar Nodo");
-                        });
-                        ui.add_space(4.0);
-                        ui.separator();
-                        ui.add_space(4.0);
-                        
-                        // Opción "Nodo nuevo" con título editable
-                        ui.label(egui::RichText::new("✨ Nodo Nuevo").strong().color(Color32::from_rgb(100, 200, 255)));
-                        ui.add_space(2.0);
-                        ui.horizontal(|ui| {
-                            ui.label("Título:");
-                            ui.text_edit_singleline(&mut self.new_node_title);
-                        });
-                        ui.add_space(4.0);
-                        if ui.button("✨ Crear Nodo").clicked() {
-                            let title = if self.new_node_title.trim().is_empty() {
-                                format!("Nodo {}", self.graph.nodes().len() + 1)
-                            } else {
-                                self.new_node_title.trim().to_string()
-                            };
-                            
-                            // Crear nodo vacío con el título especificado
-                            let world_pos = self.viewport.screen_to_world(self.node_menu_pos, Rect::from_min_size(Pos2::ZERO, Vec2::new(10000.0, 10000.0)));
-                            let id = self.graph.add_node(&title, world_pos, Color32::from_rgb(100, 150, 200), &["Entrada"], &["Código"]);
-                            
-                            // Registrar en canales
-                            if let Some(node) = self.graph.nodes().iter().find(|n| n.id == id) {
-                                let title_clone = node.title.clone();
-                                let code_clone = node.code.clone();
-                                use crate::expressions::ChannelValue;
-                                self.channel_manager.set_channel(title_clone.clone(), ChannelValue::Code(code_clone.clone()));
-                                self.channel_manager.set_node_channel(id, "code".to_string(), ChannelValue::Code(code_clone));
-                            }
-                            
-                            // Limpiar título para próxima vez
-                            self.new_node_title.clear();
-                            
-                            // Auto-save
-                            if self.workspace.has_root() {
-                                if let Err(e) = self.save_current_graph() {
-                                    eprintln!("Error auto-saving after node creation: {}", e);
-                                } else {
-                                    ctx.request_repaint();
+                            // Panel izquierdo: Categorías
+                            ui.vertical(|ui| {
+                                ui.set_width(140.0);
+                                
+                                ui.horizontal(|ui| {
+                                    ui.label(egui::RichText::new("➕").color(Color32::from_rgb(100, 200, 255)));
+                                    ui.label(egui::RichText::new("Add").strong());
+                                    ui.label(egui::RichText::new("Shift A").small().color(Color32::GRAY));
+                                });
+                                ui.separator();
+                                
+                                // Nodo nuevo
+                                if ui.selectable_label(self.selected_category.as_deref() == Some("new"), "✨ Nuevo Nodo").clicked() {
+                                    self.selected_category = Some("new".to_string());
                                 }
-                            }
+                                
+                                ui.separator();
+                                
+                                // Categorías de templates
+                                let categories = ["Assembler", "C", "C++", "Rust"];
+                                let category_icons = ["🔧", "📘", "📗", "🦀"];
+                                let category_colors = [
+                                    Color32::from_rgb(0xff, 0x47, 0x00),
+                                    Color32::from_rgb(0x00, 0x59, 0x9C),
+                                    Color32::from_rgb(0x00, 0x44, 0x82),
+                                    Color32::from_rgb(0xde, 0x39, 0x00),
+                                ];
+                                
+                                for (i, cat) in categories.iter().enumerate() {
+                                    let selected = self.selected_category.as_deref() == Some(*cat);
+                                    let response = ui.horizontal(|ui| {
+                                        ui.label(egui::RichText::new(category_icons[i]).color(category_colors[i]));
+                                        ui.selectable_label(selected, *cat)
+                                    }).inner;
+                                    
+                                    if response.clicked() {
+                                        self.selected_category = Some(cat.to_string());
+                                    }
+                                }
+                                
+                                ui.add_space(8.0);
+                                ui.separator();
+                                ui.add_space(4.0);
+                                
+                                // Shortcuts
+                                ui.label(egui::RichText::new("Buscar").small().color(Color32::GRAY));
+                                ui.horizontal(|ui| {
+                                    ui.label(egui::RichText::new("🔍 Find...").small());
+                                    ui.label(egui::RichText::new("F3").small().color(Color32::from_rgb(100, 150, 200)));
+                                });
+                            });
                             
-                            close_menu = true;
-                        }
-                        ui.add_space(4.0);
-                        ui.separator();
-                        ui.add_space(4.0);
-                        
-                        ui.label(egui::RichText::new("Assembler (NASM)").strong().color(Color32::LIGHT_GRAY));
-                        if ui.button("⏵ Hola Mundo").clicked() {
-                            self.add_template_node(ctx, "ASM: Hola Mundo", crate::templates::ASM_HELLO, Color32::from_rgb(0xff, 0x47, 0x00));
-                            close_menu = true;
-                        }
-                        if ui.button("➕ Suma").clicked() {
-                            self.add_template_node(ctx, "ASM: Suma", crate::templates::ASM_SUM, Color32::from_rgb(0xff, 0x47, 0x00));
-                            close_menu = true;
-                        }
-                        if ui.button("↻ Bucle").clicked() {
-                            self.add_template_node(ctx, "ASM: Bucle", crate::templates::ASM_LOOP, Color32::from_rgb(0xff, 0x47, 0x00));
-                            close_menu = true;
-                        }
-                        if ui.button("🔀 Condicional").clicked() {
-                            self.add_template_node(ctx, "ASM: Condicional", crate::templates::ASM_CONDITIONAL, Color32::from_rgb(0xff, 0x47, 0x00));
-                            close_menu = true;
-                        }
-                        
-                        ui.separator();
-                        ui.label(egui::RichText::new("C").strong().color(Color32::LIGHT_GRAY));
-                        if ui.button("Hola Mundo").clicked() {
-                            self.add_template_node(ctx, "Base C", crate::templates::C_HELLO, Color32::from_rgb(0x00, 0x59, 0x9C));
-                            close_menu = true;
-                        }
-                        
-                        ui.separator();
-                        ui.label(egui::RichText::new("C++").strong().color(Color32::LIGHT_GRAY));
-                        if ui.button("Hola Mundo").clicked() {
-                            self.add_template_node(ctx, "Base C++", crate::templates::CPP_HELLO, Color32::from_rgb(0x00, 0x44, 0x82));
-                            close_menu = true;
-                        }
-                        
-                        ui.separator();
-                        ui.label(egui::RichText::new("Rust").strong().color(Color32::LIGHT_GRAY));
-                        if ui.button("Hola Mundo").clicked() {
-                            self.add_template_node(ctx, "Base Rust", crate::templates::RUST_HELLO, Color32::from_rgb(0xde, 0x39, 0x00));
-                            close_menu = true;
-                        }
+                            ui.separator();
+                            
+                            // Panel derecho: Subcategorías y templates
+                            ui.vertical(|ui| {
+                                ui.set_min_width(200.0);
+                                
+                                if let Some(ref cat) = self.selected_category.clone() {
+                                    if cat == "new" {
+                                        // Panel para crear nodo nuevo
+                                        ui.heading("Crear Nodo");
+                                        ui.add_space(8.0);
+                                        
+                                        ui.horizontal(|ui| {
+                                            ui.label("Título:");
+                                            ui.text_edit_singleline(&mut self.new_node_title);
+                                        });
+                                        
+                                        ui.add_space(8.0);
+                                        
+                                        if ui.button("✨ Crear Nodo Vacío").clicked() {
+                                            let title = if self.new_node_title.trim().is_empty() {
+                                                format!("Nodo {}", self.graph.nodes().len() + 1)
+                                            } else {
+                                                self.new_node_title.trim().to_string()
+                                            };
+                                            
+                                            let world_pos = self.viewport.screen_to_world(self.node_menu_pos, Rect::from_min_size(Pos2::ZERO, Vec2::new(10000.0, 10000.0)));
+                                            let id = self.graph.add_node(&title, world_pos, Color32::from_rgb(100, 150, 200), &["Entrada"], &["Código"]);
+                                            
+                                            if let Some(node) = self.graph.nodes().iter().find(|n| n.id == id) {
+                                                let title_clone = node.title.clone();
+                                                let code_clone = node.code.clone();
+                                                use crate::expressions::ChannelValue;
+                                                self.channel_manager.set_channel(title_clone.clone(), ChannelValue::Code(code_clone.clone()));
+                                                self.channel_manager.set_node_channel(id, "code".to_string(), ChannelValue::Code(code_clone));
+                                            }
+                                            
+                                            self.new_node_title.clear();
+                                            
+                                            if self.workspace.has_root() {
+                                                let _ = self.save_current_graph();
+                                            }
+                                            
+                                            close_menu = true;
+                                        }
+                                    } else {
+                                        // Mostrar templates de la categoría seleccionada
+                                        let templates = crate::templates::all_templates();
+                                        let filtered: Vec<_> = templates.iter()
+                                            .filter(|t| t.category == cat.as_str())
+                                            .collect();
+                                        
+                                        // Agrupar por subcategoría
+                                        let mut subcats: Vec<&str> = filtered.iter()
+                                            .map(|t| t.subcategory)
+                                            .collect();
+                                        subcats.sort();
+                                        subcats.dedup();
+                                        
+                                        egui::ScrollArea::vertical()
+                                            .max_height(300.0)
+                                            .show(ui, |ui| {
+                                                for subcat in subcats {
+                                                    ui.label(egui::RichText::new(subcat).strong().color(Color32::from_rgb(150, 150, 150)));
+                                                    ui.add_space(4.0);
+                                                    
+                                                    for template in filtered.iter().filter(|t| t.subcategory == subcat) {
+                                                        let color = Color32::from_rgb(template.color.0, template.color.1, template.color.2);
+                                                        let btn_text = format!("{} {}", template.icon, template.name);
+                                                        
+                                                        if ui.add(egui::Button::new(
+                                                            egui::RichText::new(&btn_text).color(color)
+                                                        ).min_size(Vec2::new(180.0, 24.0))).clicked() {
+                                                            template_to_add = Some((*template).clone());
+                                                            close_menu = true;
+                                                        }
+                                                    }
+                                                    
+                                                    ui.add_space(8.0);
+                                                }
+                                            });
+                                    }
+                                } else {
+                                    // Sin categoría seleccionada
+                                    ui.centered_and_justified(|ui| {
+                                        ui.label(egui::RichText::new("← Selecciona una categoría").color(Color32::GRAY));
+                                    });
+                                }
+                            });
+                        });
                     });
                 });
+            
+            // Agregar template si se seleccionó uno
+            if let Some(template) = template_to_add {
+                let color = Color32::from_rgb(template.color.0, template.color.1, template.color.2);
+                let title = format!("{}: {}", template.category, template.name);
+                self.add_template_node(ctx, &title, template.code, color);
+            }
                 
             if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
                 close_menu = true;
@@ -538,6 +618,109 @@ impl NodeGraphApp {
             
             if close_menu {
                 self.show_node_menu = false;
+                self.selected_category = None;
+            }
+        }
+        
+        // ═══════════════════════════════════════════════════════════════
+        // MENÚ F3 - Búsqueda rápida estilo Blender
+        // ═══════════════════════════════════════════════════════════════
+        if self.show_search_menu {
+            let mut close_menu = false;
+            let mut template_to_add: Option<crate::templates::Template> = None;
+            
+            egui::Area::new("search_menu_area".into())
+                .fixed_pos(self.node_menu_pos)
+                .order(egui::Order::Foreground)
+                .show(ctx, |ui| {
+                    let frame = egui::Frame::window(ui.style())
+                        .shadow(eframe::egui::epaint::Shadow {
+                            offset: Vec2::new(4.0, 8.0),
+                            blur: 12.0,
+                            spread: 0.0,
+                            color: Color32::from_black_alpha(120),
+                        })
+                        .rounding(egui::Rounding::same(8.0))
+                        .inner_margin(egui::Margin::same(8.0));
+                        
+                    frame.show(ui, |ui| {
+                        ui.set_width(350.0);
+                        
+                        // Barra de búsqueda
+                        ui.horizontal(|ui| {
+                            ui.label("🔍");
+                            let response = ui.add(
+                                egui::TextEdit::singleline(&mut self.search_query)
+                                    .desired_width(300.0)
+                                    .hint_text("Buscar templates...")
+                            );
+                            response.request_focus();
+                        });
+                        
+                        ui.separator();
+                        
+                        // Resultados de búsqueda
+                        let templates = crate::templates::all_templates();
+                        let query_lower = self.search_query.to_lowercase();
+                        
+                        let filtered: Vec<_> = if query_lower.is_empty() {
+                            templates.iter().take(15).collect()
+                        } else {
+                            templates.iter()
+                                .filter(|t| {
+                                    t.name.to_lowercase().contains(&query_lower) ||
+                                    t.category.to_lowercase().contains(&query_lower) ||
+                                    t.subcategory.to_lowercase().contains(&query_lower)
+                                })
+                                .collect()
+                        };
+                        
+                        egui::ScrollArea::vertical()
+                            .max_height(300.0)
+                            .show(ui, |ui| {
+                                if filtered.is_empty() {
+                                    ui.label(egui::RichText::new("No se encontraron resultados").color(Color32::GRAY));
+                                } else {
+                                    for template in filtered {
+                                        let color = Color32::from_rgb(template.color.0, template.color.1, template.color.2);
+                                        
+                                        ui.horizontal(|ui| {
+                                            // Etiqueta de categoría
+                                            ui.label(
+                                                egui::RichText::new(format!("Add ({}) • {} •", template.category, template.subcategory))
+                                                    .small()
+                                                    .color(Color32::GRAY)
+                                            );
+                                            
+                                            // Nombre del template
+                                            let btn_text = format!("{} {}", template.icon, template.name);
+                                            if ui.add(egui::Button::new(
+                                                egui::RichText::new(&btn_text).color(color)
+                                            )).clicked() {
+                                                template_to_add = Some(template.clone());
+                                                close_menu = true;
+                                            }
+                                        });
+                                    }
+                                }
+                            });
+                    });
+                });
+            
+            // Agregar template si se seleccionó uno
+            if let Some(template) = template_to_add {
+                let color = Color32::from_rgb(template.color.0, template.color.1, template.color.2);
+                let title = format!("{}: {}", template.category, template.name);
+                self.add_template_node(ctx, &title, template.code, color);
+            }
+                
+            if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+                close_menu = true;
+            }
+            
+            if close_menu {
+                self.show_search_menu = false;
+                self.search_query.clear();
             }
         }
     }

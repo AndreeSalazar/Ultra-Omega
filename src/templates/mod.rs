@@ -1,8 +1,309 @@
-pub const ASM_HELLO: &str = include_str!("asm/hello_world.asm");
-pub const ASM_SUM: &str = include_str!("asm/sum.asm");
-pub const ASM_LOOP: &str = include_str!("asm/loop.asm");
-pub const ASM_CONDITIONAL: &str = include_str!("asm/conditional.asm");
+// ═══════════════════════════════════════════════════════════════════════════
+// Templates de código para Ultra Omega
+// ═══════════════════════════════════════════════════════════════════════════
 
-pub const C_HELLO: &str = include_str!("c/hello_world.c");
-pub const CPP_HELLO: &str = include_str!("cpp/hello_world.cpp");
-pub const RUST_HELLO: &str = include_str!("rust/hello_world.rs");
+// ══════════════════════════════════════════
+// ASSEMBLER (NASM x64)
+// ══════════════════════════════════════════
+pub mod asm {
+    // Básicos
+    pub const HELLO: &str = include_str!("asm/hello_world.asm");
+    pub const SUM: &str = include_str!("asm/sum.asm");
+    pub const LOOP: &str = include_str!("asm/loop.asm");
+    pub const CONDITIONAL: &str = include_str!("asm/conditional.asm");
+    
+    // Intermedio
+    pub const VARIABLES: &str = include_str!("asm/variables.asm");
+    pub const FUNCTIONS: &str = include_str!("asm/functions.asm");
+    pub const STRINGS: &str = include_str!("asm/strings.asm");
+    pub const ARRAYS: &str = include_str!("asm/arrays.asm");
+}
+
+// ══════════════════════════════════════════
+// C
+// ══════════════════════════════════════════
+pub mod c {
+    // Básicos
+    pub const HELLO: &str = include_str!("c/hello_world.c");
+    pub const VARIABLES: &str = include_str!("c/variables.c");
+    pub const FUNCTIONS: &str = include_str!("c/functions.c");
+    
+    // Intermedio
+    pub const ARRAYS: &str = include_str!("c/arrays.c");
+    pub const STRUCTS: &str = include_str!("c/structs.c");
+}
+
+// ══════════════════════════════════════════
+// C++
+// ══════════════════════════════════════════
+pub mod cpp {
+    // Básicos
+    pub const HELLO: &str = include_str!("cpp/hello_world.cpp");
+    pub const VARIABLES: &str = include_str!("cpp/variables.cpp");
+    
+    // Intermedio/Avanzado
+    pub const CLASSES: &str = include_str!("cpp/classes.cpp");
+    pub const STL: &str = include_str!("cpp/stl.cpp");
+    pub const MODERN: &str = include_str!("cpp/modern.cpp");
+}
+
+// ══════════════════════════════════════════
+// RUST
+// ══════════════════════════════════════════
+pub mod rust {
+    // Básicos
+    pub const HELLO: &str = include_str!("rust/hello_world.rs");
+    pub const VARIABLES: &str = include_str!("rust/variables.rs");
+    pub const FUNCTIONS: &str = include_str!("rust/functions.rs");
+    
+    // Intermedio/Avanzado
+    pub const STRUCTS: &str = include_str!("rust/structs.rs");
+    pub const OWNERSHIP: &str = include_str!("rust/ownership.rs");
+    pub const TRAITS: &str = include_str!("rust/traits.rs");
+}
+
+// ══════════════════════════════════════════
+// Estructura de Template para el menú
+// ══════════════════════════════════════════
+#[derive(Clone)]
+pub struct Template {
+    pub name: &'static str,
+    pub code: &'static str,
+    pub category: &'static str,
+    pub subcategory: &'static str,
+    pub color: (u8, u8, u8),  // RGB
+    pub icon: &'static str,
+}
+
+// Todos los templates en un vector para búsqueda
+pub fn all_templates() -> Vec<Template> {
+    vec![
+        // ══════════════════════════════════════════
+        // ASM - Básico
+        // ══════════════════════════════════════════
+        Template {
+            name: "Hola Mundo",
+            code: asm::HELLO,
+            category: "Assembler",
+            subcategory: "Básico",
+            color: (0xff, 0x47, 0x00),
+            icon: "⏵",
+        },
+        Template {
+            name: "Suma",
+            code: asm::SUM,
+            category: "Assembler",
+            subcategory: "Básico",
+            color: (0xff, 0x47, 0x00),
+            icon: "➕",
+        },
+        Template {
+            name: "Bucle",
+            code: asm::LOOP,
+            category: "Assembler",
+            subcategory: "Básico",
+            color: (0xff, 0x47, 0x00),
+            icon: "↻",
+        },
+        Template {
+            name: "Condicional",
+            code: asm::CONDITIONAL,
+            category: "Assembler",
+            subcategory: "Básico",
+            color: (0xff, 0x47, 0x00),
+            icon: "🔀",
+        },
+        // ASM - Intermedio
+        Template {
+            name: "Variables",
+            code: asm::VARIABLES,
+            category: "Assembler",
+            subcategory: "Intermedio",
+            color: (0xff, 0x47, 0x00),
+            icon: "📦",
+        },
+        Template {
+            name: "Funciones",
+            code: asm::FUNCTIONS,
+            category: "Assembler",
+            subcategory: "Intermedio",
+            color: (0xff, 0x47, 0x00),
+            icon: "⚡",
+        },
+        Template {
+            name: "Strings",
+            code: asm::STRINGS,
+            category: "Assembler",
+            subcategory: "Intermedio",
+            color: (0xff, 0x47, 0x00),
+            icon: "📝",
+        },
+        Template {
+            name: "Arrays",
+            code: asm::ARRAYS,
+            category: "Assembler",
+            subcategory: "Intermedio",
+            color: (0xff, 0x47, 0x00),
+            icon: "📊",
+        },
+        
+        // ══════════════════════════════════════════
+        // C - Básico
+        // ══════════════════════════════════════════
+        Template {
+            name: "Hola Mundo",
+            code: c::HELLO,
+            category: "C",
+            subcategory: "Básico",
+            color: (0x00, 0x59, 0x9C),
+            icon: "⏵",
+        },
+        Template {
+            name: "Variables",
+            code: c::VARIABLES,
+            category: "C",
+            subcategory: "Básico",
+            color: (0x00, 0x59, 0x9C),
+            icon: "📦",
+        },
+        Template {
+            name: "Funciones",
+            code: c::FUNCTIONS,
+            category: "C",
+            subcategory: "Básico",
+            color: (0x00, 0x59, 0x9C),
+            icon: "⚡",
+        },
+        // C - Intermedio
+        Template {
+            name: "Arrays",
+            code: c::ARRAYS,
+            category: "C",
+            subcategory: "Intermedio",
+            color: (0x00, 0x59, 0x9C),
+            icon: "📊",
+        },
+        Template {
+            name: "Structs",
+            code: c::STRUCTS,
+            category: "C",
+            subcategory: "Intermedio",
+            color: (0x00, 0x59, 0x9C),
+            icon: "🏗️",
+        },
+        
+        // ══════════════════════════════════════════
+        // C++ - Básico
+        // ══════════════════════════════════════════
+        Template {
+            name: "Hola Mundo",
+            code: cpp::HELLO,
+            category: "C++",
+            subcategory: "Básico",
+            color: (0x00, 0x44, 0x82),
+            icon: "⏵",
+        },
+        Template {
+            name: "Variables",
+            code: cpp::VARIABLES,
+            category: "C++",
+            subcategory: "Básico",
+            color: (0x00, 0x44, 0x82),
+            icon: "📦",
+        },
+        // C++ - Intermedio
+        Template {
+            name: "Clases (OOP)",
+            code: cpp::CLASSES,
+            category: "C++",
+            subcategory: "Intermedio",
+            color: (0x00, 0x44, 0x82),
+            icon: "🏛️",
+        },
+        Template {
+            name: "STL",
+            code: cpp::STL,
+            category: "C++",
+            subcategory: "Avanzado",
+            color: (0x00, 0x44, 0x82),
+            icon: "📚",
+        },
+        Template {
+            name: "C++ Moderno",
+            code: cpp::MODERN,
+            category: "C++",
+            subcategory: "Avanzado",
+            color: (0x00, 0x44, 0x82),
+            icon: "🚀",
+        },
+        
+        // ══════════════════════════════════════════
+        // Rust - Básico
+        // ══════════════════════════════════════════
+        Template {
+            name: "Hola Mundo",
+            code: rust::HELLO,
+            category: "Rust",
+            subcategory: "Básico",
+            color: (0xde, 0x39, 0x00),
+            icon: "🦀",
+        },
+        Template {
+            name: "Variables",
+            code: rust::VARIABLES,
+            category: "Rust",
+            subcategory: "Básico",
+            color: (0xde, 0x39, 0x00),
+            icon: "📦",
+        },
+        Template {
+            name: "Funciones",
+            code: rust::FUNCTIONS,
+            category: "Rust",
+            subcategory: "Básico",
+            color: (0xde, 0x39, 0x00),
+            icon: "⚡",
+        },
+        // Rust - Intermedio
+        Template {
+            name: "Structs y Enums",
+            code: rust::STRUCTS,
+            category: "Rust",
+            subcategory: "Intermedio",
+            color: (0xde, 0x39, 0x00),
+            icon: "🏗️",
+        },
+        Template {
+            name: "Ownership",
+            code: rust::OWNERSHIP,
+            category: "Rust",
+            subcategory: "Avanzado",
+            color: (0xde, 0x39, 0x00),
+            icon: "🔒",
+        },
+        Template {
+            name: "Traits",
+            code: rust::TRAITS,
+            category: "Rust",
+            subcategory: "Avanzado",
+            color: (0xde, 0x39, 0x00),
+            icon: "🎭",
+        },
+    ]
+}
+
+// Compatibilidad con código anterior (marcados con allow unused)
+#[allow(unused_imports)]
+pub use asm::HELLO as ASM_HELLO;
+#[allow(unused_imports)]
+pub use asm::SUM as ASM_SUM;
+#[allow(unused_imports)]
+pub use asm::LOOP as ASM_LOOP;
+#[allow(unused_imports)]
+pub use asm::CONDITIONAL as ASM_CONDITIONAL;
+#[allow(unused_imports)]
+pub use c::HELLO as C_HELLO;
+#[allow(unused_imports)]
+pub use cpp::HELLO as CPP_HELLO;
+#[allow(unused_imports)]
+pub use rust::HELLO as RUST_HELLO;
