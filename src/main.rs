@@ -5,6 +5,8 @@ mod ui;
 mod workspace;
 mod templates;
 mod config;
+mod editor_history;
+mod expressions;
 
 use crate::app::NodeGraphApp;
 use crate::config::AppConfig;

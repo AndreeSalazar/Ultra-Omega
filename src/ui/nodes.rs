@@ -19,6 +19,7 @@ pub fn draw_node(
     selected: bool,
     is_inherited: bool,
     _visuals: &Visuals,
+    connected_pins: &std::collections::HashSet<crate::node_graph::PinId>, // Pins que están conectados
 ) {
     let rounding = egui::Rounding::same(12.0 * zoom);
 
@@ -125,13 +126,15 @@ pub fn draw_node(
     for (i, pin) in node.inputs.iter().enumerate() {
         let y = rect.min.y + header_height + PIN_SPACING * zoom * (i as f32 + 0.5);
         let pos = Pos2::new(rect.min.x + CONTENT_PADDING * zoom, y);
-        draw_pin(painter, pin, pos, Align2::LEFT_CENTER, 1.0, zoom, &pin_font);
+        let is_connected = connected_pins.contains(&pin.id);
+        draw_pin(painter, pin, pos, Align2::LEFT_CENTER, 1.0, zoom, &pin_font, is_connected);
     }
 
     for (i, pin) in node.outputs.iter().enumerate() {
         let y = rect.min.y + header_height + PIN_SPACING * zoom * (i as f32 + 0.5);
         let pos = Pos2::new(rect.max.x - CONTENT_PADDING * zoom, y);
-        draw_pin(painter, pin, pos, Align2::RIGHT_CENTER, -1.0, zoom, &pin_font);
+        let is_connected = connected_pins.contains(&pin.id);
+        draw_pin(painter, pin, pos, Align2::RIGHT_CENTER, -1.0, zoom, &pin_font, is_connected);
     }
 }
 
@@ -143,6 +146,7 @@ fn draw_pin(
     direction: f32,
     zoom: f32,
     font: &FontId,
+    is_connected: bool,
 ) {
     let radius = PIN_RADIUS * zoom;
     
@@ -150,23 +154,58 @@ fn draw_pin(
     let hover_radius = radius * 2.5;
     painter.circle_filled(center, hover_radius, Color32::from_black_alpha(0));
     
-    // Pin Hole (Darker center) - más visible
-    painter.circle_filled(center, radius * 0.6, Color32::from_rgb(30, 30, 30));
-    
-    // Pin Rim (Colored or Grey) - más grueso y visible
-    painter.circle_stroke(center, radius, Stroke::new(2.5 * zoom, Color32::from_rgb(200, 200, 200)));
-    
-    // Outer glow para mejor visibilidad
-    painter.circle_stroke(center, radius * 1.3, Stroke::new(1.0 * zoom, Color32::from_rgba_unmultiplied(200, 200, 200, 80)));
+    if is_connected {
+        // PIN CONECTADO: Efecto de llenado con neón
+        // Glow exterior animado
+        painter.circle_filled(center, radius * 2.0, Color32::from_rgba_unmultiplied(100, 200, 255, 40));
+        painter.circle_filled(center, radius * 1.6, Color32::from_rgba_unmultiplied(100, 200, 255, 80));
+        
+        // Borde exterior brillante
+        painter.circle_stroke(center, radius * 1.4, Stroke::new(2.0 * zoom, Color32::from_rgb(100, 200, 255)));
+        
+        // Pin lleno con color del conector
+        painter.circle_filled(center, radius * 1.1, Color32::from_rgb(100, 200, 255));
+        
+        // Highlight central brillante
+        painter.circle_filled(center, radius * 0.5, Color32::from_rgb(150, 220, 255));
+        
+        // Borde interno para definición
+        painter.circle_stroke(center, radius * 1.1, Stroke::new(1.5 * zoom, Color32::from_rgb(150, 220, 255)));
+    } else {
+        // PIN DESCONECTADO: Diseño mejorado con más personalidad
+        // Glow sutil exterior
+        painter.circle_filled(center, radius * 1.8, Color32::from_rgba_unmultiplied(150, 150, 150, 20));
+        
+        // Anillo exterior elegante
+        painter.circle_stroke(center, radius * 1.4, Stroke::new(1.5 * zoom, Color32::from_rgb(120, 120, 120)));
+        
+        // Pin Rim principal (más grueso y visible)
+        painter.circle_stroke(center, radius, Stroke::new(3.0 * zoom, Color32::from_rgb(180, 180, 180)));
+        
+        // Pin Hole (centro oscuro con profundidad)
+        painter.circle_filled(center, radius * 0.65, Color32::from_rgb(25, 25, 30));
+        
+        // Highlight sutil en el borde superior
+        let highlight_pos = center + Vec2::new(0.0, -radius * 0.3);
+        painter.circle_filled(highlight_pos, radius * 0.3, Color32::from_rgba_unmultiplied(255, 255, 255, 60));
+        
+        // Borde interno para definición
+        painter.circle_stroke(center, radius * 0.65, Stroke::new(1.0 * zoom, Color32::from_rgb(60, 60, 60)));
+    }
 
-    // Label
-    let text_pos = center + Vec2::new(direction * (radius + PIN_TEXT_GAP * zoom), 0.0);
+    // Label con mejor contraste
+    let text_pos = center + Vec2::new(direction * (radius * 1.8 + PIN_TEXT_GAP * zoom), 0.0);
+    let label_color = if is_connected {
+        Color32::from_rgb(150, 220, 255) // Color más brillante cuando está conectado
+    } else {
+        Color32::from_rgb(212, 212, 212)
+    };
     painter.text(
         text_pos,
         align,
         &pin.label,
         font.clone(),
-        Color32::from_rgb(212, 212, 212),
+        label_color,
     );
 }
 

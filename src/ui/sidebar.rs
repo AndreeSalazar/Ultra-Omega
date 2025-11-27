@@ -163,6 +163,10 @@ pub fn draw_sidebar(app: &mut NodeGraphApp, ctx: &egui::Context, _open_factor: f
                             }
                         };
                         if title_changed {
+                            // Actualizar canales cuando cambia el título
+                            if let Some(node_id) = app.interaction.selected_nodes.iter().next() {
+                                app.update_node_channels(*node_id);
+                            }
                             app.check_and_auto_save();
                         }
                     } else {

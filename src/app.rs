@@ -12,9 +12,11 @@ pub struct NodeGraphApp {
     pub terminal: TerminalManager,
     pub show_node_menu: bool,
     pub node_menu_pos: Pos2,
+    pub new_node_title: String, // Título para el nuevo nodo
     pub workspace: Workspace,
     pub last_save_hash: u64,
     pub last_save_time: Option<std::time::Instant>,
+    pub channel_manager: crate::expressions::ChannelManager, // Sistema de canales para ch()
 }
 
 #[derive(Default)]
@@ -27,6 +29,7 @@ pub struct InteractionState {
     pub connecting_from: Option<PinId>,
     pub viewing_inheritance: Option<NodeId>,
     pub cut_tool: crate::ui::cut::CutTool,
+    pub editor_history: Option<crate::editor_history::EditorHistory>, // Historial del editor
 }
 
 #[derive(Clone, Copy)]
@@ -49,6 +52,27 @@ impl Default for NodeGraphApp {
 }
 
 impl NodeGraphApp {
+    /// Determina el color de sintaxis para una línea de código Assembly
+    fn get_asm_line_color(line: &str) -> Color32 {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with(';') {
+            // Comentarios en verde
+            Color32::from_rgb(106, 153, 85)
+        } else if trimmed.contains("section") || trimmed.contains("global") || trimmed.contains("extern") || trimmed.contains("default") {
+            // Keywords en azul
+            Color32::from_rgb(86, 156, 214)
+        } else if trimmed.ends_with(':') {
+            // Labels en amarillo/naranja
+            Color32::from_rgb(220, 220, 170)
+        } else if trimmed.starts_with("db") || trimmed.starts_with("dw") || trimmed.starts_with("dd") || trimmed.starts_with("dq") {
+            // Directivas de datos en púrpura
+            Color32::from_rgb(197, 134, 192)
+        } else {
+            // Código normal en blanco/gris claro
+            Color32::from_rgb(212, 212, 212)
+        }
+    }
+
     pub fn from_config(config: AppConfig) -> Self {
         let mut workspace = Workspace::new();
         workspace.auto_save = config.auto_save;
@@ -60,9 +84,11 @@ impl NodeGraphApp {
             terminal: TerminalManager::default(),
             show_node_menu: false,
             node_menu_pos: Pos2::ZERO,
+            new_node_title: String::new(),
             workspace,
             last_save_hash: 0,
             last_save_time: None,
+            channel_manager: crate::expressions::ChannelManager::new(),
         };
         
         // Load workspace if configured
@@ -83,6 +109,14 @@ impl NodeGraphApp {
         } else {
             app.graph = NodeGraph::demo();
             app.graph.recalculate_ids();
+        }
+        
+        // Registrar todos los nodos existentes en el sistema de canales
+        let nodes_to_register: Vec<_> = app.graph.nodes().iter().map(|n| (n.id, n.title.clone(), n.code.clone())).collect();
+        for (node_id, title, code) in nodes_to_register {
+            use crate::expressions::ChannelValue;
+            app.channel_manager.set_channel(title.clone(), ChannelValue::Code(code.clone()));
+            app.channel_manager.set_node_channel(node_id, "code".to_string(), ChannelValue::Code(code));
         }
         
         app
@@ -147,6 +181,15 @@ impl eframe::App for NodeGraphApp {
             if !self.interaction.selected_nodes.is_empty() {
                 // Don't delete if editing a node
                 if self.interaction.editing_node.is_none() {
+                    // Limpiar canales de los nodos que se van a eliminar
+                    for node_id in &self.interaction.selected_nodes {
+                        self.channel_manager.clear_node_channels(*node_id);
+                        // También limpiar por nombre si existe
+                        if let Some(node) = self.graph.nodes().iter().find(|n| n.id == *node_id) {
+                            // Nota: No podemos eliminar del HashMap directamente aquí, pero el canal quedará obsoleto
+                            // Se actualizará cuando se registre un nuevo nodo con el mismo nombre
+                        }
+                    }
                     self.graph.remove_nodes(&self.interaction.selected_nodes);
                     self.interaction.selected_nodes.clear();
                     // Auto-save after deletion
@@ -160,9 +203,8 @@ impl eframe::App for NodeGraphApp {
         if ctx.input(|i| i.key_pressed(egui::Key::Y) && !i.pointer.primary_down()) {
             self.interaction.cut_tool.active = !self.interaction.cut_tool.active;
             if !self.interaction.cut_tool.active {
-                // Desactivar: limpiar línea y cancelar cualquier operación en curso
-                self.interaction.cut_tool.line_start = None;
-                self.interaction.cut_tool.line_end = None;
+                // Desactivar: limpiar puntos y cancelar cualquier operación en curso
+                self.interaction.cut_tool.clear();
                 // También limpiar selección/drag si estaban activos
                 self.interaction.dragging_node = None;
                 self.interaction.box_selection_start = None;
@@ -259,9 +301,18 @@ impl NodeGraphApp {
         
         // Todos los nodos tienen una entrada "Entrada" y una salida "Código"
         let id = self.graph.add_node(title, world_pos, color, &["Entrada"], &["Código"]);
-        if let Some(node) = self.graph.node_mut(id) {
-             node.code = code.to_string();
-        }
+        let (node_title, node_code) = {
+            if let Some(node) = self.graph.node_mut(id) {
+                node.code = code.to_string();
+                (node.title.clone(), node.code.clone())
+            } else {
+                return;
+            }
+        };
+        // Registrar nodo en el sistema de canales (después de soltar el borrow)
+        use crate::expressions::ChannelValue;
+        self.channel_manager.set_channel(node_title.clone(), ChannelValue::Code(node_code.clone()));
+        self.channel_manager.set_node_channel(id, "code".to_string(), ChannelValue::Code(node_code));
         
         // Auto-save immediately when a node is created
         if self.workspace.has_root() {
@@ -271,6 +322,34 @@ impl NodeGraphApp {
                 // Request repaint to update sidebar
                 ctx.request_repaint();
             }
+        }
+    }
+    
+    /// Registrar un nodo en el sistema de canales para acceso mediante ch()
+    fn register_node_in_channels(&mut self, node_id: crate::node_graph::NodeId, node: &crate::node_graph::Node) {
+        use crate::expressions::ChannelValue;
+        // Registrar por nombre del nodo
+        self.channel_manager.set_channel(
+            node.title.clone(),
+            ChannelValue::Code(node.code.clone()),
+        );
+        // Registrar por ID del nodo
+        self.channel_manager.set_node_channel(
+            node_id,
+            "code".to_string(),
+            ChannelValue::Code(node.code.clone()),
+        );
+    }
+    
+    /// Actualizar canales cuando un nodo cambia
+    pub fn update_node_channels(&mut self, node_id: crate::node_graph::NodeId) {
+        // Clonar datos para evitar problemas de borrow
+        if let Some(node) = self.graph.nodes().iter().find(|n| n.id == node_id) {
+            let title = node.title.clone();
+            let code = node.code.clone();
+            use crate::expressions::ChannelValue;
+            self.channel_manager.set_channel(title.clone(), ChannelValue::Code(code.clone()));
+            self.channel_manager.set_node_channel(node_id, "code".to_string(), ChannelValue::Code(code));
         }
     }
     
@@ -356,12 +435,58 @@ impl NodeGraphApp {
                         .inner_margin(egui::Margin::same(12.0));
                         
                     frame.show(ui, |ui| {
-                        ui.set_width(150.0);
+                        ui.set_width(200.0);
                         
                         ui.horizontal(|ui| {
                             ui.label(egui::RichText::new("➕").color(Color32::from_rgb(100, 200, 255)));
                             ui.heading("Agregar Nodo");
                         });
+                        ui.add_space(4.0);
+                        ui.separator();
+                        ui.add_space(4.0);
+                        
+                        // Opción "Nodo nuevo" con título editable
+                        ui.label(egui::RichText::new("✨ Nodo Nuevo").strong().color(Color32::from_rgb(100, 200, 255)));
+                        ui.add_space(2.0);
+                        ui.horizontal(|ui| {
+                            ui.label("Título:");
+                            ui.text_edit_singleline(&mut self.new_node_title);
+                        });
+                        ui.add_space(4.0);
+                        if ui.button("✨ Crear Nodo").clicked() {
+                            let title = if self.new_node_title.trim().is_empty() {
+                                format!("Nodo {}", self.graph.nodes().len() + 1)
+                            } else {
+                                self.new_node_title.trim().to_string()
+                            };
+                            
+                            // Crear nodo vacío con el título especificado
+                            let world_pos = self.viewport.screen_to_world(self.node_menu_pos, Rect::from_min_size(Pos2::ZERO, Vec2::new(10000.0, 10000.0)));
+                            let id = self.graph.add_node(&title, world_pos, Color32::from_rgb(100, 150, 200), &["Entrada"], &["Código"]);
+                            
+                            // Registrar en canales
+                            if let Some(node) = self.graph.nodes().iter().find(|n| n.id == id) {
+                                let title_clone = node.title.clone();
+                                let code_clone = node.code.clone();
+                                use crate::expressions::ChannelValue;
+                                self.channel_manager.set_channel(title_clone.clone(), ChannelValue::Code(code_clone.clone()));
+                                self.channel_manager.set_node_channel(id, "code".to_string(), ChannelValue::Code(code_clone));
+                            }
+                            
+                            // Limpiar título para próxima vez
+                            self.new_node_title.clear();
+                            
+                            // Auto-save
+                            if self.workspace.has_root() {
+                                if let Err(e) = self.save_current_graph() {
+                                    eprintln!("Error auto-saving after node creation: {}", e);
+                                } else {
+                                    ctx.request_repaint();
+                                }
+                            }
+                            
+                            close_menu = true;
+                        }
                         ui.add_space(4.0);
                         ui.separator();
                         ui.add_space(4.0);
@@ -433,8 +558,8 @@ impl NodeGraphApp {
                 
                 // Si Y NO está presionado y el modo de corte está activo, desactivarlo
                 if !y_key_down && self.interaction.cut_tool.active {
-                    // Solo desactivar si no hay una línea de corte en progreso
-                    if self.interaction.cut_tool.line_start.is_none() {
+                    // Solo desactivar si no hay puntos de corte en progreso
+                    if self.interaction.cut_tool.is_empty() {
                         self.interaction.cut_tool.active = false;
                     }
                 }
@@ -516,9 +641,63 @@ impl NodeGraphApp {
         let mut open = self.interaction.editing_node.is_some();
         let node_id = self.interaction.editing_node;
 
+        // Inicializar historial si se abre un nuevo editor
+        if let Some(id) = node_id {
+            if self.interaction.editor_history.is_none() || 
+               self.interaction.editor_history.as_ref().map(|h| h.node_id) != Some(id) {
+                if let Some(node) = self.graph.nodes().iter().find(|n| n.id == id) {
+                    // Intentar cargar desde temp primero
+                    let initial_code = if let Some(temp_code) = self.load_editor_temp(id) {
+                        // Actualizar el código del nodo con el código cargado desde temp
+                        if let Some(node_mut) = self.graph.node_mut(id) {
+                            node_mut.code = temp_code.clone();
+                        }
+                        temp_code
+                    } else {
+                        node.code.clone()
+                    };
+                    self.interaction.editor_history = Some(crate::editor_history::EditorHistory::new(id, initial_code));
+                }
+            }
+        }
+
         // Check for Esc key to close editor
         if open && ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
             open = false;
+        }
+
+        // Handle Ctrl+S for save
+        if open && ctx.input(|i| i.key_pressed(egui::Key::S) && i.modifiers.ctrl) {
+            if let Some(id) = node_id {
+                self.save_editor_code(id);
+            }
+        }
+
+        // Handle Ctrl+Z for undo, Ctrl+Y/Ctrl+Shift+Z for redo
+        if open {
+            if ctx.input(|i| i.key_pressed(egui::Key::Z) && i.modifiers.ctrl && !i.modifiers.shift) {
+                if let Some(history) = &mut self.interaction.editor_history {
+                    if let Some(undo_code) = history.undo() {
+                        if let Some(id) = node_id {
+                            if let Some(node) = self.graph.node_mut(id) {
+                                node.code = undo_code;
+                            }
+                        }
+                    }
+                }
+            }
+            if ctx.input(|i| (i.key_pressed(egui::Key::Y) && i.modifiers.ctrl) || 
+                              (i.key_pressed(egui::Key::Z) && i.modifiers.ctrl && i.modifiers.shift)) {
+                if let Some(history) = &mut self.interaction.editor_history {
+                    if let Some(redo_code) = history.redo() {
+                        if let Some(id) = node_id {
+                            if let Some(node) = self.graph.node_mut(id) {
+                                node.code = redo_code;
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         if open {
@@ -541,63 +720,299 @@ impl NodeGraphApp {
                         should_close = true;
                     }
                     if let Some(id) = node_id {
-                        if let Some(node) = self.graph.node_mut(id) {
-                            ui.horizontal(|ui| {
-                                ui.heading(&node.title);
-                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                    if ui.button("Cerrar").clicked() {
-                                        should_close = true;
-                                    }
-                                    if ui.button("▶ Ejecutar").clicked() {
-                                        let lang = if node.title.contains("ASM") {
-                                            crate::terminal::Language::Nasm
-                                        } else if node.title.contains("C++") {
-                                            crate::terminal::Language::Cpp
-                                        } else if node.title.contains("Rust") {
-                                            crate::terminal::Language::Rust
+                        // Obtener información del nodo antes del closure
+                        let node_title = self.graph.nodes().iter()
+                            .find(|n| n.id == id)
+                            .map(|n| n.title.clone())
+                            .unwrap_or_default();
+                        let node_code_len = self.graph.nodes().iter()
+                            .find(|n| n.id == id)
+                            .map(|n| n.code.lines().count())
+                            .unwrap_or(1);
+                        
+                        // Estado para acciones del UI
+                        let (can_undo, can_redo) = if let Some(history) = &self.interaction.editor_history {
+                            (history.can_undo(), history.can_redo())
+                        } else {
+                            (false, false)
+                        };
+                        
+                        let mut undo_clicked = false;
+                        let mut redo_clicked = false;
+                        let mut save_clicked = false;
+                        let mut execute_clicked = false;
+                        
+                        ui.horizontal(|ui| {
+                            ui.heading(&node_title);
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                // Indicador de auto-save
+                                if let Some(history) = &self.interaction.editor_history {
+                                    if history.should_auto_save() {
+                                        ui.label(egui::RichText::new("● Guardando...").color(egui::Color32::YELLOW).small());
+                                    } else if let Some(last_save) = history.last_save_time {
+                                        let elapsed = last_save.elapsed().as_secs();
+                                        if elapsed < 2 {
+                                            ui.label(egui::RichText::new("✓ Guardado").color(egui::Color32::GREEN).small());
                                         } else {
-                                            crate::terminal::Language::C
-                                        };
-                                        let workspace_path = self.workspace.root_path.as_ref();
-                                        self.terminal.run_code(&node.code, lang, workspace_path);
+                                            ui.label(egui::RichText::new(format!("Guardado hace {}s", elapsed)).color(egui::Color32::GRAY).small());
+                                        }
                                     }
-                                });
+                                }
+                                
+                                if ui.button("Cerrar").clicked() {
+                                    should_close = true;
+                                }
+                                if ui.button("▶ Ejecutar").clicked() {
+                                    execute_clicked = true;
+                                }
                             });
+                        });
+                        ui.separator();
+
+                        // Barra de herramientas con undo/redo
+                        ui.horizontal(|ui| {
+                            if ui.add_enabled(can_undo, egui::Button::new("↶ Deshacer (Ctrl+Z)")).clicked() {
+                                undo_clicked = true;
+                            }
+                            if ui.add_enabled(can_redo, egui::Button::new("↷ Rehacer (Ctrl+Y)")).clicked() {
+                                redo_clicked = true;
+                            }
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                if ui.button("💾 Guardar (Ctrl+S)").clicked() {
+                                    save_clicked = true;
+                                }
+                            });
+                        });
+                        ui.separator();
+
+                        // Procesar acciones después del closure
+                        if undo_clicked {
+                            if let Some(history) = &mut self.interaction.editor_history {
+                                if let Some(undo_code) = history.undo() {
+                                    if let Some(node) = self.graph.node_mut(id) {
+                                        node.code = undo_code;
+                                    }
+                                }
+                            }
+                        }
+                        if redo_clicked {
+                            if let Some(history) = &mut self.interaction.editor_history {
+                                if let Some(redo_code) = history.redo() {
+                                    if let Some(node) = self.graph.node_mut(id) {
+                                        node.code = redo_code;
+                                    }
+                                }
+                            }
+                        }
+                        if save_clicked {
+                            self.save_editor_code(id);
+                        }
+                        if execute_clicked {
+                            if let Some(node) = self.graph.nodes().iter().find(|n| n.id == id) {
+                                let lang = if node.title.contains("ASM") {
+                                    crate::terminal::Language::Nasm
+                                } else if node.title.contains("C++") {
+                                    crate::terminal::Language::Cpp
+                                } else if node.title.contains("Rust") {
+                                    crate::terminal::Language::Rust
+                                } else {
+                                    crate::terminal::Language::C
+                                };
+                                let workspace_path = self.workspace.root_path.as_ref();
+                                // Combinar código heredado + propio para ejecutar
+                                let inherited_raw = self.graph.get_inherited_code(id).unwrap_or_default();
+                                // Evaluar ch() en código heredado
+                                let inherited = self.evaluate_ch_expressions_in_code(&inherited_raw, id);
+                                // Evaluar ch() en código propio también
+                                let own_code_evaluated = self.evaluate_ch_expressions_in_code(&node.code, id);
+                                
+                                let full_code = if !inherited.is_empty() && !own_code_evaluated.is_empty() {
+                                    format!("{}\n\n{}", inherited, own_code_evaluated)
+                                } else if !inherited.is_empty() {
+                                    inherited
+                                } else {
+                                    own_code_evaluated
+                                };
+                                self.terminal.run_code(&full_code, lang, workspace_path);
+                            }
+                        }
+
+                        // Obtener información de herencia y evaluar expresiones ch()
+                        let (inherited_code, parent_node_id, parent_node_title) = if let Some(inherited_raw) = self.graph.get_inherited_code(id) {
+                            // Evaluar expresiones ch() en el código heredado
+                            let inherited_evaluated = self.evaluate_ch_expressions_in_code(&inherited_raw, id);
+                            
+                            if let Some(parent_id) = self.graph.get_parent_node(id) {
+                                // Obtener información del nodo padre
+                                if let Some(parent_node) = self.graph.nodes().iter().find(|n| n.id == parent_id) {
+                                    (Some(inherited_evaluated), Some(parent_id), Some(parent_node.title.clone()))
+                                } else {
+                                    (Some(inherited_evaluated), Some(parent_id), None)
+                                }
+                            } else {
+                                (Some(inherited_evaluated), None, None)
+                            }
+                        } else {
+                            (None, None, None)
+                        };
+                        
+                        // Mostrar información de herencia si existe
+                        if let (Some(_inh_code), Some(parent_id), Some(parent_title)) = (inherited_code, parent_node_id, parent_node_title) {
+                            ui.horizontal(|ui| {
+                                ui.label(egui::RichText::new("📥 Código Heredado de:").strong().color(Color32::from_rgb(89, 185, 89)));
+                                if ui.button(egui::RichText::new(format!("→ {}", parent_title)).color(Color32::from_rgb(100, 200, 255))).clicked() {
+                                    // Ir al nodo padre
+                                    self.interaction.editing_node = Some(parent_id);
+                                    self.interaction.selected_nodes.clear();
+                                    self.interaction.selected_nodes.insert(parent_id);
+                                    // Cerrar este editor y abrir el del padre
+                                    should_close = true;
+                                    // El editor del padre se abrirá automáticamente
+                                }
+                            });
+                            ui.add_space(4.0);
+                        }
+
+                        // Obtener código heredado y propio para combinarlos en un solo editor
+                        let inherited_for_edit = self.graph.get_inherited_code(id).unwrap_or_default();
+                        let inherited_evaluated = if !inherited_for_edit.is_empty() {
+                            self.evaluate_ch_expressions_in_code(&inherited_for_edit, id)
+                        } else {
+                            String::new()
+                        };
+                        
+                        let own_code_initial = {
+                            if let Some(node) = self.graph.nodes().iter().find(|n| n.id == id) {
+                                let full_code = &node.code;
+                                // Separar código propio del heredado
+                                if !inherited_for_edit.is_empty() && full_code.starts_with(&inherited_for_edit) {
+                                    full_code[inherited_for_edit.len()..].trim_start_matches('\n').trim_start_matches('\r').to_string()
+                                } else {
+                                    full_code.clone()
+                                }
+                            } else {
+                                String::new()
+                            }
+                        };
+
+                        // Combinar código heredado + propio para mostrar en un solo editor
+                        let combined_code_display = if !inherited_evaluated.is_empty() {
+                            format!("{}\n\n{}", inherited_evaluated, own_code_initial)
+                        } else {
+                            own_code_initial.clone()
+                        };
+                        
+                        let _combined_lines = combined_code_display.lines().count().max(1);
+                        let inherited_lines_count = if !inherited_evaluated.is_empty() {
+                            inherited_evaluated.lines().count()
+                        } else {
+                            0
+                        };
+
+                        // Obtener código propio actualizado
+                        let current_own_code = if let Some(node) = self.graph.nodes().iter().find(|n| n.id == id) {
+                            let full_code = &node.code;
+                            if !inherited_for_edit.is_empty() && full_code.starts_with(&inherited_for_edit) {
+                                full_code[inherited_for_edit.len()..].trim_start_matches('\n').trim_start_matches('\r').to_string()
+                            } else {
+                                full_code.clone()
+                            }
+                        } else {
+                            own_code_initial.clone()
+                        };
+                        
+                        // Código heredado (solo lectura) con fondo verde
+                        if inherited_lines_count > 0 {
+                            egui::Frame::none()
+                                .fill(Color32::from_rgba_unmultiplied(89, 185, 89, 15))
+                                .inner_margin(egui::Margin::same(4.0))
+                                .rounding(egui::Rounding::same(4.0))
+                                .show(ui, |ui| {
+                                    ui.label(
+                                        egui::RichText::new("📦 Código heredado (solo lectura)")
+                                            .small()
+                                            .color(Color32::from_rgb(89, 185, 89))
+                                    );
+                                    
+                                    egui::ScrollArea::horizontal()
+                                        .max_height(150.0)
+                                        .show(ui, |ui| {
+                                            ui.add(
+                                                egui::TextEdit::multiline(&mut inherited_evaluated.as_str())
+                                                    .font(egui::TextStyle::Monospace)
+                                                    .code_editor()
+                                                    .interactive(false)
+                                                    .desired_width(f32::INFINITY)
+                                            );
+                                        });
+                                });
+                            
+                            ui.add_space(8.0);
                             ui.separator();
-
-                            egui::ScrollArea::vertical().show(ui, |ui| {
-                                let font_id = egui::FontId::monospace(14.0);
-                                let _row_height = ui.fonts(|f| f.row_height(&font_id));
-                                let num_lines = node.code.lines().count().max(1);
-
+                            ui.add_space(8.0);
+                        }
+                        
+                        // Editor de código propio (EDITABLE) - con números de línea integrados
+                        let mut own_code_editable = current_own_code.clone();
+                        let own_lines_count = own_code_editable.lines().count().max(1);
+                        
+                        // Calcular ancho de columna de números
+                        let total_lines = inherited_lines_count + own_lines_count;
+                        let num_width = (total_lines.to_string().len() as f32 * 10.0) + 20.0;
+                        let start_line = inherited_lines_count + 1;
+                        
+                        egui::ScrollArea::both()
+                            .auto_shrink([false, false])
+                            .show(ui, |ui| {
                                 ui.horizontal_top(|ui| {
+                                    // COLUMNA DE NÚMEROS DE LÍNEA
                                     ui.vertical(|ui| {
-                                        ui.set_width(40.0);
-                                        for i in 1..=num_lines {
-                                            ui.label(
-                                                egui::RichText::new(format!("{}", i))
-                                                    .font(font_id.clone())
-                                                    .color(Color32::GRAY),
+                                        ui.set_width(num_width);
+                                        // Obtener altura de línea del texto monoespaciado
+                                        let line_height = ui.text_style_height(&egui::TextStyle::Monospace);
+                                        ui.style_mut().spacing.item_spacing.y = 0.0;
+                                        
+                                        // Mostrar números de línea
+                                        for i in 0..own_lines_count {
+                                            let line_num = start_line + i;
+                                            ui.add_sized(
+                                                [num_width, line_height],
+                                                egui::Label::new(
+                                                    egui::RichText::new(format!("{:>4}", line_num))
+                                                        .monospace()
+                                                        .color(Color32::from_gray(100))
+                                                )
                                             );
                                         }
                                     });
-
-                                    let code_changed = ui.add_sized(
-                                        ui.available_size(),
-                                        egui::TextEdit::multiline(&mut node.code)
+                                    
+                                    // SEPARADOR
+                                    ui.separator();
+                                    
+                                    // EDITOR DE CÓDIGO
+                                    let code_changed = ui.add(
+                                        egui::TextEdit::multiline(&mut own_code_editable)
                                             .font(egui::TextStyle::Monospace)
                                             .code_editor()
-                                            .lock_focus(true)
-                                            .desired_width(f32::INFINITY),
+                                            .desired_width(f32::INFINITY)
+                                            .desired_rows(own_lines_count.max(5)),
                                     ).changed();
                                     
-                                    // Store flag for auto-save after borrow ends
+                                    // Procesar cambios
                                     if code_changed {
-                                        ctx.request_repaint();
+                                        if let Some(node) = self.graph.node_mut(id) {
+                                            node.code = own_code_editable.clone();
+                                            
+                                            if let Some(history) = &mut self.interaction.editor_history {
+                                                history.add_version(node.code.clone());
+                                                history.save_to_temp(&node.code);
+                                            }
+                                            self.update_node_channels(id);
+                                            ctx.request_repaint_after(std::time::Duration::from_millis(1));
+                                        }
                                     }
                                 });
                             });
-                        }
                     }
                 });
             if should_close {
@@ -605,12 +1020,93 @@ impl NodeGraphApp {
             }
         }
 
+        // Auto-save cada 10 segundos
+        if open {
+            let should_auto_save = if let Some(history) = &self.interaction.editor_history {
+                history.should_auto_save()
+            } else {
+                false
+            };
+            
+            if should_auto_save {
+                if let Some(id) = node_id {
+                    self.save_editor_code(id);
+                    if let Some(history) = &mut self.interaction.editor_history {
+                        history.mark_saved();
+                    }
+                }
+            }
+        }
+
         if !open {
+            // Guardar antes de cerrar
+            if let Some(id) = node_id {
+                self.save_editor_code(id);
+            }
+            // Limpiar historial al cerrar
+            if let Some(history) = &self.interaction.editor_history {
+                history.cleanup_temp();
+            }
             self.interaction.editing_node = None;
+            self.interaction.editor_history = None;
         }
         
-        // Auto-save after editing (check if graph changed)
+        // Auto-save del grafo después de editar
         self.check_and_auto_save();
+    }
+    
+    fn save_editor_code(&mut self, node_id: NodeId) {
+        // Obtener código heredado para separarlo
+        let inherited = self.graph.get_inherited_code(node_id).unwrap_or_default();
+        
+        if let Some(node) = self.graph.node_mut(node_id) {
+            // Separar código propio del heredado antes de guardar
+            let full_code = &node.code;
+            let own_code = if !inherited.is_empty() && full_code.starts_with(&inherited) {
+                full_code[inherited.len()..].trim_start_matches('\n').trim_start_matches('\r').to_string()
+            } else {
+                full_code.clone()
+            };
+            
+            // Guardar solo el código propio en el nodo
+            node.code = own_code.clone();
+            
+            // Guardar en el historial (con código completo para referencia)
+            if let Some(history) = &mut self.interaction.editor_history {
+                // Guardar código completo en temp para referencia
+                let full_for_temp = if !inherited.is_empty() {
+                    format!("{}\n\n{}", inherited, own_code)
+                } else {
+                    own_code.clone()
+                };
+                history.add_version(full_for_temp.clone());
+                history.save_to_temp(&full_for_temp);
+                history.mark_saved();
+            }
+            
+            // Guardar en el workspace si está configurado
+            if self.workspace.has_root() {
+                if let Err(e) = self.workspace.save_graph(&self.graph) {
+                    eprintln!("Error guardando código del editor: {}", e);
+                } else {
+                    self.last_save_hash = self.graph_hash();
+                    self.last_save_time = Some(std::time::Instant::now());
+                }
+            }
+        }
+    }
+    
+    fn load_editor_temp(&self, node_id: NodeId) -> Option<String> {
+        let temp_dir = std::env::temp_dir().join("Ultra-Omega");
+        let filename = format!("node_{}_code.tmp", node_id.0);
+        let temp_path = temp_dir.join(&filename);
+        
+        if temp_path.exists() {
+            if let Ok(code) = std::fs::read_to_string(&temp_path) {
+                return Some(code);
+            }
+        }
+        None
     }
 
     fn inheritance_view_ui(&mut self, ctx: &egui::Context) {
@@ -743,11 +1239,17 @@ impl NodeGraphApp {
             std::collections::HashSet::new()
         };
 
+        // Recolectar todos los pins conectados para el efecto de llenado
+        let connected_pins: std::collections::HashSet<PinId> = self.graph.links()
+            .iter()
+            .flat_map(|link| vec![link.from, link.to])
+            .collect();
+
         for node in self.graph.nodes() {
             let node_rect = self.node_rect(node, rect);
             let selected = self.interaction.selected_nodes.contains(&node.id);
             let is_inherited = inherited_nodes.contains(&node.id);
-            crate::ui::nodes::draw_node(painter, node, node_rect, self.viewport.zoom, selected, is_inherited, visuals);
+            crate::ui::nodes::draw_node(painter, node, node_rect, self.viewport.zoom, selected, is_inherited, visuals, &connected_pins);
         }
     }
 
@@ -874,8 +1376,7 @@ impl NodeGraphApp {
                             if let Some(from_pin_id) = from_pin {
                                 // Crear conexión con snap
                                 self.graph.add_link(from_pin_id, snap_pin_id, Color32::from_rgb(100, 200, 255));
-                                // Aplicar herencia de código
-                                self.apply_inheritance();
+                                // No aplicar herencia automáticamente - se combina en tiempo de ejecución/visualización
                                 self.check_and_auto_save();
                             }
                         }
@@ -886,10 +1387,9 @@ impl NodeGraphApp {
                                 if addr.kind == PinKind::Input {
                                     if let Some(from_pin_id) = from_pin {
                                         // Crear conexión
-                                        self.graph.add_link(from_pin_id, pin_id, Color32::from_rgb(100, 200, 255));
-                                        // Aplicar herencia de código
-                                        self.apply_inheritance();
-                                        self.check_and_auto_save();
+                                self.graph.add_link(from_pin_id, pin_id, Color32::from_rgb(100, 200, 255));
+                                // No aplicar herencia automáticamente - se combina en tiempo de ejecución/visualización
+                                self.check_and_auto_save();
                                     }
                                 }
                             }
@@ -921,14 +1421,29 @@ impl NodeGraphApp {
     fn draw_connecting_line(&self, painter: &egui::Painter, canvas: Rect, pointer_pos: Option<Pos2>, time: f64) {
         if let (Some(from_pin), Some(pointer)) = (self.interaction.connecting_from, pointer_pos) {
             if let Some(start_pos) = self.pin_screen_position(from_pin, canvas) {
+                // Verificar si hay snap disponible
+                let (end_pos, snap_color) = if let Some((_snap_pin_id, snap_pos, snap_kind)) = self.find_nearest_snap_pin(pointer, canvas, Some(from_pin)) {
+                    if snap_kind == PinKind::Input {
+                        // Snap a pin de entrada - color verde brillante
+                        (snap_pos, Color32::from_rgb(100, 255, 150))
+                    } else {
+                        (snap_pos, Color32::from_rgb(100, 200, 255))
+                    }
+                } else {
+                    (pointer, Color32::from_rgb(100, 200, 255))
+                };
+                
                 crate::ui::connectors::draw_connection(
                     painter,
                     start_pos,
-                    pointer,
-                    Color32::from_rgb(100, 200, 255),
+                    end_pos,
+                    snap_color,
                     self.viewport.zoom,
                     time,
                 );
+                
+                // Dibujar indicadores de snap mejorados
+                self.draw_snap_indicators(painter, canvas, pointer_pos, Some(from_pin));
             }
         }
     }
@@ -1015,19 +1530,39 @@ impl NodeGraphApp {
         closest.map(|(id, kind, _)| (id, kind))
     }
 
-    // Encontrar el pin más cercano para snap
+    // Encontrar el pin más cercano para snap (mejorado para pins de entrada)
     fn find_nearest_snap_pin(&self, pointer: Pos2, canvas: Rect, from_pin: Option<PinId>) -> Option<(PinId, Pos2, PinKind)> {
-        const SNAP_DISTANCE: f32 = 30.0; // Distancia de snap
+        // Distancia de snap más grande para pins de entrada (más fácil de atrapar)
+        const SNAP_DISTANCE_INPUT: f32 = 50.0; // Mayor distancia para pins de entrada
+        const SNAP_DISTANCE_OUTPUT: f32 = 30.0; // Distancia normal para pins de salida
         let mut nearest: Option<(PinId, Pos2, PinKind, f32)> = None;
-        
+
+        let from_node_id = if let Some(from_pin_id) = from_pin {
+            if let Some(addr) = self.graph.locate_pin(from_pin_id) {
+                Some(self.graph.nodes()[addr.node_index].id)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
         for node in self.graph.nodes() {
-            // Check input pins (solo si estamos conectando desde una salida)
+            // No hacer snap a pins del mismo nodo
+            if let Some(from_id) = from_node_id {
+                if node.id == from_id {
+                    continue;
+                }
+            }
+            
+            // Check input pins (solo para conexiones) - SNAP MEJORADO
             if from_pin.is_some() {
                 for (idx, pin) in node.inputs.iter().enumerate() {
                     let pin_pos = self.pin_slot_position(node, canvas, PinKind::Input, idx);
                     let distance = (pin_pos - pointer).length();
+                    let snap_distance = SNAP_DISTANCE_INPUT * self.viewport.zoom;
                     
-                    if distance < SNAP_DISTANCE * self.viewport.zoom {
+                    if distance < snap_distance {
                         if nearest.is_none() || distance < nearest.unwrap().3 {
                             nearest = Some((pin.id, pin_pos, PinKind::Input, distance));
                         }
@@ -1040,8 +1575,9 @@ impl NodeGraphApp {
                 for (idx, pin) in node.outputs.iter().enumerate() {
                     let pin_pos = self.pin_slot_position(node, canvas, PinKind::Output, idx);
                     let distance = (pin_pos - pointer).length();
+                    let snap_distance = SNAP_DISTANCE_OUTPUT * self.viewport.zoom;
                     
-                    if distance < SNAP_DISTANCE * self.viewport.zoom {
+                    if distance < snap_distance {
                         if nearest.is_none() || distance < nearest.unwrap().3 {
                             nearest = Some((pin.id, pin_pos, PinKind::Output, distance));
                         }
@@ -1052,30 +1588,152 @@ impl NodeGraphApp {
         
         nearest.map(|(id, pos, kind, _)| (id, pos, kind))
     }
+    
+    // Dibujar indicador de snap en pins de entrada
+    fn draw_snap_indicators(&self, painter: &egui::Painter, canvas: Rect, pointer_pos: Option<Pos2>, connecting_from: Option<PinId>) {
+        if let (Some(pointer), Some(from_pin)) = (pointer_pos, connecting_from) {
+            if let Some((_snap_pin_id, snap_pos, snap_kind)) = self.find_nearest_snap_pin(pointer, canvas, Some(from_pin)) {
+                if snap_kind == PinKind::Input {
+                    // Calcular intensidad del snap basado en la distancia
+                    let distance = (snap_pos - pointer).length();
+                    let max_distance = 50.0 * self.viewport.zoom;
+                    let intensity = 1.0 - (distance / max_distance).min(1.0);
+                    
+                    // Glow pulsante alrededor del pin de entrada
+                    let pulse_size = 12.0 + intensity * 4.0;
+                    let pulse_alpha = (intensity * 200.0) as u8;
+                    
+                    // Círculos concéntricos para efecto de atracción
+                    painter.circle_filled(
+                        snap_pos,
+                        pulse_size * self.viewport.zoom,
+                        Color32::from_rgba_unmultiplied(100, 255, 150, pulse_alpha / 3),
+                    );
+                    painter.circle_filled(
+                        snap_pos,
+                        pulse_size * 0.7 * self.viewport.zoom,
+                        Color32::from_rgba_unmultiplied(100, 255, 150, pulse_alpha / 2),
+                    );
+                    painter.circle_stroke(
+                        snap_pos,
+                        pulse_size * 0.5 * self.viewport.zoom,
+                        Stroke::new(2.0 * self.viewport.zoom, Color32::from_rgba_unmultiplied(100, 255, 150, pulse_alpha)),
+                    );
+                    
+                    // Línea guía desde el puntero al pin (sutil)
+                    painter.line_segment(
+                        [pointer, snap_pos],
+                        Stroke::new(1.0 * self.viewport.zoom, Color32::from_rgba_unmultiplied(100, 255, 150, (intensity * 100.0) as u8)),
+                    );
+                }
+            }
+        }
+    }
 
     fn apply_inheritance(&mut self) {
         // Aplicar herencia de código a todos los nodos que tienen padre
-        // Primero recolectar los IDs y códigos heredados
-        let inheritance_map: Vec<(NodeId, String)> = self.graph.nodes()
-            .iter()
-            .filter_map(|node| {
-                self.graph.get_inherited_code(node.id)
-                    .map(|code| (node.id, code))
-            })
-            .collect();
+        // NOTA: Ahora solo combinamos al guardar/ejecutar, no modificamos node.code directamente
+        // para permitir edición separada en el editor
+        // La combinación se hace en tiempo de ejecución o cuando se necesita el código completo
+    }
+    
+    /// Evaluar todas las expresiones ch() en un bloque de código
+    fn evaluate_ch_expressions_in_code(&self, code: &str, current_node_id: NodeId) -> String {
+        use crate::expressions::{ExpressionParser, ExpressionEvaluator};
+        use crate::expressions::ChannelValue;
         
-        // Luego aplicar los cambios
-        for (node_id, inherited_code) in inheritance_map {
-            if let Some(node_mut) = self.graph.node_mut(node_id) {
-                // Combinar código heredado con código propio
-                if !node_mut.code.is_empty() && !inherited_code.is_empty() {
-                    // Si ya tiene código, agregar el heredado al inicio
-                    node_mut.code = format!("{}\n\n{}", inherited_code, node_mut.code);
-                } else if node_mut.code.is_empty() {
-                    // Si no tiene código, usar solo el heredado
-                    node_mut.code = inherited_code;
+        // Crear evaluador con el channel_manager actual
+        let mut evaluator = ExpressionEvaluator::new(self.channel_manager.clone());
+        evaluator.set_current_node(current_node_id);
+        
+        // Buscar todas las expresiones ch() en el código
+        let mut result = String::new();
+        let mut last_end = 0;
+        
+        // Buscar patrones ch("...") o ch('...')
+        let code_chars: Vec<char> = code.chars().collect();
+        let mut i = 0;
+        
+        while i < code_chars.len() {
+            // Buscar "ch("
+            if i + 2 < code_chars.len() 
+                && code_chars[i] == 'c' 
+                && code_chars[i + 1] == 'h' 
+                && code_chars[i + 2] == '(' {
+                
+                // Agregar todo antes de ch(
+                result.push_str(&code[last_end..i]);
+                
+                // Buscar el cierre del paréntesis
+                let mut depth = 1;
+                let mut j = i + 3;
+                let mut in_string = false;
+                let mut string_char = '\0';
+                
+                while j < code_chars.len() && depth > 0 {
+                    let c = code_chars[j];
+                    
+                    if !in_string {
+                        if c == '"' || c == '\'' {
+                            in_string = true;
+                            string_char = c;
+                        } else if c == '(' {
+                            depth += 1;
+                        } else if c == ')' {
+                            depth -= 1;
+                        }
+                    } else {
+                        if c == string_char && (j == 0 || code_chars[j - 1] != '\\') {
+                            in_string = false;
+                        }
+                    }
+                    
+                    if depth > 0 {
+                        j += 1;
+                    }
+                }
+                
+                if depth == 0 {
+                    // Extraer la expresión completa ch(...)
+                    let expr_str = &code[i..=j];
+                    
+                    // Intentar evaluar
+                    match evaluator.evaluate_string(expr_str) {
+                        Ok(value) => {
+                            // Reemplazar con el valor evaluado
+                            let value_str = match value {
+                                ChannelValue::String(s) => s,
+                                ChannelValue::Number(n) => n.to_string(),
+                                ChannelValue::Boolean(b) => b.to_string(),
+                                ChannelValue::Code(c) => c,
+                            };
+                            result.push_str(&value_str);
+                            last_end = j + 1;
+                            i = j + 1;
+                            continue;
+                        }
+                        Err(_) => {
+                            // Si falla, dejar la expresión original
+                            result.push_str(expr_str);
+                            last_end = j + 1;
+                            i = j + 1;
+                            continue;
+                        }
+                    }
                 }
             }
+            i += 1;
+        }
+        
+        // Agregar el resto del código
+        if last_end < code.len() {
+            result.push_str(&code[last_end..]);
+        }
+        
+        if result.is_empty() {
+            code.to_string()
+        } else {
+            result
         }
     }
 
@@ -1158,9 +1816,10 @@ impl NodeGraphApp {
         self.interaction.box_selection_start = None;
         self.interaction.box_selection_current = None;
 
-        // Dibujar línea de corte si ya existe
-        if self.interaction.cut_tool.line_start.is_some() {
-            self.interaction.cut_tool.draw_cut_line(painter);
+        // Dibujar línea de corte si ya existe (con animación)
+        if self.interaction.cut_tool.has_points() {
+            let time = painter.ctx().input(|i| i.time);
+            self.interaction.cut_tool.draw_cut_line(painter, time);
         }
 
         if let Some(pointer_pos) = input.pos {
@@ -1173,25 +1832,29 @@ impl NodeGraphApp {
                 self.interaction.box_selection_start = None;
                 self.interaction.box_selection_current = None;
                 
-                // Si no hay línea activa, iniciar una nueva
-                if self.interaction.cut_tool.line_start.is_none() {
-                    self.interaction.cut_tool.line_start = Some(pointer_pos);
-                    self.interaction.cut_tool.line_end = Some(pointer_pos);
+                // Si no hay puntos, iniciar una nueva línea de corte
+                if self.interaction.cut_tool.is_empty() {
+                    self.interaction.cut_tool.add_point(pointer_pos);
                 }
             }
 
-            // Actualizar línea mientras se arrastra
-            if input.primary_down && self.interaction.cut_tool.line_start.is_some() {
-                self.interaction.cut_tool.line_end = Some(pointer_pos);
+            // Agregar puntos mientras se arrastra (dibujo libre)
+            if input.primary_down && self.interaction.cut_tool.has_points() {
+                self.interaction.cut_tool.add_point(pointer_pos);
             }
 
             // Completar corte al soltar el mouse
             // Verificar que el mouse se soltó (primary_down pasó de true a false)
-            if !input.primary_down && self.interaction.cut_tool.line_start.is_some() {
-                // Solo procesar si hay una línea válida
-                if let (Some(start), Some(end)) = (self.interaction.cut_tool.line_start, self.interaction.cut_tool.line_end) {
+            if !input.primary_down && self.interaction.cut_tool.has_points() {
+                // Solo procesar si hay suficientes puntos (línea válida)
+                if self.interaction.cut_tool.points.len() >= 2 {
                     // Verificar que la línea tenga una longitud mínima
-                    if start.distance(end) > 5.0 {
+                    let total_length: f32 = self.interaction.cut_tool.points
+                        .windows(2)
+                        .map(|w| w[0].distance(w[1]))
+                        .sum();
+                    
+                    if total_length > 5.0 {
                         // Encontrar y eliminar conexiones que intersectan
                         let links_to_remove: Vec<crate::node_graph::Link> = self.graph.links()
                             .iter()
@@ -1231,9 +1894,8 @@ impl NodeGraphApp {
                     }
                 }
 
-                // Limpiar línea de corte después de procesar
-                self.interaction.cut_tool.line_start = None;
-                self.interaction.cut_tool.line_end = None;
+                // Limpiar puntos de corte después de procesar
+                self.interaction.cut_tool.clear();
             }
         }
     }
