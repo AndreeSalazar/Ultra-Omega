@@ -27,6 +27,7 @@ pub struct Node {
     pub color: Color32,
     pub inputs: Vec<Pin>,
     pub outputs: Vec<Pin>,
+    pub code: String,
 }
 
 #[derive(Clone, Debug)]
@@ -55,49 +56,33 @@ impl NodeGraph {
     pub fn demo() -> Self {
         let mut graph = Self::default();
 
-        let texture = graph.add_node(
-            "Textura",
-            pos2(-120.0, -40.0),
-            Color32::from_rgb(0x7a, 0x5d, 0xff),
-            &["UV"],
-            &["Color"],
+        // Node 1: Base ASM (NASM)
+        let asm_node_id = graph.add_node(
+            "Base ASM (NASM)",
+            pos2(100.0, 100.0),
+            Color32::from_rgb(0xff, 0x47, 0x00), // Orange-Red for low level/danger
+            &[],
+            &["Código Fuente"],
         );
-
-        let mixer = graph.add_node(
-            "Mezclar",
-            pos2(220.0, -10.0),
-            Color32::from_rgb(0x4c, 0xba, 0xe4),
-            &["Color A", "Color B"],
-            &["Salida"],
-        );
-
-        let output = graph.add_node(
-            "Material",
-            pos2(560.0, 60.0),
-            Color32::from_rgb(0xff, 0x66, 0x66),
-            &["Color"],
-            &["RGB"],
-        );
-
-        if let (Some(tex_out), Some(mix_in_a)) = (
-            graph.pin_id(texture, PinKind::Output, 0),
-            graph.pin_id(mixer, PinKind::Input, 0),
-        ) {
-            graph.add_link(tex_out, mix_in_a, Color32::LIGHT_BLUE);
+        if let Some(node) = graph.node_mut(asm_node_id) {
+            node.code = "section .text\nglobal _start\n\n_start:\n    mov eax, 1\n    mov ebx, 42\n    int 0x80".to_string();
         }
 
-        if let (Some(tex_out), Some(mix_in_b)) = (
-            graph.pin_id(texture, PinKind::Output, 0),
-            graph.pin_id(mixer, PinKind::Input, 1),
-        ) {
-            graph.add_link(tex_out, mix_in_b, Color32::from_rgb(0xff, 0xc1, 0x6c));
-        }
+        // Node 2: Constructor / Visualizador
+        let builder_node = graph.add_node(
+            "Visualizador",
+            pos2(500.0, 150.0),
+            Color32::from_rgb(0x00, 0xa3, 0xff), // Cyan for tech/visuals
+            &["Entrada ASM"],
+            &["Vista Previa", "Binario"],
+        );
 
-        if let (Some(mix_out), Some(material_in)) = (
-            graph.pin_id(mixer, PinKind::Output, 0),
-            graph.pin_id(output, PinKind::Input, 0),
+        // Link them together
+        if let (Some(source_out), Some(builder_in)) = (
+            graph.pin_id(asm_node_id, PinKind::Output, 0),
+            graph.pin_id(builder_node, PinKind::Input, 0),
         ) {
-            graph.add_link(mix_out, material_in, Color32::from_rgb(0xff, 0x99, 0x66));
+            graph.add_link(source_out, builder_in, Color32::from_rgb(0xff, 0xaa, 0x00));
         }
 
         graph
@@ -140,6 +125,7 @@ impl NodeGraph {
             color,
             inputs: input_pins,
             outputs: output_pins,
+            code: String::new(),
         });
 
         id

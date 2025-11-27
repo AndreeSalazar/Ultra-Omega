@@ -35,6 +35,7 @@ struct NodeGraphApp {
 struct InteractionState {
     dragging_node: Option<NodeId>,
     new_node_requested: bool,
+    editing_node: Option<NodeId>,
 }
 
 struct Viewport2D {
@@ -83,7 +84,9 @@ impl NodeGraphApp {
                 let input = ui.input(|i| PointerSnapshot {
                     pos: i.pointer.interact_pos(),
                     delta: i.pointer.delta(),
+                    primary_pressed: i.pointer.button_pressed(PointerButton::Primary),
                     primary_down: i.pointer.button_down(PointerButton::Primary),
+                    secondary_pressed: i.pointer.button_pressed(PointerButton::Secondary),
                     middle_down: i.pointer.button_down(PointerButton::Middle),
                     ctrl_scroll: if i.modifiers.ctrl {
                         i.smooth_scroll_delta.y
@@ -272,11 +275,16 @@ impl NodeGraphApp {
 
     fn handle_node_dragging(&mut self, input: &PointerSnapshot, rect: Rect) {
         if let Some(pointer_pos) = input.pos {
-            if input.primary_down
+            if input.primary_pressed
                 && rect.contains(pointer_pos)
                 && self.interaction.dragging_node.is_none()
             {
                 self.interaction.dragging_node = self.hit_test(pointer_pos, rect);
+            }
+            if input.secondary_pressed && rect.contains(pointer_pos) {
+                if let Some(node_id) = self.hit_test(pointer_pos, rect) {
+                    self.interaction.editing_node = Some(node_id);
+                }
             }
             if !input.primary_down {
                 self.interaction.dragging_node = None;
@@ -352,6 +360,69 @@ impl NodeGraphApp {
         Some(self.pin_slot_position(node, canvas, address.kind, address.slot))
     }
 
+    fn editor_ui(&mut self, ctx: &egui::Context) {
+        let mut open = self.interaction.editing_node.is_some();
+        let node_id = self.interaction.editing_node;
+
+        if open {
+            let mut should_close = false;
+            egui::Window::new("Editor de Código")
+                .open(&mut open)
+                .resizable(true)
+                .default_size([600.0, 500.0])
+                .show(ctx, |ui| {
+                    if let Some(id) = node_id {
+                        if let Some(node) = self.graph.node_mut(id) {
+                            ui.horizontal(|ui| {
+                                ui.heading(&node.title);
+                                if ui.button("Cerrar").clicked() {
+                                    should_close = true;
+                                }
+                            });
+                            ui.separator();
+
+                            egui::ScrollArea::vertical().show(ui, |ui| {
+                                let font_id = egui::FontId::monospace(14.0);
+                                let _row_height = ui.fonts(|f| f.row_height(&font_id));
+                                let num_lines = node.code.lines().count().max(1);
+
+                                ui.horizontal_top(|ui| {
+                                    // Line numbers column
+                                    ui.vertical(|ui| {
+                                        ui.set_width(40.0);
+                                        for i in 1..=num_lines {
+                                            ui.label(
+                                                egui::RichText::new(format!("{}", i))
+                                                    .font(font_id.clone())
+                                                    .color(Color32::GRAY),
+                                            );
+                                        }
+                                    });
+
+                                    // Code editor
+                                    ui.add_sized(
+                                        ui.available_size(),
+                                        egui::TextEdit::multiline(&mut node.code)
+                                            .font(egui::TextStyle::Monospace)
+                                            .code_editor()
+                                            .lock_focus(true)
+                                            .desired_width(f32::INFINITY),
+                                    );
+                                });
+                            });
+                        }
+                    }
+                });
+            if should_close {
+                open = false;
+            }
+        }
+
+        if !open {
+            self.interaction.editing_node = None;
+        }
+    }
+
     fn rect_shape(rect: Rect, rounding: egui::Rounding, fill: Color32, stroke: Stroke) -> Shape {
         Shape::Rect(RectShape {
             rect,
@@ -394,6 +465,7 @@ impl eframe::App for NodeGraphApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.toolbar_ui(ctx);
         self.canvas_ui(ctx);
+        self.editor_ui(ctx);
     }
 }
 
@@ -401,7 +473,9 @@ impl eframe::App for NodeGraphApp {
 struct PointerSnapshot {
     pos: Option<Pos2>,
     delta: Vec2,
+    primary_pressed: bool,
     primary_down: bool,
+    secondary_pressed: bool,
     middle_down: bool,
     ctrl_scroll: f32,
 }
