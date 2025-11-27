@@ -4,6 +4,8 @@ use std::path::Path;
 pub struct TerminalManager {
     pub asm_output: String,
     pub c_output: String,
+    pub cpp_output: String,
+    pub rust_output: String,
     pub active_tab: TerminalTab,
     pub visible: bool,
     pub pinned: bool,
@@ -15,6 +17,8 @@ pub enum TerminalTab {
     #[default]
     Nasm,
     C,
+    Cpp,
+    Rust,
 }
 
 impl Default for TerminalManager {
@@ -22,6 +26,8 @@ impl Default for TerminalManager {
         Self {
             asm_output: String::new(),
             c_output: String::new(),
+            cpp_output: String::new(),
+            rust_output: String::new(),
             active_tab: TerminalTab::default(),
             visible: false,
             pinned: false,
@@ -30,25 +36,38 @@ impl Default for TerminalManager {
     }
 }
 
+#[derive(PartialEq, Eq, Clone, Copy)]
+pub enum Language {
+    Nasm,
+    C,
+    Cpp,
+    Rust,
+}
+
 impl TerminalManager {
-    pub fn run_code(&mut self, code: &str, is_c: bool) {
-        // Switch to the relevant tab automatically upon running
-        self.active_tab = if is_c { TerminalTab::C } else { TerminalTab::Nasm };
+    pub fn run_code(&mut self, code: &str, lang: Language) {
         self.visible = true;
         self.hide_timer = 10.0; // Show for 10 seconds
         
-        let output_buffer = if is_c { &mut self.c_output } else { &mut self.asm_output };
+        let (output_buffer, tab) = match lang {
+            Language::Nasm => (&mut self.asm_output, TerminalTab::Nasm),
+            Language::C => (&mut self.c_output, TerminalTab::C),
+            Language::Cpp => (&mut self.cpp_output, TerminalTab::Cpp),
+            Language::Rust => (&mut self.rust_output, TerminalTab::Rust),
+        };
+        
+        self.active_tab = tab;
         output_buffer.clear();
         output_buffer.push_str(">>> Iniciando compilación...\n");
 
         let exe_file = "program.exe";
-        // Use absolute path to avoid issues with CWD
         let exe_path = std::env::current_dir().unwrap_or_default().join(exe_file);
 
-        if is_c {
-            Self::compile_c(code, exe_file, output_buffer);
-        } else {
-            Self::compile_nasm(code, exe_file, output_buffer);
+        match lang {
+            Language::Nasm => Self::compile_nasm(code, exe_file, output_buffer),
+            Language::C => Self::compile_c(code, exe_file, output_buffer),
+            Language::Cpp => Self::compile_cpp(code, exe_file, output_buffer),
+            Language::Rust => Self::compile_rust(code, exe_file, output_buffer),
         }
 
         // Run if compiled
@@ -70,32 +89,64 @@ impl TerminalManager {
     }
 
     fn compile_c(code: &str, exe_file: &str, output: &mut String) {
-        let temp_c = "temp.c";
-        if let Err(e) = std::fs::write(temp_c, code) {
+        let temp_file = "temp.c";
+        if let Err(e) = std::fs::write(temp_file, code) {
             output.push_str(&format!("Error guardando archivo: {}\n", e));
             return;
         }
 
         let cmd_output = Command::new("gcc")
-            .args(&[temp_c, "-o", exe_file])
+            .args(&[temp_file, "-o", exe_file])
             .output();
 
-        match cmd_output {
+        Self::handle_compile_output(cmd_output, "GCC", exe_file, output);
+    }
+
+    fn compile_cpp(code: &str, exe_file: &str, output: &mut String) {
+        let temp_file = "temp.cpp";
+        if let Err(e) = std::fs::write(temp_file, code) {
+            output.push_str(&format!("Error guardando archivo: {}\n", e));
+            return;
+        }
+
+        let cmd_output = Command::new("g++")
+            .args(&[temp_file, "-o", exe_file])
+            .output();
+
+        Self::handle_compile_output(cmd_output, "G++", exe_file, output);
+    }
+
+    fn compile_rust(code: &str, exe_file: &str, output: &mut String) {
+        let temp_file = "temp.rs";
+        if let Err(e) = std::fs::write(temp_file, code) {
+            output.push_str(&format!("Error guardando archivo: {}\n", e));
+            return;
+        }
+
+        let cmd_output = Command::new("rustc")
+            .args(&[temp_file, "-o", exe_file])
+            .output();
+
+        Self::handle_compile_output(cmd_output, "Rustc", exe_file, output);
+    }
+
+    fn handle_compile_output(result: std::io::Result<std::process::Output>, name: &str, exe_file: &str, output: &mut String) {
+        match result {
             Ok(out) => {
                 let stderr = String::from_utf8_lossy(&out.stderr);
                 if !stderr.is_empty() {
-                    output.push_str("GCC Log:\n");
+                    output.push_str(&format!("{} Log:\n", name));
                     output.push_str(&stderr);
                 }
                 if out.status.success() {
-                    output.push_str(">>> GCC: Compilación exitosa.\n");
+                    output.push_str(&format!(">>> {}: Compilación exitosa.\n", name));
                 } else {
-                    output.push_str(">>> GCC: Error de compilación.\n");
+                    output.push_str(&format!(">>> {}: Error de compilación.\n", name));
                     let _ = std::fs::remove_file(exe_file);
                 }
             }
             Err(e) => {
-                output.push_str(&format!("Error invocando GCC: {}\n", e));
+                output.push_str(&format!("Error invocando {}: {}\n", name, e));
             }
         }
     }

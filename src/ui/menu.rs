@@ -93,23 +93,33 @@ pub fn draw_menu_bar(app: &mut NodeGraphApp, ctx: &egui::Context, open_factor: f
                         ui.label(format!("Zoom: {:.0}%", app.viewport.zoom * 100.0));
                     });
         
-                    ui.menu_button("Run", |ui| {
-                        if ui.button("Run Selected Node").clicked() {
-                            if let Some(id) = app.interaction.selected_nodes.iter().next() {
-                                if let Some(node) = app.graph.nodes().iter().find(|n| n.id == *id) {
-                                    let is_c = node.title.contains("Base C") || node.title.contains("C++");
-                                    app.terminal.run_code(&node.code, is_c);
-                                }
-                            }
-                            ui.close_menu();
+            ui.menu_button("Run", |ui| {
+                if ui.button("Run Selected Node").clicked() {
+                    if let Some(id) = app.interaction.selected_nodes.iter().next() {
+                        if let Some(node) = app.graph.nodes().iter().find(|n| n.id == *id) {
+                            let lang = if node.title.contains("ASM") {
+                                crate::terminal::Language::Nasm
+                            } else if node.title.contains("C++") {
+                                crate::terminal::Language::Cpp
+                            } else if node.title.contains("Rust") {
+                                crate::terminal::Language::Rust
+                            } else {
+                                crate::terminal::Language::C
+                            };
+                            app.terminal.run_code(&node.code, lang);
                         }
-                    });
-        
-                    ui.menu_button("Terminal", |ui| {
-                        ui.selectable_value(&mut app.terminal.active_tab, TerminalTab::Nasm, "NASM Output");
-                        ui.selectable_value(&mut app.terminal.active_tab, TerminalTab::C, "C/C++ Output");
-                    });
-                    
+                    }
+                    ui.close_menu();
+                }
+            });
+
+            ui.menu_button("Terminal", |ui| {
+                ui.selectable_value(&mut app.terminal.active_tab, TerminalTab::Nasm, "NASM Output");
+                ui.selectable_value(&mut app.terminal.active_tab, TerminalTab::C, "C Output");
+                ui.selectable_value(&mut app.terminal.active_tab, TerminalTab::Cpp, "C++ Output");
+                ui.selectable_value(&mut app.terminal.active_tab, TerminalTab::Rust, "Rust Output");
+            });
+
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         ui.label(format!("Nodos: {}", app.graph.nodes().len()));
                         ui.separator();

@@ -69,7 +69,7 @@ impl NodeGraph {
             node.code = "default rel\nsection .text\nglobal main\nextern printf\nextern exit\n\nmain:\n    sub rsp, 40\n    mov rcx, msg\n    xor eax, eax\n    call printf\n    add rsp, 40\n    ret\n\nsection .data\n    msg db 'Hola ASM desde Ultra Omega!', 10, 0".to_string();
         }
 
-        // Node 3: Base C
+        // Node 2: Base C
         let c_node_id = graph.add_node(
             "Base C",
             pos2(100.0, 280.0),
@@ -79,23 +79,6 @@ impl NodeGraph {
         );
         if let Some(node) = graph.node_mut(c_node_id) {
             node.code = "#include <stdio.h>\n\nint main() {\n    printf(\"Hola desde C en Ultra Omega!\\n\");\n    return 0;\n}".to_string();
-        }
-
-        // Node 2: Constructor / Visualizador
-        let builder_node = graph.add_node(
-            "Visualizador",
-            pos2(500.0, 150.0),
-            Color32::from_rgb(0x00, 0xa3, 0xff), // Cyan for tech/visuals
-            &["Entrada ASM"],
-            &["Vista Previa", "Binario"],
-        );
-
-        // Link them together
-        if let (Some(source_out), Some(builder_in)) = (
-            graph.pin_id(asm_node_id, PinKind::Output, 0),
-            graph.pin_id(builder_node, PinKind::Input, 0),
-        ) {
-            graph.add_link(source_out, builder_in, Color32::from_rgb(0xff, 0xaa, 0x00));
         }
 
         graph
@@ -144,6 +127,7 @@ impl NodeGraph {
         id
     }
 
+    #[allow(dead_code)] // Se usará cuando se implemente la conexión manual de nodos
     pub fn add_link(&mut self, from: PinId, to: PinId, color: Color32) {
         self.links.push(Link { from, to, color });
     }
@@ -168,6 +152,7 @@ impl NodeGraph {
         })
     }
 
+    #[allow(dead_code)] // Se usará cuando se implemente la conexión manual de nodos
     pub fn pin_id(&self, node_id: NodeId, kind: PinKind, slot: usize) -> Option<PinId> {
         self.nodes
             .iter()

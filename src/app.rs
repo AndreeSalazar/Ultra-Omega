@@ -153,8 +153,14 @@ impl NodeGraphApp {
         Rect::from_min_size(node.position, size)
     }
 
-    // Legacy toolbar removed in favor of menu bar
-    // fn toolbar_ui(&mut self, ctx: &egui::Context) { ... }
+    fn add_template_node(&mut self, _ctx: &egui::Context, title: &str, code: &str, color: Color32) {
+        let world_pos = self.viewport.screen_to_world(self.node_menu_pos, Rect::from_min_size(Pos2::ZERO, Vec2::new(10000.0, 10000.0)));
+        
+        let id = self.graph.add_node(title, world_pos, color, &[], &["Código"]);
+        if let Some(node) = self.graph.node_mut(id) {
+             node.code = code.to_string();
+        }
+    }
     
     fn terminal_panel(&mut self, ctx: &egui::Context, _open_factor: f32) {
         // Terminal visibility logic
@@ -180,7 +186,9 @@ impl NodeGraphApp {
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     ui.selectable_value(&mut self.terminal.active_tab, TerminalTab::Nasm, "Terminal NASM");
-                    ui.selectable_value(&mut self.terminal.active_tab, TerminalTab::C, "Terminal C/C++");
+                    ui.selectable_value(&mut self.terminal.active_tab, TerminalTab::C, "Terminal C");
+                    ui.selectable_value(&mut self.terminal.active_tab, TerminalTab::Cpp, "Terminal C++");
+                    ui.selectable_value(&mut self.terminal.active_tab, TerminalTab::Rust, "Terminal Rust");
                     
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         // Pin button
@@ -204,6 +212,8 @@ impl NodeGraphApp {
                     let text = match self.terminal.active_tab {
                         TerminalTab::Nasm => &mut self.terminal.asm_output,
                         TerminalTab::C => &mut self.terminal.c_output,
+                        TerminalTab::Cpp => &mut self.terminal.cpp_output,
+                        TerminalTab::Rust => &mut self.terminal.rust_output,
                     };
                     
                     ui.add(
@@ -244,63 +254,42 @@ impl NodeGraphApp {
                         ui.separator();
                         ui.add_space(4.0);
                         
-                        let btn_style = |ui: &mut egui::Ui, text: &str, color: Color32| {
-                            let rich_text = egui::RichText::new(text).color(Color32::WHITE).size(14.0);
-                            let resp = ui.add(egui::Button::new(rich_text).fill(color.gamma_multiply(0.2)).frame(true).rounding(4.0));
-                            if resp.hovered() {
-                                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
-                            }
-                            resp
-                        };
-
                         ui.label(egui::RichText::new("Assembler (NASM)").strong().color(Color32::LIGHT_GRAY));
-                        
-                        if btn_style(ui, "Hola Mundo", Color32::from_rgb(0xff, 0x47, 0x00)).clicked() {
-                            let id = self.graph.add_node("ASM: Hola Mundo", self.viewport.screen_to_world(self.node_menu_pos, ctx.screen_rect()), Color32::from_rgb(0xff, 0x47, 0x00), &[], &["Código"]);
-                            if let Some(node) = self.graph.node_mut(id) {
-                                 node.code = crate::templates::ASM_HELLO.to_string();
-                            }
+                        if ui.button("⏵ Hola Mundo").clicked() {
+                            self.add_template_node(ctx, "ASM: Hola Mundo", crate::templates::ASM_HELLO, Color32::from_rgb(0xff, 0x47, 0x00));
                             close_menu = true;
                         }
-
-                        if btn_style(ui, "Suma Básica", Color32::from_rgb(0xff, 0x47, 0x00)).clicked() {
-                            let id = self.graph.add_node("ASM: Suma", self.viewport.screen_to_world(self.node_menu_pos + Vec2::new(20.0, 20.0), ctx.screen_rect()), Color32::from_rgb(0xff, 0x47, 0x00), &[], &["Código"]);
-                            if let Some(node) = self.graph.node_mut(id) {
-                                 node.code = crate::templates::ASM_SUM.to_string();
-                            }
+                        if ui.button("➕ Suma").clicked() {
+                            self.add_template_node(ctx, "ASM: Suma", crate::templates::ASM_SUM, Color32::from_rgb(0xff, 0x47, 0x00));
                             close_menu = true;
                         }
-
-                        if btn_style(ui, "Bucle (Loop)", Color32::from_rgb(0xff, 0x47, 0x00)).clicked() {
-                            let id = self.graph.add_node("ASM: Bucle", self.viewport.screen_to_world(self.node_menu_pos + Vec2::new(40.0, 40.0), ctx.screen_rect()), Color32::from_rgb(0xff, 0x47, 0x00), &[], &["Código"]);
-                            if let Some(node) = self.graph.node_mut(id) {
-                                 node.code = crate::templates::ASM_LOOP.to_string();
-                            }
+                        if ui.button("↻ Bucle").clicked() {
+                            self.add_template_node(ctx, "ASM: Bucle", crate::templates::ASM_LOOP, Color32::from_rgb(0xff, 0x47, 0x00));
                             close_menu = true;
                         }
-
-                        if btn_style(ui, "Condicional (If/Else)", Color32::from_rgb(0xff, 0x47, 0x00)).clicked() {
-                            let id = self.graph.add_node("ASM: Condicional", self.viewport.screen_to_world(self.node_menu_pos + Vec2::new(60.0, 60.0), ctx.screen_rect()), Color32::from_rgb(0xff, 0x47, 0x00), &[], &["Código"]);
-                            if let Some(node) = self.graph.node_mut(id) {
-                                 node.code = crate::templates::ASM_CONDITIONAL.to_string();
-                            }
+                        if ui.button("🔀 Condicional").clicked() {
+                            self.add_template_node(ctx, "ASM: Condicional", crate::templates::ASM_CONDITIONAL, Color32::from_rgb(0xff, 0x47, 0x00));
                             close_menu = true;
                         }
                         
-                        ui.add_space(8.0);
-                        ui.label(egui::RichText::new("C / C++").strong().color(Color32::LIGHT_GRAY));
-                        if btn_style(ui, "Base C", Color32::from_rgb(0x00, 0x59, 0x9C)).clicked() {
-                            let id = self.graph.add_node("Base C", self.viewport.screen_to_world(self.node_menu_pos, ctx.screen_rect()), Color32::from_rgb(0x00, 0x59, 0x9C), &[], &["Código"]);
-                            if let Some(node) = self.graph.node_mut(id) {
-                                 node.code = crate::templates::C_HELLO.to_string();
-                            }
+                        ui.separator();
+                        ui.label(egui::RichText::new("C").strong().color(Color32::LIGHT_GRAY));
+                        if ui.button("Hola Mundo").clicked() {
+                            self.add_template_node(ctx, "Base C", crate::templates::C_HELLO, Color32::from_rgb(0x00, 0x59, 0x9C));
                             close_menu = true;
                         }
                         
-                        ui.add_space(8.0);
-                        ui.label(egui::RichText::new("Utilidades").strong().color(Color32::LIGHT_GRAY));
-                         if btn_style(ui, "Visualizador", Color32::from_rgb(0x00, 0xa3, 0xff)).clicked() {
-                            self.graph.add_node("Visualizador", self.viewport.screen_to_world(self.node_menu_pos, ctx.screen_rect()), Color32::from_rgb(0x00, 0xa3, 0xff), &["Entrada"], &["Salida"]);
+                        ui.separator();
+                        ui.label(egui::RichText::new("C++").strong().color(Color32::LIGHT_GRAY));
+                        if ui.button("Hola Mundo").clicked() {
+                            self.add_template_node(ctx, "Base C++", crate::templates::CPP_HELLO, Color32::from_rgb(0x00, 0x44, 0x82));
+                            close_menu = true;
+                        }
+                        
+                        ui.separator();
+                        ui.label(egui::RichText::new("Rust").strong().color(Color32::LIGHT_GRAY));
+                        if ui.button("Hola Mundo").clicked() {
+                            self.add_template_node(ctx, "Base Rust", crate::templates::RUST_HELLO, Color32::from_rgb(0xde, 0x39, 0x00));
                             close_menu = true;
                         }
                     });
@@ -320,24 +309,6 @@ impl NodeGraphApp {
     // The layout is now managed by central panel block in update()
     
     fn canvas_ui(&mut self, ctx: &egui::Context) {
-        // We use a simple central panel here, but since we are already inside a CentralPanel in update()
-        // we should just allocate the space. 
-        // BUT: CentralPanel cannot be nested inside CentralPanel easily without frame tweaks.
-        // Let's adjust update() to use CentralPanel for everything or structure panels properly.
-        // Actually, SidePanel + TopPanel + CentralPanel is the way.
-        // update() does Top + Side + Central.
-        
-        // So canvas_ui should just draw into the available region of the CentralPanel.
-        // ui is not passed here, we get it from ctx? No, ctx gives us a new layer.
-        // We need to pass `ui` if we are inside a panel.
-        // Or we can use CentralPanel here if we didn't use it in update.
-        
-        // Let's revert update logic slightly to be standard eframe:
-        // TopPanel (Menu)
-        // SidePanel (Sidebar)
-        // BottomPanel (Terminal)
-        // CentralPanel (Canvas)
-        
         egui::CentralPanel::default()
             .frame(egui::Frame::canvas(&ctx.style()))
             .show(ctx, |ui| {
@@ -399,8 +370,16 @@ impl NodeGraphApp {
                                         should_close = true;
                                     }
                                     if ui.button("▶ Ejecutar").clicked() {
-                                        let is_c = node.title.contains("Base C") || node.title.contains("C++");
-                                        self.terminal.run_code(&node.code, is_c);
+                                        let lang = if node.title.contains("ASM") {
+                                            crate::terminal::Language::Nasm
+                                        } else if node.title.contains("C++") {
+                                            crate::terminal::Language::Cpp
+                                        } else if node.title.contains("Rust") {
+                                            crate::terminal::Language::Rust
+                                        } else {
+                                            crate::terminal::Language::C
+                                        };
+                                        self.terminal.run_code(&node.code, lang);
                                     }
                                 });
                             });

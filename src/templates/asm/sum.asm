@@ -1,3 +1,7 @@
+; ==========================================
+; Suma Básica en NASM
+; ==========================================
+
 default rel
 section .text
 global main
@@ -5,14 +9,22 @@ extern printf
 
 main:
     sub rsp, 40
-    mov rax, 15
-    mov rbx, 27
+    
+    ; Cargar valores en registros
+    mov rax, 15     ; Primer numero
+    mov rbx, 27     ; Segundo numero
+    
+    ; Sumar RBX a RAX (el resultado se guarda en RAX)
     add rax, rbx
-    mov rcx, fmt
-    mov rdx, rax
+    
+    ; Preparar argumentos para printf
+    mov rcx, fmt    ; Primer argumento: formato
+    mov rdx, rax    ; Segundo argumento: el valor a imprimir
+    
     call printf
+    
     add rsp, 40
     ret
 
 section .data
-    fmt db 'La suma es: %d', 10, 0
+    fmt db 'La suma de 15 + 27 es: %d', 10, 0
