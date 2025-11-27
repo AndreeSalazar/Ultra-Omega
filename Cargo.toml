@@ -1,7 +1,11 @@
 [package]
 name = "ultra-omega"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
 eframe = { version = "0.27", features = ["wgpu"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+rfd = "0.14"
+dirs = "5.0"

@@ -2,6 +2,8 @@ use eframe::egui::{self, Color32, Pos2, Rect, Sense, Stroke, Vec2, Visuals, pos2
 use crate::node_graph::{self, NodeGraph, NodeId, PinId, PinKind};
 use crate::terminal::{TerminalManager, TerminalTab};
 use crate::ui::viewport::Viewport2D;
+use crate::workspace::Workspace;
+use crate::config::AppConfig;
 
 pub struct NodeGraphApp {
     pub graph: NodeGraph,
@@ -10,6 +12,9 @@ pub struct NodeGraphApp {
     pub terminal: TerminalManager,
     pub show_node_menu: bool,
     pub node_menu_pos: Pos2,
+    pub workspace: Workspace,
+    pub last_save_hash: u64,
+    pub last_save_time: Option<std::time::Instant>,
 }
 
 #[derive(Default)]
@@ -36,18 +41,69 @@ struct PointerSnapshot {
 
 impl Default for NodeGraphApp {
     fn default() -> Self {
-        Self {
-            graph: NodeGraph::demo(),
+        Self::from_config(AppConfig::default())
+    }
+}
+
+impl NodeGraphApp {
+    pub fn from_config(config: AppConfig) -> Self {
+        let mut workspace = Workspace::new();
+        workspace.auto_save = config.auto_save;
+        
+        let mut app = Self {
+            graph: NodeGraph::default(),
             viewport: Viewport2D::default(),
             interaction: InteractionState::default(),
             terminal: TerminalManager::default(),
             show_node_menu: false,
             node_menu_pos: Pos2::ZERO,
+            workspace,
+            last_save_hash: 0,
+            last_save_time: None,
+        };
+        
+        // Load workspace if configured
+        if let Some(workspace_path) = config.workspace_path {
+            let path = std::path::PathBuf::from(&workspace_path);
+            if path.exists() {
+                app.workspace.set_root(path);
+                if let Err(e) = app.load_graph_from_workspace() {
+                    eprintln!("Error loading workspace: {}", e);
+                    // Fallback to demo if load fails
+                    app.graph = NodeGraph::demo();
+                    app.graph.recalculate_ids();
+                }
+            } else {
+                app.graph = NodeGraph::demo();
+                app.graph.recalculate_ids();
+            }
+        } else {
+            app.graph = NodeGraph::demo();
+            app.graph.recalculate_ids();
+        }
+        
+        app
+    }
+    
+    pub fn save_config(&self) {
+        let mut config = AppConfig::load();
+        config.workspace_path = self.workspace.root_path.as_ref()
+            .and_then(|p| p.to_str())
+            .map(|s| s.to_string());
+        config.auto_save = self.workspace.auto_save;
+        
+        if let Err(e) = config.save() {
+            eprintln!("Error saving config: {}", e);
         }
     }
 }
 
 impl eframe::App for NodeGraphApp {
+    fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
+        // Save config on exit
+        self.save_config();
+    }
+    
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Handle global shortcuts
         if ctx.input(|i| i.key_pressed(egui::Key::Tab)) {
@@ -61,36 +117,44 @@ impl eframe::App for NodeGraphApp {
             self.focus_view(ctx.screen_rect());
         }
 
-        // 1. Top Menu Bar
-        // Auto-hide logic for Top
-        let top_threshold = 10.0; // px to trigger
-        let top_menu_height = 28.0; // Approx height
-        let pointer_pos = ctx.pointer_hover_pos().unwrap_or(Pos2::new(-100.0, -100.0));
-        let _screen_rect = ctx.screen_rect();
-        
-        let show_top = pointer_pos.y < top_threshold || (pointer_pos.y < top_menu_height && ctx.animate_bool(egui::Id::new("anim_top"), false) > 0.01);
-        let top_factor = ctx.animate_bool(egui::Id::new("anim_top"), show_top);
-        
-        if top_factor > 0.0 {
-            crate::ui::menu::draw_menu_bar(self, ctx, top_factor);
+        // Handle Ctrl+S for save
+        if ctx.input(|i| i.key_pressed(egui::Key::S) && i.modifiers.ctrl && !i.modifiers.shift) {
+            if self.workspace.has_root() {
+                let _ = self.save_current_graph();
+            }
         }
+
+        // Handle Ctrl+Shift+S for save as
+        if ctx.input(|i| i.key_pressed(egui::Key::S) && i.modifiers.ctrl && i.modifiers.shift) {
+            if let Some(path) = rfd::FileDialog::new()
+                .add_filter("Node Map", &["json"])
+                .set_file_name("node_map.json")
+                .save_file()
+            {
+                if let Some(parent) = path.parent() {
+                    self.workspace.set_root(parent.to_path_buf());
+                    self.workspace.current_file = Some(path);
+                    let _ = self.save_current_graph();
+                }
+            }
+        }
+
+        // Auto-save and file change detection
+        self.check_and_auto_save();
+        self.check_file_changes();
+        
+        // Save config periodically (every 5 seconds or on close)
+        // This will be handled on close via save_config
+
+        // 1. Top Menu Bar (Always visible, no animation)
+        crate::ui::menu::draw_menu_bar(self, ctx, 1.0);
 
         // 2. Bottom Terminal
         // Logic handled inside terminal_panel now (timer based)
         self.terminal_panel(ctx, 1.0);
 
-        // 3. Left Sidebar
-        // Auto-hide logic for Left
-        let left_threshold = 10.0;
-        let sidebar_width = 200.0; // Default
-        let show_left = pointer_pos.x < left_threshold || 
-                        (pointer_pos.x < sidebar_width && ctx.animate_bool(egui::Id::new("anim_left"), false) > 0.01);
-        
-        let left_factor = ctx.animate_bool(egui::Id::new("anim_left"), show_left);
-
-        if left_factor > 0.0 {
-            crate::ui::sidebar::draw_sidebar(self, ctx, left_factor);
-        }
+        // 3. Left Sidebar (Always visible and pinned)
+        crate::ui::sidebar::draw_sidebar(self, ctx, 1.0);
 
         // 4. Central Canvas (Remaining space)
         self.canvas_ui(ctx);
@@ -153,12 +217,22 @@ impl NodeGraphApp {
         Rect::from_min_size(node.position, size)
     }
 
-    fn add_template_node(&mut self, _ctx: &egui::Context, title: &str, code: &str, color: Color32) {
+    fn add_template_node(&mut self, ctx: &egui::Context, title: &str, code: &str, color: Color32) {
         let world_pos = self.viewport.screen_to_world(self.node_menu_pos, Rect::from_min_size(Pos2::ZERO, Vec2::new(10000.0, 10000.0)));
         
         let id = self.graph.add_node(title, world_pos, color, &[], &["Código"]);
         if let Some(node) = self.graph.node_mut(id) {
              node.code = code.to_string();
+        }
+        
+        // Auto-save immediately when a node is created
+        if self.workspace.has_root() {
+            if let Err(e) = self.save_current_graph() {
+                eprintln!("Error auto-saving after node creation: {}", e);
+            } else {
+                // Request repaint to update sidebar
+                ctx.request_repaint();
+            }
         }
     }
     
@@ -359,7 +433,15 @@ impl NodeGraphApp {
             egui::Window::new("Editor de Código")
                 .open(&mut open)
                 .resizable(true)
-                .default_size([600.0, 500.0])
+                .default_size([700.0, 550.0])
+                .frame(egui::Frame::window(&ctx.style())
+                    .fill(egui::Color32::from_rgb(37, 37, 38))
+                    .shadow(egui::epaint::Shadow {
+                        offset: egui::vec2(0.0, 4.0),
+                        blur: 12.0,
+                        spread: 0.0,
+                        color: egui::Color32::from_black_alpha(200),
+                    }))
                 .show(ctx, |ui| {
                     if let Some(id) = node_id {
                         if let Some(node) = self.graph.node_mut(id) {
@@ -402,14 +484,19 @@ impl NodeGraphApp {
                                         }
                                     });
 
-                                    ui.add_sized(
+                                    let code_changed = ui.add_sized(
                                         ui.available_size(),
                                         egui::TextEdit::multiline(&mut node.code)
                                             .font(egui::TextStyle::Monospace)
                                             .code_editor()
                                             .lock_focus(true)
                                             .desired_width(f32::INFINITY),
-                                    );
+                                    ).changed();
+                                    
+                                    // Store flag for auto-save after borrow ends
+                                    if code_changed {
+                                        ctx.request_repaint();
+                                    }
                                 });
                             });
                         }
@@ -423,6 +510,9 @@ impl NodeGraphApp {
         if !open {
             self.interaction.editing_node = None;
         }
+        
+        // Auto-save after editing (check if graph changed)
+        self.check_and_auto_save();
     }
 
     // --- Painting Helpers (Moved from old main) ---
@@ -542,13 +632,20 @@ impl NodeGraphApp {
                         }
                     }
                 }
+                let was_dragging = self.interaction.dragging_node.is_some();
                 self.interaction.dragging_node = None;
                 self.interaction.box_selection_start = None;
                 self.interaction.box_selection_current = None;
+                
+                // Auto-save after releasing mouse if we were dragging
+                if was_dragging {
+                    self.check_and_auto_save();
+                }
             }
 
             // 3. Apply Node Movement (Deferred to solve borrow checker)
-            if input.primary_down && self.interaction.dragging_node.is_some() {
+            let was_dragging = self.interaction.dragging_node.is_some();
+            if input.primary_down && was_dragging {
                  let delta_world = input.delta / self.viewport.zoom;
                  // Collect IDs to avoid borrow issues
                  let nodes_to_move: Vec<NodeId> = self.interaction.selected_nodes.iter().cloned().collect();
@@ -557,6 +654,9 @@ impl NodeGraphApp {
                          node.position += delta_world;
                      }
                  }
+            } else if !input.primary_down && was_dragging {
+                // Mouse released after dragging - auto-save
+                self.check_and_auto_save();
             }
 
             if input.secondary_pressed && rect.contains(pointer_pos) {
@@ -625,6 +725,74 @@ impl NodeGraphApp {
         let address = self.graph.locate_pin(pin_id)?;
         let node = &self.graph.nodes()[address.node_index];
         Some(self.pin_slot_position(node, canvas, address.kind, address.slot))
+    }
+
+    pub fn save_current_graph(&mut self) -> Result<(), String> {
+        self.workspace.save_graph(&self.graph)?;
+        self.last_save_hash = self.graph_hash();
+        self.last_save_time = Some(std::time::Instant::now());
+        Ok(())
+    }
+
+    pub fn load_graph_from_workspace(&mut self) -> Result<(), String> {
+        let graph = self.workspace.load_graph()?;
+        self.graph = graph;
+        self.graph.recalculate_ids();
+        self.interaction.selected_nodes.clear();
+        self.last_save_hash = self.graph_hash();
+        self.last_save_time = Some(std::time::Instant::now());
+        Ok(())
+    }
+
+    pub fn graph_hash(&self) -> u64 {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        let mut hasher = DefaultHasher::new();
+        serde_json::to_string(&self.graph).unwrap_or_default().hash(&mut hasher);
+        hasher.finish()
+    }
+
+    pub fn check_and_auto_save(&mut self) {
+        if self.workspace.auto_save && self.workspace.has_root() {
+            let current_hash = self.graph_hash();
+            if current_hash != self.last_save_hash {
+                if let Err(e) = self.save_current_graph() {
+                    eprintln!("Auto-save error: {}", e);
+                }
+            }
+        }
+    }
+
+    pub fn check_file_changes(&mut self) {
+        if self.workspace.has_root() {
+            if let Ok(node_map_path) = self.workspace.get_node_map_path().ok_or("") {
+                if node_map_path.exists() {
+                    if let Ok(metadata) = std::fs::metadata(&node_map_path) {
+                        if let Ok(_modified) = metadata.modified() {
+                            // Simple check: if file was modified externally, reload
+                            // In a real implementation, you'd track the last known modification time
+                            // For now, we'll just check if the hash differs
+                            if let Ok(loaded_graph) = self.workspace.load_graph() {
+                                let loaded_hash = {
+                                    use std::collections::hash_map::DefaultHasher;
+                                    use std::hash::{Hash, Hasher};
+                                    let mut hasher = DefaultHasher::new();
+                                    serde_json::to_string(&loaded_graph).unwrap_or_default().hash(&mut hasher);
+                                    hasher.finish()
+                                };
+                                
+                                if loaded_hash != self.last_save_hash && loaded_hash != self.graph_hash() {
+                                    // File was modified externally, reload
+                                    if let Err(e) = self.load_graph_from_workspace() {
+                                        eprintln!("Error reloading graph: {}", e);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

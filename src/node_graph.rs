@@ -1,18 +1,19 @@
 use eframe::egui::{Color32, Pos2, pos2};
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct NodeId(pub u64);
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PinId(pub u64);
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PinKind {
     Input,
     Output,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Pin {
     pub id: PinId,
     pub label: String,
@@ -20,29 +21,75 @@ pub struct Pin {
     pub kind: PinKind,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Node {
     pub id: NodeId,
     pub title: String,
+    #[serde(with = "pos2_serde")]
     pub position: Pos2,
+    #[serde(with = "color32_serde")]
     pub color: Color32,
     pub inputs: Vec<Pin>,
     pub outputs: Vec<Pin>,
     pub code: String,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Link {
     pub from: PinId,
     pub to: PinId,
+    #[serde(with = "color32_serde")]
     pub color: Color32,
 }
 
-#[derive(Default)]
+// Serialization helpers
+mod pos2_serde {
+    use eframe::egui::Pos2;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S>(pos: &Pos2, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        (pos.x, pos.y).serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Pos2, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let (x, y) = <(f32, f32)>::deserialize(deserializer)?;
+        Ok(Pos2::new(x, y))
+    }
+}
+
+mod color32_serde {
+    use eframe::egui::Color32;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S>(color: &Color32, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        (color.r(), color.g(), color.b(), color.a()).serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Color32, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let (r, g, b, a) = <(u8, u8, u8, u8)>::deserialize(deserializer)?;
+        Ok(Color32::from_rgba_unmultiplied(r, g, b, a))
+    }
+}
+
+#[derive(Default, Serialize, Deserialize)]
 pub struct NodeGraph {
     nodes: Vec<Node>,
     links: Vec<Link>,
+    #[serde(skip)]
     next_node_id: u64,
+    #[serde(skip)]
     next_pin_id: u64,
 }
 
@@ -90,6 +137,16 @@ impl NodeGraph {
 
     pub fn links(&self) -> &[Link] {
         &self.links
+    }
+
+    // Recalculate ID counters after deserialization
+    pub fn recalculate_ids(&mut self) {
+        self.next_node_id = self.nodes.iter().map(|n| n.id.0).max().unwrap_or(0) + 1;
+        self.next_pin_id = self.nodes.iter()
+            .flat_map(|n| n.inputs.iter().chain(n.outputs.iter()))
+            .map(|p| p.id.0)
+            .max()
+            .unwrap_or(0) + 1;
     }
 
     pub fn node_mut(&mut self, id: NodeId) -> Option<&mut Node> {
