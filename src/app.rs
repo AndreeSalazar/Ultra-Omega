@@ -873,93 +873,130 @@ impl NodeGraphApp {
                             ui.add_space(4.0);
                         }
 
-                        // Obtener código heredado y propio para combinarlos en un solo editor
-                        let inherited_for_edit = self.graph.get_inherited_code(id).unwrap_or_default();
-                        let inherited_evaluated = if !inherited_for_edit.is_empty() {
-                            self.evaluate_ch_expressions_in_code(&inherited_for_edit, id)
-                        } else {
-                            String::new()
-                        };
+                        // Obtener la cadena completa de herencia: A → B → C → ...
+                        let inheritance_chain = self.graph.get_inheritance_chain(id);
                         
-                        let own_code_initial = {
-                            if let Some(node) = self.graph.nodes().iter().find(|n| n.id == id) {
-                                let full_code = &node.code;
-                                // Separar código propio del heredado
-                                if !inherited_for_edit.is_empty() && full_code.starts_with(&inherited_for_edit) {
-                                    full_code[inherited_for_edit.len()..].trim_start_matches('\n').trim_start_matches('\r').to_string()
-                                } else {
-                                    full_code.clone()
-                                }
-                            } else {
-                                String::new()
-                            }
-                        };
-
-                        // Combinar código heredado + propio para mostrar en un solo editor
-                        let combined_code_display = if !inherited_evaluated.is_empty() {
-                            format!("{}\n\n{}", inherited_evaluated, own_code_initial)
-                        } else {
-                            own_code_initial.clone()
-                        };
+                        // Mostrar información de la cadena de herencia
+                        if !inheritance_chain.is_empty() {
+                            let chain_names: Vec<&str> = inheritance_chain.iter()
+                                .map(|(_, title, _)| title.as_str())
+                                .collect();
+                            
+                            ui.horizontal(|ui| {
+                                ui.label(
+                                    egui::RichText::new("🔗 Cadena de herencia:")
+                                        .small()
+                                        .color(Color32::from_rgb(150, 150, 150))
+                                );
+                                ui.label(
+                                    egui::RichText::new(chain_names.join(" → "))
+                                        .small()
+                                        .strong()
+                                        .color(Color32::from_rgb(89, 185, 89))
+                                );
+                            });
+                            ui.add_space(8.0);
+                        }
                         
-                        let _combined_lines = combined_code_display.lines().count().max(1);
-                        let inherited_lines_count = if !inherited_evaluated.is_empty() {
-                            inherited_evaluated.lines().count()
-                        } else {
-                            0
-                        };
-
-                        // Obtener código propio actualizado
-                        let current_own_code = if let Some(node) = self.graph.nodes().iter().find(|n| n.id == id) {
-                            let full_code = &node.code;
-                            if !inherited_for_edit.is_empty() && full_code.starts_with(&inherited_for_edit) {
-                                full_code[inherited_for_edit.len()..].trim_start_matches('\n').trim_start_matches('\r').to_string()
-                            } else {
-                                full_code.clone()
-                            }
-                        } else {
-                            own_code_initial.clone()
-                        };
+                        // Calcular total de líneas heredadas
+                        let mut total_inherited_lines = 0;
                         
-                        // Código heredado (solo lectura) con fondo verde
-                        if inherited_lines_count > 0 {
-                            egui::Frame::none()
-                                .fill(Color32::from_rgba_unmultiplied(89, 185, 89, 15))
-                                .inner_margin(egui::Margin::same(4.0))
-                                .rounding(egui::Rounding::same(4.0))
-                                .show(ui, |ui| {
-                                    ui.label(
-                                        egui::RichText::new("📦 Código heredado (solo lectura)")
-                                            .small()
-                                            .color(Color32::from_rgb(89, 185, 89))
-                                    );
+                        // Mostrar cada bloque heredado por separado con su etiqueta
+                        egui::ScrollArea::vertical()
+                            .max_height(300.0)
+                            .id_source("inherited_blocks")
+                            .show(ui, |ui| {
+                                for (i, (node_id, title, code)) in inheritance_chain.iter().enumerate() {
+                                    // Evaluar expresiones ch() en el código heredado
+                                    let evaluated_code = self.evaluate_ch_expressions_in_code(code, id);
+                                    let lines_in_block = evaluated_code.lines().count();
                                     
-                                    egui::ScrollArea::horizontal()
-                                        .max_height(150.0)
+                                    // Colores alternados para distinguir bloques
+                                    let bg_alpha = if i % 2 == 0 { 15 } else { 25 };
+                                    let border_color = if i % 2 == 0 {
+                                        Color32::from_rgb(89, 185, 89)
+                                    } else {
+                                        Color32::from_rgb(100, 200, 150)
+                                    };
+                                    
+                                    egui::Frame::none()
+                                        .fill(Color32::from_rgba_unmultiplied(89, 185, 89, bg_alpha))
+                                        .stroke(egui::Stroke::new(1.0, border_color))
+                                        .inner_margin(egui::Margin::same(6.0))
+                                        .outer_margin(egui::Margin::symmetric(0.0, 2.0))
+                                        .rounding(egui::Rounding::same(4.0))
                                         .show(ui, |ui| {
+                                            // Encabezado del bloque
+                                            ui.horizontal(|ui| {
+                                                ui.label(
+                                                    egui::RichText::new(format!("📦 Heredado de: {}", title))
+                                                        .small()
+                                                        .strong()
+                                                        .color(border_color)
+                                                );
+                                                
+                                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                    ui.label(
+                                                        egui::RichText::new(format!("Líneas {}-{}", 
+                                                            total_inherited_lines + 1,
+                                                            total_inherited_lines + lines_in_block
+                                                        ))
+                                                            .small()
+                                                            .color(Color32::from_gray(120))
+                                                    );
+                                                    
+                                                    // Botón para ir al nodo padre
+                                                    if ui.small_button("📝 Editar").clicked() {
+                                                        self.interaction.editing_node = Some(*node_id);
+                                                        self.interaction.selected_nodes.clear();
+                                                        self.interaction.selected_nodes.insert(*node_id);
+                                                        should_close = true;
+                                                    }
+                                                });
+                                            });
+                                            
+                                            ui.add_space(4.0);
+                                            
+                                            // Código del bloque (solo lectura)
                                             ui.add(
-                                                egui::TextEdit::multiline(&mut inherited_evaluated.as_str())
+                                                egui::TextEdit::multiline(&mut evaluated_code.as_str())
                                                     .font(egui::TextStyle::Monospace)
                                                     .code_editor()
                                                     .interactive(false)
                                                     .desired_width(f32::INFINITY)
                                             );
                                         });
-                                });
-                            
+                                    
+                                    total_inherited_lines += lines_in_block;
+                                }
+                            });
+                        
+                        // Separador visual si hay herencia
+                        if !inheritance_chain.is_empty() {
                             ui.add_space(8.0);
                             ui.separator();
                             ui.add_space(8.0);
+                            
+                            // Indicador de código propio
+                            ui.horizontal(|ui| {
+                                ui.label(
+                                    egui::RichText::new("✏️ Tu código (editable):")
+                                        .strong()
+                                        .color(Color32::from_rgb(100, 200, 255))
+                                );
+                            });
+                            ui.add_space(4.0);
                         }
                         
-                        // Editor de código propio (EDITABLE) - con números de línea integrados
+                        // Obtener código propio del nodo actual
+                        let current_own_code = self.graph.get_own_code(id);
                         let mut own_code_editable = current_own_code.clone();
                         let own_lines_count = own_code_editable.lines().count().max(1);
                         
                         // Calcular ancho de columna de números
-                        let total_lines = inherited_lines_count + own_lines_count;
+                        let total_lines = total_inherited_lines + own_lines_count;
                         let num_width = (total_lines.to_string().len() as f32 * 10.0) + 20.0;
-                        let start_line = inherited_lines_count + 1;
+                        let start_line = total_inherited_lines + 1;
                         
                         egui::ScrollArea::both()
                             .auto_shrink([false, false])

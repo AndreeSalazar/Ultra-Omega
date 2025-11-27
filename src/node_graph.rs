@@ -282,6 +282,54 @@ impl NodeGraph {
         None
     }
 
+    /// Obtener la cadena completa de herencia: A → B → C → ...
+    /// Devuelve un Vec de (NodeId, título, código) ordenado desde el más antiguo al más reciente
+    pub fn get_inheritance_chain(&self, node_id: NodeId) -> Vec<(NodeId, String, String)> {
+        let mut chain = Vec::new();
+        let mut current_id = Some(node_id);
+        
+        // Recolectar todos los ancestros (subir por la cadena)
+        while let Some(id) = current_id {
+            if let Some(parent_id) = self.get_parent_node(id) {
+                if let Some(parent) = self.nodes.iter().find(|n| n.id == parent_id) {
+                    chain.push((parent_id, parent.title.clone(), parent.code.clone()));
+                }
+                current_id = Some(parent_id);
+            } else {
+                current_id = None;
+            }
+        }
+        
+        // Revertir para que esté en orden: ancestro más antiguo primero
+        chain.reverse();
+        chain
+    }
+
+    /// Obtener el código propio de un nodo (sin el código heredado)
+    pub fn get_own_code(&self, node_id: NodeId) -> String {
+        if let Some(node) = self.nodes.iter().find(|n| n.id == node_id) {
+            // Obtener la cadena de herencia
+            let chain = self.get_inheritance_chain(node_id);
+            
+            if chain.is_empty() {
+                // No hay herencia, todo el código es propio
+                return node.code.clone();
+            }
+            
+            // El código del último ancestro directo
+            if let Some((_parent_id, _title, parent_code)) = chain.last() {
+                if node.code.starts_with(parent_code) {
+                    // Remover el código heredado
+                    return node.code[parent_code.len()..].trim_start_matches('\n').trim_start_matches('\r').to_string();
+                }
+            }
+            
+            node.code.clone()
+        } else {
+            String::new()
+        }
+    }
+
     pub fn locate_pin(&self, pin_id: PinId) -> Option<PinAddress> {
         self.nodes.iter().enumerate().find_map(|(idx, node)| {
             if let Some(slot) = node.inputs.iter().position(|pin| pin.id == pin_id) {
