@@ -1,5 +1,5 @@
 use eframe::egui::{self, Color32, Pos2, Rect, Sense, Stroke, Vec2, Visuals, pos2, PointerButton};
-use crate::node_graph::{self, NodeGraph, NodeId, PinId, PinKind};
+use crate::node_graph::{self, NodeGraph, NodeId, NodeLanguage, PinId, PinKind};
 use crate::terminal::{TerminalManager, TerminalTab};
 use crate::ui::viewport::Viewport2D;
 use crate::workspace::Workspace;
@@ -123,6 +123,7 @@ impl NodeGraphApp {
         for (node_id, title, code) in nodes_to_register {
             use crate::expressions::ChannelValue;
             app.channel_manager.set_channel(title.clone(), ChannelValue::Code(code.clone()));
+            app.channel_manager.set_channel(format!("{}/code", title.clone()), ChannelValue::Code(code.clone()));
             app.channel_manager.set_node_channel(node_id, "code".to_string(), ChannelValue::Code(code));
         }
         
@@ -315,14 +316,15 @@ impl NodeGraphApp {
         Rect::from_min_size(node.position, size)
     }
 
-    fn add_template_node(&mut self, ctx: &egui::Context, title: &str, code: &str, color: Color32) {
+    fn add_template_node(&mut self, ctx: &egui::Context, title: &str, code: &str, color: Color32, language: NodeLanguage) {
         let world_pos = self.viewport.screen_to_world(self.node_menu_pos, Rect::from_min_size(Pos2::ZERO, Vec2::new(10000.0, 10000.0)));
         
         // Todos los nodos tienen una entrada "Entrada" y una salida "Código"
-        let id = self.graph.add_node(title, world_pos, color, &["Entrada"], &["Código"]);
+        let id = self.graph.add_node(title, world_pos, color, &["Entrada"], &["Código"], language);
         let (node_title, node_code) = {
             if let Some(node) = self.graph.node_mut(id) {
                 node.code = code.to_string();
+                node.language = language;
                 (node.title.clone(), node.code.clone())
             } else {
                 return;
@@ -331,6 +333,7 @@ impl NodeGraphApp {
         // Registrar nodo en el sistema de canales (después de soltar el borrow)
         use crate::expressions::ChannelValue;
         self.channel_manager.set_channel(node_title.clone(), ChannelValue::Code(node_code.clone()));
+        self.channel_manager.set_channel(format!("{}/code", node_title.clone()), ChannelValue::Code(node_code.clone()));
         self.channel_manager.set_node_channel(id, "code".to_string(), ChannelValue::Code(node_code));
         
         // Auto-save immediately when a node is created
@@ -343,6 +346,47 @@ impl NodeGraphApp {
             }
         }
     }
+
+    fn resolve_effective_language(&self, node_id: NodeId, inheritance_chain: &[(NodeId, String, String)]) -> NodeLanguage {
+        if let Some(node) = self.graph.node(node_id) {
+            if node.language != NodeLanguage::Auto {
+                return node.language;
+            }
+        }
+
+        for (ancestor_id, _title, _code) in inheritance_chain.iter().rev() {
+            if let Some(node) = self.graph.node(*ancestor_id) {
+                if node.language != NodeLanguage::Auto {
+                    return node.language;
+                }
+            }
+        }
+
+        NodeLanguage::Auto
+    }
+
+    fn language_to_terminal(language: NodeLanguage, node_title: &str) -> crate::terminal::Language {
+        match language {
+            NodeLanguage::Asm => crate::terminal::Language::Nasm,
+            NodeLanguage::C => crate::terminal::Language::C,
+            NodeLanguage::Cpp => crate::terminal::Language::Cpp,
+            NodeLanguage::Rust => crate::terminal::Language::Rust,
+            NodeLanguage::Auto => {
+                let lower = node_title.to_lowercase();
+                if lower.contains("asm") {
+                    crate::terminal::Language::Nasm
+                } else if lower.contains("cpp") || lower.contains("c++") {
+                    crate::terminal::Language::Cpp
+                } else if lower.contains("rust") {
+                    crate::terminal::Language::Rust
+                } else if lower.contains("c ") || lower.ends_with('c') {
+                    crate::terminal::Language::C
+                } else {
+                    crate::terminal::Language::C
+                }
+            }
+        }
+    }
     
     /// Registrar un nodo en el sistema de canales para acceso mediante ch()
     fn register_node_in_channels(&mut self, node_id: crate::node_graph::NodeId, node: &crate::node_graph::Node) {
@@ -350,6 +394,10 @@ impl NodeGraphApp {
         // Registrar por nombre del nodo
         self.channel_manager.set_channel(
             node.title.clone(),
+            ChannelValue::Code(node.code.clone()),
+        );
+        self.channel_manager.set_channel(
+            format!("{}/code", node.title.clone()),
             ChannelValue::Code(node.code.clone()),
         );
         // Registrar por ID del nodo
@@ -368,6 +416,7 @@ impl NodeGraphApp {
             let code = node.code.clone();
             use crate::expressions::ChannelValue;
             self.channel_manager.set_channel(title.clone(), ChannelValue::Code(code.clone()));
+            self.channel_manager.set_channel(format!("{}/code", title.clone()), ChannelValue::Code(code.clone()));
             self.channel_manager.set_node_channel(node_id, "code".to_string(), ChannelValue::Code(code));
         }
     }
@@ -539,13 +588,14 @@ impl NodeGraphApp {
                                             };
                                             
                                             let world_pos = self.viewport.screen_to_world(self.node_menu_pos, Rect::from_min_size(Pos2::ZERO, Vec2::new(10000.0, 10000.0)));
-                                            let id = self.graph.add_node(&title, world_pos, Color32::from_rgb(100, 150, 200), &["Entrada"], &["Código"]);
+                                            let id = self.graph.add_node(&title, world_pos, Color32::from_rgb(100, 150, 200), &["Entrada"], &["Código"], NodeLanguage::Auto);
                                             
                                             if let Some(node) = self.graph.nodes().iter().find(|n| n.id == id) {
                                                 let title_clone = node.title.clone();
                                                 let code_clone = node.code.clone();
                                                 use crate::expressions::ChannelValue;
                                                 self.channel_manager.set_channel(title_clone.clone(), ChannelValue::Code(code_clone.clone()));
+                                                self.channel_manager.set_channel(format!("{}/code", title_clone.clone()), ChannelValue::Code(code_clone.clone()));
                                                 self.channel_manager.set_node_channel(id, "code".to_string(), ChannelValue::Code(code_clone));
                                             }
                                             
@@ -609,7 +659,7 @@ impl NodeGraphApp {
             if let Some(template) = template_to_add {
                 let color = Color32::from_rgb(template.color.0, template.color.1, template.color.2);
                 let title = format!("{}: {}", template.category, template.name);
-                self.add_template_node(ctx, &title, template.code, color);
+                self.add_template_node(ctx, &title, template.code, color, template.language);
             }
                 
             if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
@@ -711,7 +761,7 @@ impl NodeGraphApp {
             if let Some(template) = template_to_add {
                 let color = Color32::from_rgb(template.color.0, template.color.1, template.color.2);
                 let title = format!("{}: {}", template.category, template.name);
-                self.add_template_node(ctx, &title, template.code, color);
+                self.add_template_node(ctx, &title, template.code, color, template.language);
             }
                 
             if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
@@ -912,6 +962,7 @@ impl NodeGraphApp {
                             .find(|n| n.id == id)
                             .map(|n| n.code.lines().count())
                             .unwrap_or(1);
+                        let inheritance_chain = self.graph.get_inheritance_chain(id);
                         
                         // Estado para acciones del UI
                         let (can_undo, can_redo) = if let Some(history) = &self.interaction.editor_history {
@@ -992,15 +1043,8 @@ impl NodeGraphApp {
                         }
                         if execute_clicked {
                             if let Some(node) = self.graph.nodes().iter().find(|n| n.id == id) {
-                                let lang = if node.title.contains("ASM") {
-                                    crate::terminal::Language::Nasm
-                                } else if node.title.contains("C++") {
-                                    crate::terminal::Language::Cpp
-                                } else if node.title.contains("Rust") {
-                                    crate::terminal::Language::Rust
-                                } else {
-                                    crate::terminal::Language::C
-                                };
+                                let effective_language = self.resolve_effective_language(id, &inheritance_chain);
+                                let lang = Self::language_to_terminal(effective_language, &node.title);
                                 let workspace_path = self.workspace.root_path.as_ref();
                                 // Combinar código heredado + propio para ejecutar
                                 let inherited_raw = self.graph.get_inherited_code(id).unwrap_or_default();
@@ -1056,9 +1100,6 @@ impl NodeGraphApp {
                             ui.add_space(4.0);
                         }
 
-                        // Obtener la cadena completa de herencia: A → B → C → ...
-                        let inheritance_chain = self.graph.get_inheritance_chain(id);
-                        
                         // Mostrar información de la cadena de herencia
                         if !inheritance_chain.is_empty() {
                             let chain_names: Vec<&str> = inheritance_chain.iter()
@@ -1080,6 +1121,89 @@ impl NodeGraphApp {
                             });
                             ui.add_space(8.0);
                         }
+                        
+                        // Construir lista de canales disponibles a través de la cadena de herencia
+                        let mut available_channels: Vec<(String, String, String, String)> = Vec::new();
+                        for (ancestor_id, ancestor_title, _) in &inheritance_chain {
+                            if let Some(channels) = self.channel_manager.get_node_channels(*ancestor_id) {
+                                for (name, value) in channels {
+                                    let expr = if name == "code" {
+                                        format!(r#"ch("{}")"#, ancestor_title)
+                                    } else {
+                                        format!(r#"ch("{}/{}")"#, ancestor_title, name)
+                                    };
+                                    available_channels.push((
+                                        ancestor_title.clone(),
+                                        name.clone(),
+                                        value.as_string(),
+                                        expr,
+                                    ));
+                                }
+                            }
+                        }
+                        if let Some(node_channels) = self.channel_manager.get_node_channels(id) {
+                            for (name, value) in node_channels {
+                                let expr = if name == "code" {
+                                    format!(r#"ch("{}")"#, node_title)
+                                } else {
+                                    format!(r#"ch("{}/{}")"#, node_title, name)
+                                };
+                                available_channels.push((
+                                    format!("{} (este nodo)", node_title),
+                                    name.clone(),
+                                    value.as_string(),
+                                    expr,
+                                ));
+                            }
+                        }
+                        
+                        ui.collapsing("📡 Canales disponibles para ch()", |ui| {
+                            if available_channels.is_empty() {
+                                ui.label("Conecta este nodo a otro para heredar canales disponibles.");
+                            } else {
+                                for (node_label, channel_name, preview, expr) in &available_channels {
+                                    ui.horizontal(|ui| {
+                                        let label_text = if channel_name == "code" {
+                                            format!("{} → código", node_label)
+                                        } else {
+                                            format!("{} → {}", node_label, channel_name)
+                                        };
+                                        ui.label(
+                                            egui::RichText::new(label_text)
+                                                .strong()
+                                                .color(Color32::from_rgb(150, 200, 255))
+                                        );
+                                        ui.label(
+                                            egui::RichText::new(expr)
+                                                .monospace()
+                                                .color(Color32::from_rgb(100, 200, 255))
+                                        );
+                                        if ui.small_button("Copiar ch").clicked() {
+                                            let expr_clip = expr.clone();
+                                            ctx.output_mut(|o| o.copied_text = expr_clip);
+                                        }
+                                    });
+                                    
+                                    let preview_line = preview.lines().next().unwrap_or("").trim();
+                                    if !preview_line.is_empty() {
+                                        let mut snippet = preview_line.to_string();
+                                        if snippet.len() > 80 {
+                                            snippet.truncate(80);
+                                            snippet.push('…');
+                                        }
+                                        ui.label(
+                                            egui::RichText::new(snippet)
+                                                .small()
+                                                .color(Color32::from_gray(140))
+                                        );
+                                    }
+                                    
+                                    ui.add_space(4.0);
+                                    ui.separator();
+                                }
+                            }
+                        });
+                        ui.add_space(8.0);
                         
                         // Calcular total de líneas heredadas
                         let mut total_inherited_lines = 0;

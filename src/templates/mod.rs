@@ -2,6 +2,8 @@
 // Templates de código para Ultra Omega
 // ═══════════════════════════════════════════════════════════════════════════
 
+use crate::node_graph::NodeLanguage;
+
 // ══════════════════════════════════════════
 // ASSEMBLER (NASM x64)
 // ══════════════════════════════════════════
@@ -73,6 +75,7 @@ pub struct Template {
     pub subcategory: &'static str,
     pub color: (u8, u8, u8),  // RGB
     pub icon: &'static str,
+    pub language: NodeLanguage,
 }
 
 // Todos los templates en un vector para búsqueda
@@ -88,6 +91,7 @@ pub fn all_templates() -> Vec<Template> {
             subcategory: "Básico",
             color: (0xff, 0x47, 0x00),
             icon: "⏵",
+            language: NodeLanguage::Asm,
         },
         Template {
             name: "Suma",
@@ -96,6 +100,7 @@ pub fn all_templates() -> Vec<Template> {
             subcategory: "Básico",
             color: (0xff, 0x47, 0x00),
             icon: "➕",
+            language: NodeLanguage::Asm,
         },
         Template {
             name: "Bucle",
@@ -104,6 +109,7 @@ pub fn all_templates() -> Vec<Template> {
             subcategory: "Básico",
             color: (0xff, 0x47, 0x00),
             icon: "↻",
+            language: NodeLanguage::Asm,
         },
         Template {
             name: "Condicional",
@@ -112,6 +118,7 @@ pub fn all_templates() -> Vec<Template> {
             subcategory: "Básico",
             color: (0xff, 0x47, 0x00),
             icon: "🔀",
+            language: NodeLanguage::Asm,
         },
         // ASM - Intermedio
         Template {
@@ -121,6 +128,7 @@ pub fn all_templates() -> Vec<Template> {
             subcategory: "Intermedio",
             color: (0xff, 0x47, 0x00),
             icon: "📦",
+            language: NodeLanguage::Asm,
         },
         Template {
             name: "Funciones",
@@ -129,6 +137,7 @@ pub fn all_templates() -> Vec<Template> {
             subcategory: "Intermedio",
             color: (0xff, 0x47, 0x00),
             icon: "⚡",
+            language: NodeLanguage::Asm,
         },
         Template {
             name: "Strings",
@@ -137,6 +146,7 @@ pub fn all_templates() -> Vec<Template> {
             subcategory: "Intermedio",
             color: (0xff, 0x47, 0x00),
             icon: "📝",
+            language: NodeLanguage::Asm,
         },
         Template {
             name: "Arrays",
@@ -145,6 +155,7 @@ pub fn all_templates() -> Vec<Template> {
             subcategory: "Intermedio",
             color: (0xff, 0x47, 0x00),
             icon: "📊",
+            language: NodeLanguage::Asm,
         },
         
         // ══════════════════════════════════════════
@@ -157,6 +168,7 @@ pub fn all_templates() -> Vec<Template> {
             subcategory: "Básico",
             color: (0x00, 0x59, 0x9C),
             icon: "⏵",
+            language: NodeLanguage::C,
         },
         Template {
             name: "Variables",
@@ -165,6 +177,7 @@ pub fn all_templates() -> Vec<Template> {
             subcategory: "Básico",
             color: (0x00, 0x59, 0x9C),
             icon: "📦",
+            language: NodeLanguage::C,
         },
         Template {
             name: "Funciones",
@@ -173,6 +186,7 @@ pub fn all_templates() -> Vec<Template> {
             subcategory: "Básico",
             color: (0x00, 0x59, 0x9C),
             icon: "⚡",
+            language: NodeLanguage::C,
         },
         // C - Intermedio
         Template {
@@ -182,6 +196,7 @@ pub fn all_templates() -> Vec<Template> {
             subcategory: "Intermedio",
             color: (0x00, 0x59, 0x9C),
             icon: "📊",
+            language: NodeLanguage::C,
         },
         Template {
             name: "Structs",
@@ -190,6 +205,7 @@ pub fn all_templates() -> Vec<Template> {
             subcategory: "Intermedio",
             color: (0x00, 0x59, 0x9C),
             icon: "🏗️",
+            language: NodeLanguage::C,
         },
         
         // ══════════════════════════════════════════
@@ -202,6 +218,7 @@ pub fn all_templates() -> Vec<Template> {
             subcategory: "Básico",
             color: (0x00, 0x44, 0x82),
             icon: "⏵",
+            language: NodeLanguage::Cpp,
         },
         Template {
             name: "Variables",
@@ -210,6 +227,7 @@ pub fn all_templates() -> Vec<Template> {
             subcategory: "Básico",
             color: (0x00, 0x44, 0x82),
             icon: "📦",
+            language: NodeLanguage::Cpp,
         },
         // C++ - Intermedio
         Template {
@@ -219,6 +237,7 @@ pub fn all_templates() -> Vec<Template> {
             subcategory: "Intermedio",
             color: (0x00, 0x44, 0x82),
             icon: "🏛️",
+            language: NodeLanguage::Cpp,
         },
         Template {
             name: "STL",
@@ -227,6 +246,7 @@ pub fn all_templates() -> Vec<Template> {
             subcategory: "Avanzado",
             color: (0x00, 0x44, 0x82),
             icon: "📚",
+            language: NodeLanguage::Cpp,
         },
         Template {
             name: "C++ Moderno",
@@ -235,6 +255,7 @@ pub fn all_templates() -> Vec<Template> {
             subcategory: "Avanzado",
             color: (0x00, 0x44, 0x82),
             icon: "🚀",
+            language: NodeLanguage::Cpp,
         },
         
         // ══════════════════════════════════════════
@@ -247,6 +268,7 @@ pub fn all_templates() -> Vec<Template> {
             subcategory: "Básico",
             color: (0xde, 0x39, 0x00),
             icon: "🦀",
+            language: NodeLanguage::Rust,
         },
         Template {
             name: "Variables",
@@ -255,6 +277,7 @@ pub fn all_templates() -> Vec<Template> {
             subcategory: "Básico",
             color: (0xde, 0x39, 0x00),
             icon: "📦",
+            language: NodeLanguage::Rust,
         },
         Template {
             name: "Funciones",
@@ -263,6 +286,7 @@ pub fn all_templates() -> Vec<Template> {
             subcategory: "Básico",
             color: (0xde, 0x39, 0x00),
             icon: "⚡",
+            language: NodeLanguage::Rust,
         },
         // Rust - Intermedio
         Template {
@@ -272,6 +296,7 @@ pub fn all_templates() -> Vec<Template> {
             subcategory: "Intermedio",
             color: (0xde, 0x39, 0x00),
             icon: "🏗️",
+            language: NodeLanguage::Rust,
         },
         Template {
             name: "Ownership",
@@ -280,6 +305,7 @@ pub fn all_templates() -> Vec<Template> {
             subcategory: "Avanzado",
             color: (0xde, 0x39, 0x00),
             icon: "🔒",
+            language: NodeLanguage::Rust,
         },
         Template {
             name: "Traits",
@@ -288,6 +314,7 @@ pub fn all_templates() -> Vec<Template> {
             subcategory: "Avanzado",
             color: (0xde, 0x39, 0x00),
             icon: "🎭",
+            language: NodeLanguage::Rust,
         },
     ]
 }

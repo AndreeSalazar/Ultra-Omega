@@ -13,6 +13,21 @@ pub enum PinKind {
     Output,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum NodeLanguage {
+    Auto,
+    Asm,
+    C,
+    Cpp,
+    Rust,
+}
+
+impl Default for NodeLanguage {
+    fn default() -> Self {
+        NodeLanguage::Auto
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Pin {
     pub id: PinId,
@@ -32,6 +47,8 @@ pub struct Node {
     pub inputs: Vec<Pin>,
     pub outputs: Vec<Pin>,
     pub code: String,
+    #[serde(default)]
+    pub language: NodeLanguage,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -111,6 +128,7 @@ impl NodeGraph {
             Color32::from_rgb(0xff, 0x47, 0x00), // Orange-Red for low level/danger
             &[],
             &["Código Fuente"],
+            NodeLanguage::Asm,
         );
         if let Some(node) = graph.node_mut(asm_node_id) {
             node.code = "default rel\nsection .text\nglobal main\nextern printf\nextern exit\n\nmain:\n    sub rsp, 40\n    mov rcx, msg\n    xor eax, eax\n    call printf\n    add rsp, 40\n    ret\n\nsection .data\n    msg db 'Hola ASM desde Ultra Omega!', 10, 0".to_string();
@@ -123,6 +141,7 @@ impl NodeGraph {
             Color32::from_rgb(0x00, 0x59, 0x9C), // C++ Blue-ish
             &[],
             &["Código C"],
+            NodeLanguage::C,
         );
         if let Some(node) = graph.node_mut(c_node_id) {
             node.code = "#include <stdio.h>\n\nint main() {\n    printf(\"Hola desde C en Ultra Omega!\\n\");\n    return 0;\n}".to_string();
@@ -157,6 +176,10 @@ impl NodeGraph {
 
     pub fn node_mut(&mut self, id: NodeId) -> Option<&mut Node> {
         self.nodes.iter_mut().find(|node| node.id == id)
+    }
+
+    pub fn node(&self, id: NodeId) -> Option<&Node> {
+        self.nodes.iter().find(|node| node.id == id)
     }
 
     #[allow(dead_code)] // Available for single node deletion if needed
@@ -205,6 +228,7 @@ impl NodeGraph {
         color: Color32,
         inputs: &[&str],
         outputs: &[&str],
+        language: NodeLanguage,
     ) -> NodeId {
         let id = self.alloc_node_id();
         let input_pins = inputs
@@ -224,6 +248,7 @@ impl NodeGraph {
             inputs: input_pins,
             outputs: output_pins,
             code: String::new(),
+            language,
         });
 
         id
