@@ -130,6 +130,7 @@ pub mod fastos64 {
     // Bootloader UEFI
     pub const BOOT_UEFI: &str = include_str!("fastos64/boot_uefi.asm");
     pub const KERNEL_ENTRY64: &str = include_str!("fastos64/kernel_entry64.asm");
+    pub const BOOT_MULTIBOOT2: &str = include_str!("fastos64/boot_multiboot2.asm");
     
     // Kernel
     pub const KERNEL_MAIN64: &str = include_str!("fastos64/kernel_main64.c");
@@ -139,9 +140,13 @@ pub mod fastos64 {
     // Gráficos
     pub const FRAMEBUFFER_H: &str = include_str!("fastos64/framebuffer.h");
     pub const FRAMEBUFFER_C: &str = include_str!("fastos64/framebuffer.c");
+    pub const FONT8X16_H: &str = include_str!("fastos64/font8x16.h");
     
     // Sistema
     pub const IDT64_H: &str = include_str!("fastos64/idt64.h");
+    pub const MEMORY64_H: &str = include_str!("fastos64/memory64.h");
+    pub const KEYBOARD64_H: &str = include_str!("fastos64/keyboard64.h");
+    pub const SHELL64_H: &str = include_str!("fastos64/shell64.h");
     
     // PCI (para detección de GPU)
     pub const PCI_H: &str = include_str!("fastos64/pci.h");
@@ -155,8 +160,25 @@ pub mod fastos64 {
     pub const VULKAN_FASTOS_H: &str = include_str!("fastos64/vulkan_fastos.h");
     pub const VULKAN_FASTOS_C: &str = include_str!("fastos64/vulkan_fastos.c");
     
+    // Vulkan Nativo (para GPU Passthrough)
+    pub const VULKAN_NATIVE_H: &str = include_str!("fastos64/vulkan_native.h");
+    pub const VULKAN_NATIVE_C: &str = include_str!("fastos64/vulkan_native.c");
+    
+    // Desktop (Window Manager estilo Windows 11)
+    pub const WINDOW_C: &str = include_str!("fastos64/desktop/window.c");
+    pub const TASKBAR_C: &str = include_str!("fastos64/desktop/taskbar.c");
+    pub const GRAPHICS_C: &str = include_str!("fastos64/desktop/graphics.c");
+    pub const MOUSE_C: &str = include_str!("fastos64/desktop/mouse.c");
+    
+    // Build System
+    pub const LINKER64_LD: &str = include_str!("fastos64/linker64.ld");
+    pub const MAKEFILE: &str = include_str!("fastos64/Makefile");
+    pub const BUILD64_BAT: &str = include_str!("fastos64/build64.bat");
+    pub const BUILD_SIMPLE_BAT: &str = include_str!("fastos64/build_simple.bat");
+    
     // Documentación
     pub const README: &str = include_str!("fastos64/README.md");
+    pub const VFIO_PASSTHROUGH: &str = include_str!("fastos64/vfio_passthrough.md");
 }
 
 // ══════════════════════════════════════════
@@ -1109,6 +1131,126 @@ pub fn all_templates() -> Vec<Template> {
         },
         
         // ══════════════════════════════════════════════════════════════
+        // FASTOS 64-BIT - VULKAN NATIVO (GPU Passthrough)
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "🚀 Vulkan Native Header",
+            code: fastos64::VULKAN_NATIVE_H,
+            category: "FastOS 64-bit",
+            subcategory: "Vulkan Native",
+            color: (0xac, 0x14, 0x2c),
+            icon: "🎮",
+            language: NodeLanguage::C,
+        },
+        Template {
+            name: "🚀 Vulkan Native Impl",
+            code: fastos64::VULKAN_NATIVE_C,
+            category: "FastOS 64-bit",
+            subcategory: "Vulkan Native",
+            color: (0xac, 0x14, 0x2c),
+            icon: "🎮",
+            language: NodeLanguage::C,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // FASTOS 64-BIT - DESKTOP (Window Manager)
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "🚀 Window Manager",
+            code: fastos64::WINDOW_C,
+            category: "FastOS 64-bit",
+            subcategory: "Desktop",
+            color: (0x00, 0x78, 0xd4),
+            icon: "🪟",
+            language: NodeLanguage::C,
+        },
+        Template {
+            name: "🚀 Taskbar",
+            code: fastos64::TASKBAR_C,
+            category: "FastOS 64-bit",
+            subcategory: "Desktop",
+            color: (0x00, 0x78, 0xd4),
+            icon: "📊",
+            language: NodeLanguage::C,
+        },
+        Template {
+            name: "🚀 Graphics Primitives",
+            code: fastos64::GRAPHICS_C,
+            category: "FastOS 64-bit",
+            subcategory: "Desktop",
+            color: (0x00, 0x78, 0xd4),
+            icon: "🎨",
+            language: NodeLanguage::C,
+        },
+        Template {
+            name: "🚀 Mouse Driver",
+            code: fastos64::MOUSE_C,
+            category: "FastOS 64-bit",
+            subcategory: "Desktop",
+            color: (0x00, 0x78, 0xd4),
+            icon: "🖱️",
+            language: NodeLanguage::C,
+        },
+        Template {
+            name: "🚀 Font 8x16",
+            code: fastos64::FONT8X16_H,
+            category: "FastOS 64-bit",
+            subcategory: "Desktop",
+            color: (0x00, 0x78, 0xd4),
+            icon: "🔤",
+            language: NodeLanguage::C,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // FASTOS 64-BIT - BUILD SYSTEM
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "🚀 Linker Script 64",
+            code: fastos64::LINKER64_LD,
+            category: "FastOS 64-bit",
+            subcategory: "Build",
+            color: (0x88, 0x88, 0x00),
+            icon: "🔗",
+            language: NodeLanguage::Text,
+        },
+        Template {
+            name: "🚀 Makefile",
+            code: fastos64::MAKEFILE,
+            category: "FastOS 64-bit",
+            subcategory: "Build",
+            color: (0x88, 0x88, 0x00),
+            icon: "🛠️",
+            language: NodeLanguage::Text,
+        },
+        Template {
+            name: "🚀 Build Script (Full)",
+            code: fastos64::BUILD64_BAT,
+            category: "FastOS 64-bit",
+            subcategory: "Build",
+            color: (0x88, 0x88, 0x00),
+            icon: "⚙️",
+            language: NodeLanguage::Text,
+        },
+        Template {
+            name: "🚀 Build Script (Simple)",
+            code: fastos64::BUILD_SIMPLE_BAT,
+            category: "FastOS 64-bit",
+            subcategory: "Build",
+            color: (0x88, 0x88, 0x00),
+            icon: "⚙️",
+            language: NodeLanguage::Text,
+        },
+        Template {
+            name: "🚀 Boot Multiboot2",
+            code: fastos64::BOOT_MULTIBOOT2,
+            category: "FastOS 64-bit",
+            subcategory: "Bootloader",
+            color: (0x00, 0xd4, 0xff),
+            icon: "💿",
+            language: NodeLanguage::Asm,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
         // FASTOS 64-BIT - DOCUMENTACIÓN
         // ══════════════════════════════════════════════════════════════
         Template {
@@ -1118,6 +1260,15 @@ pub fn all_templates() -> Vec<Template> {
             subcategory: "Docs",
             color: (0x88, 0x88, 0x88),
             icon: "📖",
+            language: NodeLanguage::Text,
+        },
+        Template {
+            name: "🚀 VFIO GPU Passthrough",
+            code: fastos64::VFIO_PASSTHROUGH,
+            category: "FastOS 64-bit",
+            subcategory: "Docs",
+            color: (0x76, 0xb9, 0x00),
+            icon: "🎮",
             language: NodeLanguage::Text,
         },
     ]
