@@ -1,5 +1,6 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // Templates de código para Ultra Omega
+// Organizados por jerarquía: Básico → Intermedio → Avanzado
 // ═══════════════════════════════════════════════════════════════════════════
 
 use crate::node_graph::NodeLanguage;
@@ -19,6 +20,13 @@ pub mod asm {
     pub const FUNCTIONS: &str = include_str!("asm/functions.asm");
     pub const STRINGS: &str = include_str!("asm/strings.asm");
     pub const ARRAYS: &str = include_str!("asm/arrays.asm");
+    
+    // Librerías independientes (para herencia)
+    pub const LIB_PRINT: &str = include_str!("asm/lib_print.asm");
+    pub const LIB_MATH: &str = include_str!("asm/lib_math.asm");
+    pub const LIB_STRING: &str = include_str!("asm/lib_string.asm");
+    pub const LIB_MEMORY: &str = include_str!("asm/lib_memory.asm");
+    pub const LIB_IO: &str = include_str!("asm/lib_io.asm");
 }
 
 // ══════════════════════════════════════════
@@ -33,6 +41,12 @@ pub mod c {
     // Intermedio
     pub const ARRAYS: &str = include_str!("c/arrays.c");
     pub const STRUCTS: &str = include_str!("c/structs.c");
+    
+    // Librerías independientes (para herencia)
+    pub const LIB_UTILS: &str = include_str!("c/lib_utils.c");
+    pub const LIB_STRING: &str = include_str!("c/lib_string.c");
+    pub const LIB_MEMORY: &str = include_str!("c/lib_memory.c");
+    pub const LIB_IO: &str = include_str!("c/lib_io.c");
 }
 
 // ══════════════════════════════════════════
@@ -81,9 +95,9 @@ pub struct Template {
 // Todos los templates en un vector para búsqueda
 pub fn all_templates() -> Vec<Template> {
     vec![
-        // ══════════════════════════════════════════
-        // ASM - Básico
-        // ══════════════════════════════════════════
+        // ══════════════════════════════════════════════════════════════
+        // ASM/NASM - BÁSICO
+        // ══════════════════════════════════════════════════════════════
         Template {
             name: "Hola Mundo",
             code: asm::HELLO,
@@ -94,7 +108,7 @@ pub fn all_templates() -> Vec<Template> {
             language: NodeLanguage::Asm,
         },
         Template {
-            name: "Suma",
+            name: "Suma Básica",
             code: asm::SUM,
             category: "Assembler",
             subcategory: "Básico",
@@ -103,7 +117,7 @@ pub fn all_templates() -> Vec<Template> {
             language: NodeLanguage::Asm,
         },
         Template {
-            name: "Bucle",
+            name: "Bucle Simple",
             code: asm::LOOP,
             category: "Assembler",
             subcategory: "Básico",
@@ -112,7 +126,7 @@ pub fn all_templates() -> Vec<Template> {
             language: NodeLanguage::Asm,
         },
         Template {
-            name: "Condicional",
+            name: "Condicional If/Else",
             code: asm::CONDITIONAL,
             category: "Assembler",
             subcategory: "Básico",
@@ -120,9 +134,12 @@ pub fn all_templates() -> Vec<Template> {
             icon: "🔀",
             language: NodeLanguage::Asm,
         },
-        // ASM - Intermedio
+        
+        // ══════════════════════════════════════════════════════════════
+        // ASM/NASM - INTERMEDIO
+        // ══════════════════════════════════════════════════════════════
         Template {
-            name: "Variables",
+            name: "Variables y Datos",
             code: asm::VARIABLES,
             category: "Assembler",
             subcategory: "Intermedio",
@@ -131,7 +148,7 @@ pub fn all_templates() -> Vec<Template> {
             language: NodeLanguage::Asm,
         },
         Template {
-            name: "Funciones",
+            name: "Funciones y Llamadas",
             code: asm::FUNCTIONS,
             category: "Assembler",
             subcategory: "Intermedio",
@@ -140,7 +157,7 @@ pub fn all_templates() -> Vec<Template> {
             language: NodeLanguage::Asm,
         },
         Template {
-            name: "Strings",
+            name: "Manejo de Strings",
             code: asm::STRINGS,
             category: "Assembler",
             subcategory: "Intermedio",
@@ -149,7 +166,7 @@ pub fn all_templates() -> Vec<Template> {
             language: NodeLanguage::Asm,
         },
         Template {
-            name: "Arrays",
+            name: "Arrays y Memoria",
             code: asm::ARRAYS,
             category: "Assembler",
             subcategory: "Intermedio",
@@ -158,9 +175,58 @@ pub fn all_templates() -> Vec<Template> {
             language: NodeLanguage::Asm,
         },
         
-        // ══════════════════════════════════════════
-        // C - Básico
-        // ══════════════════════════════════════════
+        // ══════════════════════════════════════════════════════════════
+        // ASM/NASM - LIBRERÍAS (Componentes independientes)
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "📚 Lib: Impresión",
+            code: asm::LIB_PRINT,
+            category: "Assembler",
+            subcategory: "Librerías",
+            color: (0x80, 0x40, 0x00),
+            icon: "🖨️",
+            language: NodeLanguage::Asm,
+        },
+        Template {
+            name: "📚 Lib: Matemáticas",
+            code: asm::LIB_MATH,
+            category: "Assembler",
+            subcategory: "Librerías",
+            color: (0x80, 0x40, 0x00),
+            icon: "🔢",
+            language: NodeLanguage::Asm,
+        },
+        Template {
+            name: "📚 Lib: Strings",
+            code: asm::LIB_STRING,
+            category: "Assembler",
+            subcategory: "Librerías",
+            color: (0x80, 0x40, 0x00),
+            icon: "📝",
+            language: NodeLanguage::Asm,
+        },
+        Template {
+            name: "📚 Lib: Memoria",
+            code: asm::LIB_MEMORY,
+            category: "Assembler",
+            subcategory: "Librerías",
+            color: (0x80, 0x40, 0x00),
+            icon: "💾",
+            language: NodeLanguage::Asm,
+        },
+        Template {
+            name: "📚 Lib: Entrada/Salida",
+            code: asm::LIB_IO,
+            category: "Assembler",
+            subcategory: "Librerías",
+            color: (0x80, 0x40, 0x00),
+            icon: "⌨️",
+            language: NodeLanguage::Asm,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // C - BÁSICO
+        // ══════════════════════════════════════════════════════════════
         Template {
             name: "Hola Mundo",
             code: c::HELLO,
@@ -171,7 +237,7 @@ pub fn all_templates() -> Vec<Template> {
             language: NodeLanguage::C,
         },
         Template {
-            name: "Variables",
+            name: "Variables y Tipos",
             code: c::VARIABLES,
             category: "C",
             subcategory: "Básico",
@@ -188,7 +254,10 @@ pub fn all_templates() -> Vec<Template> {
             icon: "⚡",
             language: NodeLanguage::C,
         },
-        // C - Intermedio
+        
+        // ══════════════════════════════════════════════════════════════
+        // C - INTERMEDIO
+        // ══════════════════════════════════════════════════════════════
         Template {
             name: "Arrays",
             code: c::ARRAYS,
@@ -199,7 +268,7 @@ pub fn all_templates() -> Vec<Template> {
             language: NodeLanguage::C,
         },
         Template {
-            name: "Structs",
+            name: "Estructuras",
             code: c::STRUCTS,
             category: "C",
             subcategory: "Intermedio",
@@ -208,9 +277,49 @@ pub fn all_templates() -> Vec<Template> {
             language: NodeLanguage::C,
         },
         
-        // ══════════════════════════════════════════
-        // C++ - Básico
-        // ══════════════════════════════════════════
+        // ══════════════════════════════════════════════════════════════
+        // C - LIBRERÍAS (Componentes independientes)
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "📚 Lib: Utilidades",
+            code: c::LIB_UTILS,
+            category: "C",
+            subcategory: "Librerías",
+            color: (0x00, 0x40, 0x70),
+            icon: "🔧",
+            language: NodeLanguage::C,
+        },
+        Template {
+            name: "📚 Lib: Strings",
+            code: c::LIB_STRING,
+            category: "C",
+            subcategory: "Librerías",
+            color: (0x00, 0x40, 0x70),
+            icon: "📝",
+            language: NodeLanguage::C,
+        },
+        Template {
+            name: "📚 Lib: Memoria",
+            code: c::LIB_MEMORY,
+            category: "C",
+            subcategory: "Librerías",
+            color: (0x00, 0x40, 0x70),
+            icon: "💾",
+            language: NodeLanguage::C,
+        },
+        Template {
+            name: "📚 Lib: Entrada/Salida",
+            code: c::LIB_IO,
+            category: "C",
+            subcategory: "Librerías",
+            color: (0x00, 0x40, 0x70),
+            icon: "⌨️",
+            language: NodeLanguage::C,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // C++ - BÁSICO
+        // ══════════════════════════════════════════════════════════════
         Template {
             name: "Hola Mundo",
             code: cpp::HELLO,
@@ -221,7 +330,7 @@ pub fn all_templates() -> Vec<Template> {
             language: NodeLanguage::Cpp,
         },
         Template {
-            name: "Variables",
+            name: "Variables Modernas",
             code: cpp::VARIABLES,
             category: "C++",
             subcategory: "Básico",
@@ -229,9 +338,12 @@ pub fn all_templates() -> Vec<Template> {
             icon: "📦",
             language: NodeLanguage::Cpp,
         },
-        // C++ - Intermedio
+        
+        // ══════════════════════════════════════════════════════════════
+        // C++ - INTERMEDIO
+        // ══════════════════════════════════════════════════════════════
         Template {
-            name: "Clases (OOP)",
+            name: "Clases y OOP",
             code: cpp::CLASSES,
             category: "C++",
             subcategory: "Intermedio",
@@ -239,8 +351,12 @@ pub fn all_templates() -> Vec<Template> {
             icon: "🏛️",
             language: NodeLanguage::Cpp,
         },
+        
+        // ══════════════════════════════════════════════════════════════
+        // C++ - AVANZADO
+        // ══════════════════════════════════════════════════════════════
         Template {
-            name: "STL",
+            name: "STL Containers",
             code: cpp::STL,
             category: "C++",
             subcategory: "Avanzado",
@@ -249,7 +365,7 @@ pub fn all_templates() -> Vec<Template> {
             language: NodeLanguage::Cpp,
         },
         Template {
-            name: "C++ Moderno",
+            name: "C++ Moderno (C++17/20)",
             code: cpp::MODERN,
             category: "C++",
             subcategory: "Avanzado",
@@ -258,9 +374,9 @@ pub fn all_templates() -> Vec<Template> {
             language: NodeLanguage::Cpp,
         },
         
-        // ══════════════════════════════════════════
-        // Rust - Básico
-        // ══════════════════════════════════════════
+        // ══════════════════════════════════════════════════════════════
+        // RUST - BÁSICO
+        // ══════════════════════════════════════════════════════════════
         Template {
             name: "Hola Mundo",
             code: rust::HELLO,
@@ -271,7 +387,7 @@ pub fn all_templates() -> Vec<Template> {
             language: NodeLanguage::Rust,
         },
         Template {
-            name: "Variables",
+            name: "Variables y Mutabilidad",
             code: rust::VARIABLES,
             category: "Rust",
             subcategory: "Básico",
@@ -288,7 +404,10 @@ pub fn all_templates() -> Vec<Template> {
             icon: "⚡",
             language: NodeLanguage::Rust,
         },
-        // Rust - Intermedio
+        
+        // ══════════════════════════════════════════════════════════════
+        // RUST - INTERMEDIO
+        // ══════════════════════════════════════════════════════════════
         Template {
             name: "Structs y Enums",
             code: rust::STRUCTS,
@@ -298,8 +417,12 @@ pub fn all_templates() -> Vec<Template> {
             icon: "🏗️",
             language: NodeLanguage::Rust,
         },
+        
+        // ══════════════════════════════════════════════════════════════
+        // RUST - AVANZADO
+        // ══════════════════════════════════════════════════════════════
         Template {
-            name: "Ownership",
+            name: "Ownership y Borrowing",
             code: rust::OWNERSHIP,
             category: "Rust",
             subcategory: "Avanzado",
@@ -308,7 +431,7 @@ pub fn all_templates() -> Vec<Template> {
             language: NodeLanguage::Rust,
         },
         Template {
-            name: "Traits",
+            name: "Traits y Generics",
             code: rust::TRAITS,
             category: "Rust",
             subcategory: "Avanzado",
@@ -319,7 +442,7 @@ pub fn all_templates() -> Vec<Template> {
     ]
 }
 
-// Compatibilidad con código anterior (marcados con allow unused)
+// Compatibilidad con código anterior
 #[allow(unused_imports)]
 pub use asm::HELLO as ASM_HELLO;
 #[allow(unused_imports)]

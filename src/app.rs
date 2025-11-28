@@ -1,4 +1,5 @@
 use eframe::egui::{self, Color32, Pos2, Rect, Sense, Stroke, Vec2, Visuals, pos2, PointerButton};
+use eframe::egui::text_selection::CursorRange;
 use crate::node_graph::{self, NodeGraph, NodeId, NodeLanguage, PinId, PinKind};
 use crate::terminal::{TerminalManager, TerminalTab};
 use crate::ui::viewport::Viewport2D;
@@ -34,6 +35,10 @@ pub struct InteractionState {
     pub viewing_inheritance: Option<NodeId>,
     pub cut_tool: crate::ui::cut::CutTool,
     pub editor_history: Option<crate::editor_history::EditorHistory>, // Historial del editor
+    pub show_r_menu: bool, // Menú Ctrl+R para exportación rápida a parámetros
+    pub multi_param_mode: bool, // Modo de múltiples parámetros (Ctrl+Shift+P)
+    pub r_menu_selection: Option<(usize, usize, String)>, // Selección guardada para menú Ctrl+R (start, end, text)
+    pub r_menu_pos: Option<egui::Pos2>, // Posición del menú Ctrl+R
 }
 
 #[derive(Clone, Copy)]
@@ -419,6 +424,105 @@ impl NodeGraphApp {
             self.channel_manager.set_channel(format!("{}/code", title.clone()), ChannelValue::Code(code.clone()));
             self.channel_manager.set_node_channel(node_id, "code".to_string(), ChannelValue::Code(code));
         }
+    }
+
+    fn generate_unique_parameter_name(&self) -> String {
+        let mut index = 1;
+        loop {
+            let name = format!("Parámetro {}", index);
+            if self.graph.nodes().iter().all(|n| n.title != name) {
+                break name;
+            }
+            index += 1;
+        }
+    }
+
+    fn create_parameter_node_from_selection(&mut self, target_node_id: NodeId, value: &str) -> Option<String> {
+        let title = self.generate_unique_parameter_name();
+        let base_pos = self.graph.node(target_node_id).map(|n| n.position).unwrap_or(Pos2::new(0.0, 0.0));
+        
+        // Posición ADELANTE (derecha) del nodo original
+        // El parámetro hereda del nodo A y permite modificar valores
+        let new_pos = Pos2::new(base_pos.x + 300.0, base_pos.y);
+        let param_color = Color32::from_rgb(0x29, 0x7d, 0xf0);
+        
+        let inheritance_chain = self.graph.get_inheritance_chain(target_node_id);
+        let effective_language = self.resolve_effective_language(target_node_id, &inheritance_chain);
+
+        // El parámetro tiene Entrada (para heredar de A) y Código (para exportar)
+        let new_node_id = self.graph.add_node(
+            &title,
+            new_pos,
+            param_color,
+            &["Entrada"],   // Recibe herencia del nodo A
+            &["Código"],    // Exporta el valor modificado
+            effective_language,
+        );
+
+        if let Some(node) = self.graph.node_mut(new_node_id) {
+            node.code = value.to_string();
+        }
+
+        if let Some(snapshot) = self.graph.node(new_node_id).cloned() {
+            self.register_node_in_channels(new_node_id, &snapshot);
+            
+            // Conectar: Nodo A (Código) -> Parámetro B (Entrada)
+            // Así el parámetro hereda todo del nodo A
+            if let Some(target_node) = self.graph.node(target_node_id) {
+                if let Some(output_pin) = target_node.outputs.first() {
+                    if let Some(input_pin) = snapshot.inputs.first() {
+                         self.graph.add_link(output_pin.id, input_pin.id, Color32::from_rgb(150, 200, 255));
+                    }
+                }
+            }
+        }
+
+        Some(title)
+    }
+
+    fn extract_selected_text(text: &str, range: &CursorRange) -> Option<(String, usize, usize)> {
+        if range.is_empty() {
+            return None;
+        }
+        let char_range = range.as_sorted_char_range();
+        if char_range.start == char_range.end {
+            return None;
+        }
+        let (start_byte, end_byte) = Self::char_range_to_byte_range(text, char_range);
+        if start_byte >= end_byte || start_byte > text.len() || end_byte > text.len() {
+            return None;
+        }
+        Some((text[start_byte..end_byte].to_string(), start_byte, end_byte))
+    }
+
+    fn char_range_to_byte_range(text: &str, char_range: std::ops::Range<usize>) -> (usize, usize) {
+        if char_range.start >= char_range.end {
+            let idx = char_range.start.min(text.chars().count());
+            return (text.len().min(idx), text.len().min(idx));
+        }
+
+        let mut current_char = 0;
+        let mut start_byte = text.len();
+        let mut end_byte = text.len();
+        for (byte_idx, _) in text.char_indices() {
+            if current_char == char_range.start && start_byte == text.len() {
+                start_byte = byte_idx;
+            }
+            if current_char == char_range.end {
+                end_byte = byte_idx;
+                break;
+            }
+            current_char += 1;
+        }
+
+        if start_byte == text.len() {
+            start_byte = text.len();
+        }
+        if end_byte == text.len() && char_range.end >= text.chars().count() {
+            end_byte = text.len();
+        }
+
+        (start_byte.min(text.len()), end_byte.min(text.len()))
     }
     
     fn terminal_panel(&mut self, ctx: &egui::Context, _open_factor: f32) {
@@ -1042,24 +1146,42 @@ impl NodeGraphApp {
                             self.save_editor_code(id);
                         }
                         if execute_clicked {
+                            // Actualizar TODOS los canales antes de ejecutar para tener valores frescos
+                            let all_node_ids: Vec<_> = self.graph.nodes().iter().map(|n| n.id).collect();
+                            for nid in all_node_ids {
+                                self.update_node_channels(nid);
+                            }
+                            
                             if let Some(node) = self.graph.nodes().iter().find(|n| n.id == id) {
                                 let effective_language = self.resolve_effective_language(id, &inheritance_chain);
                                 let lang = Self::language_to_terminal(effective_language, &node.title);
                                 let workspace_path = self.workspace.root_path.as_ref();
+                                
+                                // Detectar si es un nodo parámetro (título empieza con "Parámetro" o "Parametro")
+                                let is_parameter_node = node.title.starts_with("Parámetro") || node.title.starts_with("Parametro");
+                                
                                 // Combinar código heredado + propio para ejecutar
                                 let inherited_raw = self.graph.get_inherited_code(id).unwrap_or_default();
                                 // Evaluar ch() en código heredado
                                 let inherited = self.evaluate_ch_expressions_in_code(&inherited_raw, id);
-                                // Evaluar ch() en código propio también
-                                let own_code_evaluated = self.evaluate_ch_expressions_in_code(&node.code, id);
                                 
-                                let full_code = if !inherited.is_empty() && !own_code_evaluated.is_empty() {
-                                    format!("{}\n\n{}", inherited, own_code_evaluated)
-                                } else if !inherited.is_empty() {
+                                let full_code = if is_parameter_node {
+                                    // Para nodos parámetro: solo ejecutar código heredado
+                                    // El código propio del parámetro es solo un valor, no código ejecutable
                                     inherited
                                 } else {
-                                    own_code_evaluated
+                                    // Para nodos normales: heredado + propio
+                                    let own_code_evaluated = self.evaluate_ch_expressions_in_code(&node.code, id);
+                                    
+                                    if !inherited.is_empty() && !own_code_evaluated.is_empty() {
+                                        format!("{}\n\n{}", inherited, own_code_evaluated)
+                                    } else if !inherited.is_empty() {
+                                        inherited
+                                    } else {
+                                        own_code_evaluated
+                                    }
                                 };
+                                
                                 self.terminal.run_code(&full_code, lang, workspace_path);
                             }
                         }
@@ -1291,6 +1413,14 @@ impl NodeGraphApp {
                                         .strong()
                                         .color(Color32::from_rgb(100, 200, 255))
                                 );
+                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                    ui.label(
+                                        egui::RichText::new("Tip: Ctrl+P extrae selección a parámetro")
+                                            .small()
+                                            .italics()
+                                            .color(Color32::from_gray(150))
+                                    );
+                                });
                             });
                             ui.add_space(4.0);
                         }
@@ -1334,13 +1464,482 @@ impl NodeGraphApp {
                                     ui.separator();
                                     
                                     // EDITOR DE CÓDIGO
-                                    let code_changed = ui.add(
-                                        egui::TextEdit::multiline(&mut own_code_editable)
-                                            .font(egui::TextStyle::Monospace)
-                                            .code_editor()
-                                            .desired_width(f32::INFINITY)
-                                            .desired_rows(own_lines_count.max(5)),
-                                    ).changed();
+                        let text_output = egui::TextEdit::multiline(&mut own_code_editable)
+                            .font(egui::TextStyle::Monospace)
+                            .code_editor()
+                            .desired_width(f32::INFINITY)
+                            .desired_rows(own_lines_count.max(5))
+                            .show(ui);
+
+                        let mut code_changed = text_output.response.changed();
+                        let mut convert_selection_request: Option<(usize, usize, String)> = None;
+
+                        // Manejo del atajo Ctrl+P para convertir selección en parámetro (único)
+                        if text_output.response.has_focus() && ui.input(|i| i.key_pressed(egui::Key::P) && i.modifiers.ctrl && !i.modifiers.shift) {
+                             if let Some(range) = text_output.cursor_range {
+                                if let Some((selected_text, start_byte, end_byte)) = Self::extract_selected_text(&own_code_editable, &range) {
+                                    convert_selection_request = Some((start_byte, end_byte, selected_text));
+                                }
+                             }
+                        }
+                        
+                        // Manejo del atajo Ctrl+Shift+P para modo múltiples parámetros
+                        if text_output.response.has_focus() && ui.input(|i| i.key_pressed(egui::Key::P) && i.modifiers.ctrl && i.modifiers.shift) {
+                            self.interaction.multi_param_mode = true;
+                            if let Some(range) = text_output.cursor_range {
+                                if let Some((selected_text, start_byte, end_byte)) = Self::extract_selected_text(&own_code_editable, &range) {
+                                    convert_selection_request = Some((start_byte, end_byte, selected_text));
+                                }
+                            }
+                        }
+                        
+                        // Manejo del atajo Ctrl+R para menú rápido de exportación a nodos existentes
+                        if text_output.response.has_focus() && ui.input(|i| i.key_pressed(egui::Key::R) && i.modifiers.ctrl && !i.modifiers.shift) {
+                            if let Some(range) = text_output.cursor_range {
+                                if let Some((selected_text, start_byte, end_byte)) = Self::extract_selected_text(&own_code_editable, &range) {
+                                    // Guardar la selección y posición antes de abrir el menú
+                                    self.interaction.r_menu_selection = Some((start_byte, end_byte, selected_text));
+                                    self.interaction.r_menu_pos = ctx.input(|i| i.pointer.hover_pos());
+                                    self.interaction.show_r_menu = true;
+                                }
+                            }
+                        }
+
+                        text_output.response.context_menu(|ui| {
+                            if let Some(range) = text_output.cursor_range {
+                                if let Some((selected_text, start_byte, end_byte)) = Self::extract_selected_text(&own_code_editable, &range) {
+                                    ui.label(
+                                        egui::RichText::new(selected_text.clone())
+                                            .color(Color32::from_rgb(180, 220, 255))
+                                    );
+                                    ui.separator();
+                                    if ui.button("📤 Nuevo Parámetro (Ctrl+P)").clicked() {
+                                        convert_selection_request = Some((start_byte, end_byte, selected_text.clone()));
+                                        ui.close_menu();
+                                    }
+                                    if ui.button("📤 Múltiples Parámetros (Ctrl+Shift+P)").clicked() {
+                                        self.interaction.multi_param_mode = true;
+                                        convert_selection_request = Some((start_byte, end_byte, selected_text.clone()));
+                                        ui.close_menu();
+                                    }
+                                    if ui.button("📂 Exportar a Nodo Existente (Ctrl+R)").clicked() {
+                                        // Guardar la selección antes de abrir el menú
+                                        self.interaction.r_menu_selection = Some((start_byte, end_byte, selected_text.clone()));
+                                        self.interaction.r_menu_pos = ctx.input(|i| i.pointer.hover_pos());
+                                        self.interaction.show_r_menu = true;
+                                        ui.close_menu();
+                                    }
+                                    ui.separator();
+                                    ui.label(
+                                        egui::RichText::new("Tip: Ctrl+R muestra nodos guardados")
+                                            .small()
+                                            .italics()
+                                            .color(Color32::from_gray(140))
+                                    );
+                                } else {
+                                    ui.label("Selecciona un fragmento de código para convertir.");
+                                }
+                            } else {
+                                ui.label("Selecciona un fragmento de código para convertir.");
+                            }
+                        });
+                        
+                        // Variable para exportar a nodo existente
+                        let mut export_to_existing_node: Option<(NodeId, String, usize, usize, String)> = None;
+                        
+                        // Menú Ctrl+R flotante para exportación a nodos existentes - DISEÑO PROFESIONAL
+                        if self.interaction.show_r_menu {
+                            let menu_pos = self.interaction.r_menu_pos.unwrap_or(egui::Pos2::new(400.0, 300.0));
+                            
+                            // Recopilar nodos disponibles para exportar (excluyendo el actual)
+                            let available_nodes: Vec<(NodeId, String, NodeLanguage, Color32, String)> = self.graph.nodes()
+                                .iter()
+                                .filter(|n| n.id != id)
+                                .map(|n| {
+                                    let code_preview = if n.code.len() > 30 {
+                                        format!("{}...", n.code.chars().take(30).collect::<String>())
+                                    } else if n.code.is_empty() {
+                                        "(vacío)".to_string()
+                                    } else {
+                                        n.code.clone()
+                                    };
+                                    (n.id, n.title.clone(), n.language, n.color, code_preview)
+                                })
+                                .collect();
+                            
+                            let saved_selection = self.interaction.r_menu_selection.clone();
+                            
+                            egui::Area::new(egui::Id::new("r_export_menu"))
+                                .fixed_pos(menu_pos)
+                                .order(egui::Order::Foreground)
+                                .show(ctx, |ui| {
+                                    egui::Frame::none()
+                                        .fill(Color32::from_rgb(28, 32, 40))
+                                        .stroke(egui::Stroke::new(1.0, Color32::from_rgb(60, 70, 90)))
+                                        .rounding(12.0)
+                                        .shadow(egui::epaint::Shadow {
+                                            offset: egui::vec2(0.0, 8.0),
+                                            blur: 24.0,
+                                            spread: 4.0,
+                                            color: Color32::from_black_alpha(80),
+                                        })
+                                        .inner_margin(egui::Margin::same(0.0))
+                                        .show(ui, |ui| {
+                                            ui.set_min_width(340.0);
+                                            ui.set_max_height(500.0);
+                                            
+                                            // Header con gradiente
+                                            egui::Frame::none()
+                                                .fill(Color32::from_rgb(45, 55, 75))
+                                                .rounding(egui::Rounding { nw: 12.0, ne: 12.0, sw: 0.0, se: 0.0 })
+                                                .inner_margin(egui::Margin::symmetric(16.0, 12.0))
+                                                .show(ui, |ui| {
+                                                    ui.horizontal(|ui| {
+                                                        ui.label(
+                                                            egui::RichText::new("⚡")
+                                                                .size(18.0)
+                                                        );
+                                                        ui.label(
+                                                            egui::RichText::new("Exportar Rápido")
+                                                                .strong()
+                                                                .size(16.0)
+                                                                .color(Color32::WHITE)
+                                                        );
+                                                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                            ui.label(
+                                                                egui::RichText::new("Ctrl+R")
+                                                                    .small()
+                                                                    .color(Color32::from_rgb(140, 160, 200))
+                                                            );
+                                                        });
+                                                    });
+                                                });
+                                            
+                                            // Contenido principal
+                                            egui::Frame::none()
+                                                .inner_margin(egui::Margin::symmetric(16.0, 12.0))
+                                                .show(ui, |ui| {
+                                                    if let Some((start_byte, end_byte, selected_text)) = saved_selection {
+                                                        // Preview del valor seleccionado
+                                                        egui::Frame::none()
+                                                            .fill(Color32::from_rgb(35, 42, 55))
+                                                            .rounding(6.0)
+                                                            .inner_margin(egui::Margin::symmetric(12.0, 8.0))
+                                                            .show(ui, |ui| {
+                                                                ui.horizontal(|ui| {
+                                                                    ui.label(
+                                                                        egui::RichText::new("📋")
+                                                                            .size(14.0)
+                                                                    );
+                                                                    let preview = if selected_text.len() > 45 {
+                                                                        format!("{}...", &selected_text.chars().take(45).collect::<String>())
+                                                                    } else {
+                                                                        selected_text.clone()
+                                                                    };
+                                                                    ui.label(
+                                                                        egui::RichText::new(format!("\"{}\"", preview))
+                                                                            .monospace()
+                                                                            .size(12.0)
+                                                                            .color(Color32::from_rgb(130, 220, 130))
+                                                                    );
+                                                                });
+                                                            });
+                                                        
+                                                        ui.add_space(12.0);
+                                                        
+                                                        // Sección: Crear nuevo
+                                                        ui.horizontal(|ui| {
+                                                            let (rect, _) = ui.allocate_exact_size(egui::vec2(3.0, 14.0), egui::Sense::hover());
+                                                            ui.painter().rect_filled(rect, 2.0, Color32::from_rgb(100, 200, 100));
+                                                            ui.add_space(4.0);
+                                                            ui.label(
+                                                                egui::RichText::new("CREAR NUEVO")
+                                                                    .small()
+                                                                    .strong()
+                                                                    .color(Color32::from_rgb(100, 200, 100))
+                                                            );
+                                                        });
+                                                        ui.add_space(6.0);
+                                                        
+                                                        let new_btn = ui.add_sized(
+                                                            [ui.available_width(), 32.0],
+                                                            egui::Button::new(
+                                                                egui::RichText::new("➕  Nuevo Parámetro")
+                                                                    .size(13.0)
+                                                                    .color(Color32::WHITE)
+                                                            )
+                                                            .fill(Color32::from_rgb(50, 120, 80))
+                                                            .rounding(6.0)
+                                                        );
+                                                        if new_btn.clicked() {
+                                                            convert_selection_request = Some((start_byte, end_byte, selected_text.clone()));
+                                                            self.interaction.show_r_menu = false;
+                                                            self.interaction.r_menu_selection = None;
+                                                        }
+                                                        
+                                                        ui.add_space(16.0);
+                                                        
+                                                        // Sección: Nodos existentes
+                                                        ui.horizontal(|ui| {
+                                                            let (rect, _) = ui.allocate_exact_size(egui::vec2(3.0, 14.0), egui::Sense::hover());
+                                                            ui.painter().rect_filled(rect, 2.0, Color32::from_rgb(200, 160, 80));
+                                                            ui.add_space(4.0);
+                                                            ui.label(
+                                                                egui::RichText::new("NODOS EXISTENTES")
+                                                                    .small()
+                                                                    .strong()
+                                                                    .color(Color32::from_rgb(200, 160, 80))
+                                                            );
+                                                            ui.label(
+                                                                egui::RichText::new(format!("({})", available_nodes.len()))
+                                                                    .small()
+                                                                    .color(Color32::from_gray(120))
+                                                            );
+                                                        });
+                                                        ui.add_space(6.0);
+                                                        
+                                                        if available_nodes.is_empty() {
+                                                            egui::Frame::none()
+                                                                .fill(Color32::from_rgb(40, 35, 35))
+                                                                .rounding(6.0)
+                                                                .inner_margin(egui::Margin::symmetric(12.0, 10.0))
+                                                                .show(ui, |ui| {
+                                                                    ui.horizontal(|ui| {
+                                                                        ui.label(egui::RichText::new("📭").size(16.0));
+                                                                        ui.vertical(|ui| {
+                                                                            ui.label(
+                                                                                egui::RichText::new("No hay nodos disponibles")
+                                                                                    .color(Color32::from_gray(160))
+                                                                            );
+                                                                            ui.label(
+                                                                                egui::RichText::new("Usa Ctrl+P para crear uno primero")
+                                                                                    .small()
+                                                                                    .color(Color32::from_gray(100))
+                                                                            );
+                                                                        });
+                                                                    });
+                                                                });
+                                                        } else {
+                                                            egui::ScrollArea::vertical()
+                                                                .max_height(280.0)
+                                                                .show(ui, |ui| {
+                                                                    for (node_id, title, language, color, code_preview) in &available_nodes {
+                                                                        let (lang_str, lang_icon, lang_bg) = match language {
+                                                                            NodeLanguage::Asm => ("ASM", "🔧", Color32::from_rgb(80, 50, 40)),
+                                                                            NodeLanguage::C => ("C", "©", Color32::from_rgb(40, 60, 80)),
+                                                                            NodeLanguage::Cpp => ("C++", "⊕", Color32::from_rgb(50, 40, 80)),
+                                                                            NodeLanguage::Rust => ("Rust", "🦀", Color32::from_rgb(80, 40, 40)),
+                                                                            NodeLanguage::Auto => ("Auto", "⚙", Color32::from_rgb(50, 50, 50)),
+                                                                        };
+                                                                        let lang_color = match language {
+                                                                            NodeLanguage::Asm => Color32::from_rgb(255, 170, 120),
+                                                                            NodeLanguage::C => Color32::from_rgb(120, 200, 255),
+                                                                            NodeLanguage::Cpp => Color32::from_rgb(180, 140, 255),
+                                                                            NodeLanguage::Rust => Color32::from_rgb(255, 130, 100),
+                                                                            NodeLanguage::Auto => Color32::from_gray(180),
+                                                                        };
+                                                                        
+                                                                        let node_frame = egui::Frame::none()
+                                                                            .fill(lang_bg)
+                                                                            .rounding(8.0)
+                                                                            .inner_margin(egui::Margin::symmetric(10.0, 8.0))
+                                                                            .stroke(egui::Stroke::new(1.0, Color32::from_rgb(60, 70, 85)));
+                                                                        
+                                                                        node_frame.show(ui, |ui| {
+                                                                            ui.horizontal(|ui| {
+                                                                                // Barra de color del nodo
+                                                                                let (rect, _) = ui.allocate_exact_size(
+                                                                                    egui::vec2(4.0, 36.0),
+                                                                                    egui::Sense::hover()
+                                                                                );
+                                                                                ui.painter().rect_filled(rect, 2.0, *color);
+                                                                                
+                                                                                ui.add_space(8.0);
+                                                                                
+                                                                                ui.vertical(|ui| {
+                                                                                    ui.horizontal(|ui| {
+                                                                                        ui.label(
+                                                                                            egui::RichText::new(lang_icon)
+                                                                                                .size(12.0)
+                                                                                        );
+                                                                                        ui.label(
+                                                                                            egui::RichText::new(title)
+                                                                                                .strong()
+                                                                                                .size(13.0)
+                                                                                                .color(Color32::WHITE)
+                                                                                        );
+                                                                                        ui.label(
+                                                                                            egui::RichText::new(format!("[{}]", lang_str))
+                                                                                                .small()
+                                                                                                .color(lang_color)
+                                                                                        );
+                                                                                    });
+                                                                                    ui.label(
+                                                                                        egui::RichText::new(code_preview)
+                                                                                            .small()
+                                                                                            .monospace()
+                                                                                            .color(Color32::from_gray(130))
+                                                                                    );
+                                                                                });
+                                                                                
+                                                                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                                                    let export_btn = ui.add(
+                                                                                        egui::Button::new(
+                                                                                            egui::RichText::new("📤")
+                                                                                                .size(16.0)
+                                                                                        )
+                                                                                        .fill(Color32::from_rgb(60, 100, 150))
+                                                                                        .rounding(4.0)
+                                                                                        .min_size(egui::vec2(32.0, 28.0))
+                                                                                    );
+                                                                                    
+                                                                                    if export_btn.clicked() {
+                                                                                        export_to_existing_node = Some((
+                                                                                            *node_id,
+                                                                                            title.clone(),
+                                                                                            start_byte,
+                                                                                            end_byte,
+                                                                                            selected_text.clone()
+                                                                                        ));
+                                                                                        self.interaction.show_r_menu = false;
+                                                                                        self.interaction.r_menu_selection = None;
+                                                                                    }
+                                                                                });
+                                                                            });
+                                                                        });
+                                                                        ui.add_space(4.0);
+                                                                    }
+                                                                });
+                                                        }
+                                                    } else {
+                                                        egui::Frame::none()
+                                                            .fill(Color32::from_rgb(60, 50, 40))
+                                                            .rounding(6.0)
+                                                            .inner_margin(egui::Margin::symmetric(12.0, 10.0))
+                                                            .show(ui, |ui| {
+                                                                ui.horizontal(|ui| {
+                                                                    ui.label(egui::RichText::new("⚠").size(18.0));
+                                                                    ui.vertical(|ui| {
+                                                                        ui.label(
+                                                                            egui::RichText::new("No hay texto seleccionado")
+                                                                                .color(Color32::from_rgb(255, 200, 120))
+                                                                        );
+                                                                        ui.label(
+                                                                            egui::RichText::new("Selecciona texto y presiona Ctrl+R")
+                                                                                .small()
+                                                                                .color(Color32::from_gray(150))
+                                                                        );
+                                                                    });
+                                                                });
+                                                            });
+                                                    }
+                                                });
+                                            
+                                            // Footer
+                                            egui::Frame::none()
+                                                .fill(Color32::from_rgb(35, 40, 50))
+                                                .rounding(egui::Rounding { nw: 0.0, ne: 0.0, sw: 12.0, se: 12.0 })
+                                                .inner_margin(egui::Margin::symmetric(16.0, 10.0))
+                                                .show(ui, |ui| {
+                                                    ui.horizontal(|ui| {
+                                                        ui.label(
+                                                            egui::RichText::new("💡 Tip: Los nodos se conectan automáticamente")
+                                                                .small()
+                                                                .italics()
+                                                                .color(Color32::from_gray(100))
+                                                        );
+                                                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                            let cancel_btn = ui.add(
+                                                                egui::Button::new(
+                                                                    egui::RichText::new("Cancelar")
+                                                                        .small()
+                                                                        .color(Color32::from_gray(180))
+                                                                )
+                                                                .fill(Color32::from_rgb(55, 50, 50))
+                                                                .rounding(4.0)
+                                                            );
+                                                            if cancel_btn.clicked() {
+                                                                self.interaction.show_r_menu = false;
+                                                                self.interaction.r_menu_selection = None;
+                                                            }
+                                                        });
+                                                    });
+                                                });
+                                        });
+                                });
+                            
+                            // Cerrar con Escape
+                            if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+                                self.interaction.show_r_menu = false;
+                                self.interaction.r_menu_selection = None;
+                            }
+                        }
+                        
+                        // Procesar exportación a nodo existente
+                        if let Some((target_node_id, target_title, start_byte, end_byte, selected_text)) = export_to_existing_node {
+                            // Actualizar el código del nodo destino con el nuevo valor
+                            if let Some(target_node) = self.graph.node_mut(target_node_id) {
+                                target_node.code = selected_text;
+                            }
+                            // Actualizar canales
+                            self.update_node_channels(target_node_id);
+                            
+                            // Reemplazar en el código actual con ch("nombre_nodo")
+                            let placeholder = format!(r#"ch("{}")"#, target_title);
+                            own_code_editable.replace_range(start_byte..end_byte, &placeholder);
+                            code_changed = true;
+                            
+                            // Conectar el nodo destino al nodo actual si no está conectado
+                            if let Some(current_node) = self.graph.node(id) {
+                                if let Some(input_pin) = current_node.inputs.first() {
+                                    if let Some(target_node) = self.graph.node(target_node_id) {
+                                        if let Some(output_pin) = target_node.outputs.first() {
+                                            // Verificar si ya existe la conexión
+                                            let link_exists = self.graph.links().iter().any(|l| 
+                                                l.from == output_pin.id && l.to == input_pin.id
+                                            );
+                                            if !link_exists {
+                                                self.graph.add_link(output_pin.id, input_pin.id, Color32::from_rgb(150, 200, 255));
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Indicador de modo múltiples parámetros
+                        if self.interaction.multi_param_mode {
+                            ui.horizontal(|ui| {
+                                ui.label(
+                                    egui::RichText::new("🔄 Modo Múltiples Parámetros ACTIVO")
+                                        .strong()
+                                        .color(Color32::from_rgb(255, 200, 100))
+                                );
+                                ui.label(
+                                    egui::RichText::new("(Selecciona más texto y presiona Ctrl+P, o Esc para salir)")
+                                        .small()
+                                        .color(Color32::from_gray(160))
+                                );
+                                if ui.small_button("✓ Finalizar").clicked() {
+                                    self.interaction.multi_param_mode = false;
+                                }
+                            });
+                            
+                            // Salir del modo con Escape
+                            if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+                                self.interaction.multi_param_mode = false;
+                            }
+                        }
+
+                        if let Some((start_byte, end_byte, selected_text)) = convert_selection_request {
+                            if let Some(param_title) = self.create_parameter_node_from_selection(id, &selected_text) {
+                                let placeholder = format!(r#"ch("{}")"#, param_title);
+                                own_code_editable.replace_range(start_byte..end_byte, &placeholder);
+                                code_changed = true;
+                                // En modo múltiple, mantener el modo activo
+                                // En modo normal, ya está desactivado
+                            }
+                        }
                                     
                                     // Procesar cambios
                                     if code_changed {
@@ -1990,46 +2589,51 @@ impl NodeGraphApp {
         let mut evaluator = ExpressionEvaluator::new(self.channel_manager.clone());
         evaluator.set_current_node(current_node_id);
         
-        // Buscar todas las expresiones ch() en el código
+        // Convertir a Vec<char> para manejar UTF-8 correctamente
+        let chars: Vec<char> = code.chars().collect();
         let mut result = String::new();
-        let mut last_end = 0;
-        
-        // Buscar patrones ch("...") o ch('...')
-        let code_chars: Vec<char> = code.chars().collect();
+        let mut last_char_idx = 0;
         let mut i = 0;
         
-        while i < code_chars.len() {
-            // Buscar "ch("
-            if i + 2 < code_chars.len() 
-                && code_chars[i] == 'c' 
-                && code_chars[i + 1] == 'h' 
-                && code_chars[i + 2] == '(' {
+        // Helper para convertir índice de char a substring
+        let chars_to_string = |chars: &[char], start: usize, end: usize| -> String {
+            chars[start..end].iter().collect()
+        };
+        
+        while i < chars.len() {
+            // Buscar "ch(" en cualquier contexto
+            if i + 2 < chars.len() 
+                && chars[i] == 'c' 
+                && chars[i + 1] == 'h' 
+                && chars[i + 2] == '(' {
                 
-                // Agregar todo antes de ch(
-                result.push_str(&code[last_end..i]);
+                // Verificar si está dentro de comillas simples de NASM (ej: 'ch("...")')
+                let in_nasm_string = i > 0 && chars[i - 1] == '\'';
+                
+                // Agregar todo antes de ch( (o antes de la comilla si es NASM string)
+                let prefix_end = if in_nasm_string { i - 1 } else { i };
+                result.push_str(&chars_to_string(&chars, last_char_idx, prefix_end));
                 
                 // Buscar el cierre del paréntesis
                 let mut depth = 1;
                 let mut j = i + 3;
-                let mut in_string = false;
+                let mut in_inner_string = false;
                 let mut string_char = '\0';
                 
-                while j < code_chars.len() && depth > 0 {
-                    let c = code_chars[j];
+                while j < chars.len() && depth > 0 {
+                    let c = chars[j];
                     
-                    if !in_string {
-                        if c == '"' || c == '\'' {
-                            in_string = true;
+                    if !in_inner_string {
+                        if c == '"' {
+                            in_inner_string = true;
                             string_char = c;
                         } else if c == '(' {
                             depth += 1;
                         } else if c == ')' {
                             depth -= 1;
                         }
-                    } else {
-                        if c == string_char && (j == 0 || code_chars[j - 1] != '\\') {
-                            in_string = false;
-                        }
+                    } else if c == string_char && (j == 0 || chars[j - 1] != '\\') {
+                        in_inner_string = false;
                     }
                     
                     if depth > 0 {
@@ -2039,28 +2643,49 @@ impl NodeGraphApp {
                 
                 if depth == 0 {
                     // Extraer la expresión completa ch(...)
-                    let expr_str = &code[i..=j];
+                    let expr_str = chars_to_string(&chars, i, j + 1);
+                    
+                    // Verificar si hay comilla de cierre después (para NASM strings)
+                    let has_closing_quote = in_nasm_string && j + 1 < chars.len() && chars[j + 1] == '\'';
                     
                     // Intentar evaluar
-                    match evaluator.evaluate_string(expr_str) {
+                    match evaluator.evaluate_string(&expr_str) {
                         Ok(value) => {
-                            // Reemplazar con el valor evaluado
                             let value_str = match value {
                                 ChannelValue::String(s) => s,
                                 ChannelValue::Number(n) => n.to_string(),
                                 ChannelValue::Boolean(b) => b.to_string(),
                                 ChannelValue::Code(c) => c,
                             };
-                            result.push_str(&value_str);
-                            last_end = j + 1;
-                            i = j + 1;
+                            
+                            if in_nasm_string && has_closing_quote {
+                                // Para NASM: 'ch("...")' -> 'valor'
+                                result.push('\'');
+                                result.push_str(&value_str);
+                                result.push('\'');
+                                last_char_idx = j + 2;
+                                i = j + 2;
+                            } else {
+                                result.push_str(&value_str);
+                                last_char_idx = j + 1;
+                                i = j + 1;
+                            }
                             continue;
                         }
                         Err(_) => {
                             // Si falla, dejar la expresión original
-                            result.push_str(expr_str);
-                            last_end = j + 1;
-                            i = j + 1;
+                            if in_nasm_string {
+                                result.push('\'');
+                            }
+                            result.push_str(&expr_str);
+                            if in_nasm_string && has_closing_quote {
+                                result.push('\'');
+                                last_char_idx = j + 2;
+                                i = j + 2;
+                            } else {
+                                last_char_idx = j + 1;
+                                i = j + 1;
+                            }
                             continue;
                         }
                     }
@@ -2070,8 +2695,8 @@ impl NodeGraphApp {
         }
         
         // Agregar el resto del código
-        if last_end < code.len() {
-            result.push_str(&code[last_end..]);
+        if last_char_idx < chars.len() {
+            result.push_str(&chars_to_string(&chars, last_char_idx, chars.len()));
         }
         
         if result.is_empty() {
