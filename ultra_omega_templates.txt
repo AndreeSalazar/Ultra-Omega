@@ -1,0 +1,455 @@
+# ULTRA-OMEGA: Sistema de Templates Binarios para Backend de Nodos
+
+## PUNTO 1: ARQUITECTURA DE TEMPLATES BINARIOS/HEX
+
+### 1.1 Estructura de Archivos del Sistema
+
+```
+ultra_omega/
+├── templates/
+│   ├── cpu/
+│   │   ├── syscall.template.json
+│   │   ├── syscall.bin
+│   │   ├── memory_alloc.template.json
+│   │   ├── memory_alloc.bin
+│   │   └── ...
+│   └── gpu/
+│       ├── vertex_basic.template.json
+│       ├── vertex_basic.spv
+│       ├── fragment_simple.template.json
+│       └── fragment_simple.spv
+├── node_executor/
+│   ├── binary_compiler.c
+│   └── template_loader.c
+└── node_map.json
+```
+
+### 1.2 Formato de Template JSON (Metadata)
+
+```json
+{
+  "template_name": "syscall_write",
+  "template_type": "cpu",
+  "binary_file": "syscall_write.bin",
+  "description": "System call para escribir en file descriptor",
+  "architecture": "x86_64",
+  "size_bytes": 32,
+  "parameters": [
+    {
+      "name": "fd",
+      "type": "uint32",
+      "offset": 10,
+      "size": 4,
+      "description": "File descriptor (1=stdout, 2=stderr)"
+    },
+    {
+      "name": "buffer_addr",
+      "type": "uint64",
+      "offset": 17,
+      "size": 8,
+      "description": "Dirección del buffer en memoria"
+    },
+    {
+      "name": "length",
+      "type": "uint32",
+      "offset": 27,
+      "size": 4,
+      "description": "Cantidad de bytes a escribir"
+    }
+  ],
+  "dependencies": [],
+  "returns": "int64"
+}
+```
+
+### 1.3 Template Binario Real (syscall_write.bin en hex)
+
+```hex
+# Template completo para syscall write en x86_64
+48 C7 C0 01 00 00 00    # mov rax, 1 (syscall write)
+48 C7 C7 [FD_4_BYTES]   # mov rdi, FD (parámetro 1)
+48 BE [ADDR_8_BYTES]    # movabs rsi, BUFFER_ADDR (parámetro 2)
+48 C7 C2 [LEN_4_BYTES]  # mov rdx, LENGTH (parámetro 3)
+0F 05                   # syscall
+C3                      # ret
+```
+
+### 1.4 Template GPU SPIR-V (vertex_basic.template.json)
+
+```json
+{
+  "template_name": "vertex_transform",
+  "template_type": "gpu_spirv",
+  "binary_file": "vertex_transform.spv",
+  "description": "Vertex shader con transformación MVP básica",
+  "spirv_version": "1.3",
+  "size_bytes": 512,
+  "parameters": [
+    {
+      "name": "mvp_matrix_binding",
+      "type": "descriptor_set",
+      "offset": 156,
+      "size": 4,
+      "description": "Binding del uniform buffer MVP"
+    },
+    {
+      "name": "vertex_input_location",
+      "type": "location",
+      "offset": 89,
+      "size": 4,
+      "description": "Location del input de posición"
+    }
+  ],
+  "inputs": ["vec3 position", "vec2 texcoord"],
+  "outputs": ["vec4 gl_Position", "vec2 fragTexCoord"]
+}
+```
+
+---
+
+## PUNTO 2: BACKEND DE EJECUCIÓN DE NODOS
+
+### 2.1 Motor de Compilación de Templates
+
+```c
+// binary_compiler.h
+
+#ifndef BINARY_COMPILER_H
+#define BINARY_COMPILER_H
+
+#include <stdint.h>
+#include <stddef.h>
+
+// Estructura de template cargado en memoria
+typedef struct {
+    char name[64];
+    uint8_t* binary_data;
+    size_t binary_size;
+    struct {
+        char param_name[32];
+        uint32_t offset;
+        uint8_t size;
+        char type[16]; // "uint32", "uint64", "float", etc.
+    } params[16];
+    uint8_t param_count;
+} BinaryTemplate;
+
+// Estructura de nodo instanciado
+typedef struct {
+    uint32_t node_id;
+    BinaryTemplate* template;
+    uint8_t* compiled_code;
+    size_t code_size;
+    struct {
+        char param_name[32];
+        uint64_t value; // Valor genérico (castear según tipo)
+    } param_values[16];
+} NodeInstance;
+
+// API principal
+BinaryTemplate* load_template(const char* json_path, const char* bin_path);
+NodeInstance* create_node_instance(BinaryTemplate* tmpl, uint32_t node_id);
+int set_node_parameter(NodeInstance* node, const char* param_name, uint64_t value);
+int compile_node(NodeInstance* node);
+int execute_node(NodeInstance* node);
+void free_node_instance(NodeInstance* node);
+
+#endif
+```
+
+### 2.2 Implementación del Compilador
+
+```c
+// binary_compiler.c
+
+#include "binary_compiler.h"
+#include <stdlib.h>
+#include <string.h>
+#include <sys/mman.h>
+
+// Compilar nodo: reemplazar parámetros en template binario
+int compile_node(NodeInstance* node) {
+    if (!node || !node->template) return -1;
+    
+    // Alocar memoria ejecutable
+    node->code_size = node->template->binary_size;
+    node->compiled_code = mmap(NULL, node->code_size,
+                               PROT_READ | PROT_WRITE | PROT_EXEC,
+                               MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    
+    if (node->compiled_code == MAP_FAILED) return -1;
+    
+    // Copiar template base
+    memcpy(node->compiled_code, 
+           node->template->binary_data, 
+           node->code_size);
+    
+    // Reemplazar parámetros
+    for (int i = 0; i < node->template->param_count; i++) {
+        uint32_t offset = node->template->params[i].offset;
+        uint8_t size = node->template->params[i].size;
+        
+        // Buscar valor del parámetro
+        for (int j = 0; j < 16; j++) {
+            if (strcmp(node->param_values[j].param_name, 
+                      node->template->params[i].param_name) == 0) {
+                // Escribir valor en el offset correcto
+                memcpy(node->compiled_code + offset, 
+                       &node->param_values[j].value, 
+                       size);
+                break;
+            }
+        }
+    }
+    
+    return 0;
+}
+
+// Ejecutar código compilado
+int execute_node(NodeInstance* node) {
+    if (!node || !node->compiled_code) return -1;
+    
+    // Castear a función y ejecutar
+    int64_t (*func)() = (int64_t(*)())node->compiled_code;
+    int64_t result = func();
+    
+    return (int)result;
+}
+```
+
+### 2.3 Integración con node_map.json
+
+```json
+{
+  "nodes": [
+    {
+      "node_id": "node_001",
+      "node_type": "cpu_syscall",
+      "template": "syscall_write",
+      "parameters": {
+        "fd": 1,
+        "buffer_addr": "${prev_node_output}",
+        "length": 13
+      },
+      "connections": {
+        "input": ["node_000"],
+        "output": ["node_002"]
+      }
+    },
+    {
+      "node_id": "node_002",
+      "node_type": "gpu_vertex",
+      "template": "vertex_transform",
+      "parameters": {
+        "mvp_matrix_binding": 0,
+        "vertex_input_location": 0
+      },
+      "connections": {
+        "input": ["node_001"],
+        "output": []
+      }
+    }
+  ]
+}
+```
+
+### 2.4 Backend Executor Principal
+
+```c
+// node_executor.c
+
+#include "binary_compiler.h"
+#include <json-c/json.h>
+
+typedef struct {
+    NodeInstance** nodes;
+    size_t node_count;
+} NodeGraph;
+
+NodeGraph* load_node_graph(const char* node_map_path) {
+    // Parsear node_map.json
+    // Cargar templates necesarios
+    // Crear instancias de nodos
+    // Configurar parámetros
+    // Establecer conexiones
+    return graph;
+}
+
+int execute_node_graph(NodeGraph* graph) {
+    // Recorrer nodos en orden topológico
+    for (size_t i = 0; i < graph->node_count; i++) {
+        NodeInstance* node = graph->nodes[i];
+        
+        // Compilar si no está compilado
+        if (!node->compiled_code) {
+            if (compile_node(node) != 0) {
+                return -1;
+            }
+        }
+        
+        // Ejecutar
+        int result = execute_node(node);
+        
+        // Pasar resultado a nodos conectados
+        // (implementación de flujo de datos)
+    }
+    
+    return 0;
+}
+```
+
+---
+
+## DOCUMENTACIÓN PARA IA: PROMPT ÓPTIMO
+
+### Prompt Base para IA que Genera Templates
+
+```markdown
+# CONTEXTO
+Eres un experto en programación de bajo nivel (x86_64 assembly y SPIR-V).
+Tu tarea es generar templates binarios para el sistema Ultra-Omega.
+
+# SISTEMA ULTRA-OMEGA
+- Sistema operativo personalizado (FastOS 64-bit)
+- Backend de ejecución basado en grafos de nodos visuales
+- Cada nodo ejecuta código binario compilado desde templates
+- Soporta templates CPU (x86_64 machine code) y GPU (SPIR-V bytecode)
+
+# FORMATO DE SALIDA REQUERIDO
+
+## Para Templates CPU:
+1. Archivo JSON con metadata
+2. Bytecode hexadecimal con marcadores de parámetros [PARAM_NAME_SIZE]
+3. Documentación de instrucciones assembly equivalentes
+
+## Para Templates GPU:
+1. Archivo JSON con metadata SPIR-V
+2. Bytecode SPIR-V en hexadecimal
+3. Código GLSL equivalente para referencia
+
+# RESTRICCIONES TÉCNICAS
+- CPU: Solo x86_64, System V ABI calling convention
+- GPU: SPIR-V 1.3, Vulkan 1.3 compatible
+- Templates deben ser relocables (no direcciones absolutas hardcodeadas)
+- Máximo 2KB por template
+- Parámetros deben ser inyectables sin romper el bytecode
+
+# EJEMPLO DE PETICIÓN VÁLIDA
+"Genera template CPU para alocar memoria con mmap:
+- Parámetros: size (uint64), protection_flags (uint32)
+- Debe retornar dirección de memoria alocada
+- Incluir manejo de errores"
+
+# TU RESPUESTA DEBE INCLUIR
+1. JSON de metadata completo
+2. Hexadecimal del bytecode con comentarios
+3. Explicación de cada sección del código
+4. Casos de uso y limitaciones
+```
+
+### Documentación Técnica para IA (Archivo Reference)
+
+```markdown
+# ULTRA-OMEGA BINARY TEMPLATE SPECIFICATION v1.0
+
+## FORMATO DE TEMPLATE JSON
+
+### Campos Obligatorios
+- `template_name` (string): Identificador único
+- `template_type` (enum): "cpu" | "gpu_spirv"
+- `binary_file` (string): Ruta al archivo binario
+- `size_bytes` (int): Tamaño total del bytecode
+- `parameters` (array): Lista de parámetros inyectables
+
+### Estructura de Parámetro
+```json
+{
+  "name": "nombre_unico",
+  "type": "uint8|uint16|uint32|uint64|float|double",
+  "offset": 123,
+  "size": 4,
+  "description": "Descripción clara del parámetro"
+}
+```
+
+## CONVENCIONES DE BYTECODE
+
+### CPU (x86_64)
+- Instrucciones deben usar registros scratch: rax, rdi, rsi, rdx, rcx, r8-r11
+- Preservar registros callee-saved: rbx, rbp, r12-r15
+- Stack debe estar alineado a 16 bytes antes de calls
+- Retornar valores en rax (enteros) o xmm0 (floats)
+
+### GPU (SPIR-V)
+- Magic number: 0x07230203
+- Version: 0x00010300 (SPIR-V 1.3)
+- Generator: 0x00000000 (Ultra-Omega)
+- Bound: Calcular según IDs usados
+- Schema: 0x00000000
+
+## INYECCIÓN DE PARÁMETROS
+
+Los parámetros se marcan en el bytecode con valores placeholder:
+- uint8: 0xFF
+- uint16: 0xFFFF
+- uint32: 0xFFFFFFFF
+- uint64: 0xFFFFFFFFFFFFFFFF
+
+El compilador reemplaza estos valores en los offsets especificados.
+
+## EJEMPLOS COMPLETOS
+
+### Template CPU: Add Two Numbers
+```json
+{
+  "template_name": "add_i64",
+  "template_type": "cpu",
+  "binary_file": "add_i64.bin",
+  "size_bytes": 8,
+  "parameters": [
+    {"name": "a", "type": "uint64", "offset": 0, "size": 8},
+    {"name": "b", "type": "uint64", "offset": 0, "size": 0}
+  ]
+}
+```
+
+Bytecode (add_i64.bin):
+```hex
+48 8B 07        # mov rax, [rdi]     ; Load 'a' from memory
+48 03 06        # add rax, [rsi]     ; Add 'b' from memory
+C3              # ret                ; Return result in rax
+```
+
+---
+
+## TESTING Y VALIDACIÓN
+
+Cada template debe pasar:
+1. **Validación de bytecode**: Sin instrucciones inválidas
+2. **Test de parámetros**: Inyección correcta en offsets
+3. **Test de ejecución**: Resultado esperado con inputs conocidos
+4. **Test de seguridad**: No debe causar segfaults o comportamiento indefinido
+```
+
+---
+
+## RESUMEN EJECUTIVO
+
+### Los 2 Puntos Críticos:
+
+**1. SISTEMA DE TEMPLATES**
+- Formato JSON para metadata + archivos binarios puros
+- Parámetros inyectables en offsets específicos
+- Templates relocables y reutilizables
+
+**2. BACKEND DE EJECUCIÓN**
+- Carga templates desde disco
+- Compila nodos reemplazando parámetros
+- Ejecuta en memoria con protección PROT_EXEC
+- Gestiona flujo de datos entre nodos
+
+### Para IA:
+- Prompt estructurado con contexto completo
+- Documentación técnica exhaustiva
+- Ejemplos concretos de entrada/salida
+- Restricciones y convenciones claras

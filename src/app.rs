@@ -3,6 +3,7 @@ use eframe::egui::text_selection::CursorRange;
 use crate::node_graph::{self, NodeGraph, NodeId, NodeLanguage, PinId, PinKind};
 use crate::terminal::{TerminalManager, TerminalTab};
 use crate::ui::viewport::Viewport2D;
+use crate::ui::layout::{LayoutStyle, LayoutConfig};
 use crate::workspace::Workspace;
 use crate::config::AppConfig;
 
@@ -22,6 +23,8 @@ pub struct NodeGraphApp {
     pub show_search_menu: bool,
     pub search_query: String,
     pub selected_category: Option<String>,
+    // Sistema de Layout para nodos
+    pub layout_config: LayoutConfig,
 }
 
 #[derive(Default)]
@@ -101,6 +104,7 @@ impl NodeGraphApp {
             show_search_menu: false,
             search_query: String::new(),
             selected_category: None,
+            layout_config: LayoutConfig::default(),
         };
         
         // Load workspace if configured
@@ -2331,14 +2335,31 @@ impl NodeGraphApp {
                 continue;
             };
 
-            crate::ui::connectors::draw_connection(
-                painter,
-                start,
-                end,
-                link.color,
-                self.viewport.zoom,
-                time,
-            );
+            // Usar el estilo de conector según el layout
+            match self.layout_config.style {
+                crate::ui::layout::LayoutStyle::SemanticMap => {
+                    // Conectores verticales para mapa semántico
+                    crate::ui::nodes_semantic::draw_semantic_connector(
+                        painter,
+                        start,
+                        end,
+                        link.color,
+                        self.viewport.zoom,
+                        false, // is_highlighted
+                    );
+                }
+                crate::ui::layout::LayoutStyle::Horizontal => {
+                    // Conectores horizontales originales
+                    crate::ui::connectors::draw_connection(
+                        painter,
+                        start,
+                        end,
+                        link.color,
+                        self.viewport.zoom,
+                        time,
+                    );
+                }
+            }
         }
     }
 
@@ -2360,7 +2381,22 @@ impl NodeGraphApp {
             let node_rect = self.node_rect(node, rect);
             let selected = self.interaction.selected_nodes.contains(&node.id);
             let is_inherited = inherited_nodes.contains(&node.id);
-            crate::ui::nodes::draw_node(painter, node, node_rect, self.viewport.zoom, selected, is_inherited, visuals, &connected_pins);
+            
+            // Usar el estilo de nodo según el layout
+            match self.layout_config.style {
+                crate::ui::layout::LayoutStyle::SemanticMap => {
+                    crate::ui::nodes_semantic::draw_semantic_node(
+                        painter, node, node_rect, self.viewport.zoom, 
+                        selected, is_inherited, visuals, &connected_pins
+                    );
+                }
+                crate::ui::layout::LayoutStyle::Horizontal => {
+                    crate::ui::nodes::draw_node(
+                        painter, node, node_rect, self.viewport.zoom, 
+                        selected, is_inherited, visuals, &connected_pins
+                    );
+                }
+            }
         }
     }
 
@@ -2577,9 +2613,25 @@ impl NodeGraphApp {
     }
 
     fn node_size(&self, node: &node_graph::Node) -> Vec2 {
-        let rows = node.inputs.len().max(node.outputs.len()).max(1) as f32;
-        let height = crate::ui::nodes::HEADER_HEIGHT + rows * crate::ui::nodes::PIN_SPACING + crate::ui::nodes::CONTENT_PADDING * 2.0;
-        Vec2::new(crate::ui::nodes::NODE_WIDTH, height)
+        use crate::ui::layout::LayoutStyle;
+        
+        match self.layout_config.style {
+            LayoutStyle::SemanticMap => {
+                // Nodo semántico: más compacto y cuadrado
+                let rows = node.inputs.len().max(node.outputs.len()).max(1) as f32;
+                let height = crate::ui::nodes_semantic::HEADER_HEIGHT 
+                    + crate::ui::nodes_semantic::BODY_HEIGHT.max(rows * 20.0);
+                Vec2::new(crate::ui::nodes_semantic::NODE_WIDTH, height)
+            }
+            LayoutStyle::Horizontal => {
+                // Nodo horizontal: estilo original
+                let rows = node.inputs.len().max(node.outputs.len()).max(1) as f32;
+                let height = crate::ui::nodes::HEADER_HEIGHT 
+                    + rows * crate::ui::nodes::PIN_SPACING 
+                    + crate::ui::nodes::CONTENT_PADDING * 2.0;
+                Vec2::new(crate::ui::nodes::NODE_WIDTH, height)
+            }
+        }
     }
 
     fn pin_slot_position(
@@ -2589,14 +2641,37 @@ impl NodeGraphApp {
         kind: PinKind,
         index: usize,
     ) -> Pos2 {
+        use crate::ui::layout::LayoutStyle;
+        
         let rect = self.node_rect(node, canvas);
-        let y = rect.min.y
-            + crate::ui::nodes::HEADER_HEIGHT * self.viewport.zoom
-            + crate::ui::nodes::PIN_SPACING * self.viewport.zoom * (index as f32 + 0.5);
+        
+        match self.layout_config.style {
+            LayoutStyle::SemanticMap => {
+                // Pins arriba (input) y abajo (output)
+                match kind {
+                    PinKind::Input => {
+                        crate::ui::nodes_semantic::get_input_pin_position(
+                            rect, index, node.inputs.len(), self.viewport.zoom
+                        )
+                    }
+                    PinKind::Output => {
+                        crate::ui::nodes_semantic::get_output_pin_position(
+                            rect, index, node.outputs.len(), self.viewport.zoom
+                        )
+                    }
+                }
+            }
+            LayoutStyle::Horizontal => {
+                // Pins izquierda (input) y derecha (output) - original
+                let y = rect.min.y
+                    + crate::ui::nodes::HEADER_HEIGHT * self.viewport.zoom
+                    + crate::ui::nodes::PIN_SPACING * self.viewport.zoom * (index as f32 + 0.5);
 
-        match kind {
-            PinKind::Input => pos2(rect.min.x + crate::ui::nodes::CONTENT_PADDING * self.viewport.zoom, y),
-            PinKind::Output => pos2(rect.max.x - crate::ui::nodes::CONTENT_PADDING * self.viewport.zoom, y),
+                match kind {
+                    PinKind::Input => pos2(rect.min.x + crate::ui::nodes::CONTENT_PADDING * self.viewport.zoom, y),
+                    PinKind::Output => pos2(rect.max.x - crate::ui::nodes::CONTENT_PADDING * self.viewport.zoom, y),
+                }
+            }
         }
     }
 

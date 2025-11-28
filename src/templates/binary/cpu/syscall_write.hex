@@ -1,0 +1,39 @@
+; ═══════════════════════════════════════════════════════════════════════════════
+; ULTRA-OMEGA BINARY TEMPLATE: syscall_write
+; Arquitectura: x86_64 Linux
+; Tamaño: 32 bytes
+; ═══════════════════════════════════════════════════════════════════════════════
+
+; ─────────────────────────────────────────────────────────────────────────────
+; PARÁMETROS INYECTABLES:
+;   [FD]          @ offset 0x0A (4 bytes) - File descriptor
+;   [BUFFER_ADDR] @ offset 0x11 (8 bytes) - Dirección del buffer  
+;   [LENGTH]      @ offset 0x1B (4 bytes) - Longitud a escribir
+; ─────────────────────────────────────────────────────────────────────────────
+
+; === CÓDIGO ===
+
+0x00: 48 C7 C0 01 00 00 00    ; mov rax, 1              | syscall: write
+0x07: 48 C7 C7               ; mov rdi, (inicio)
+0x0A: [FD 4 BYTES]           ; ... FD                  | ← PARÁMETRO: fd
+0x0E: 48 B8                  ; movabs rax, (inicio)... NOTA: usamos movabs rsi
+0x0E: 48 BE                  ; movabs rsi, (inicio)
+0x11: [ADDR 8 BYTES]         ; ... BUFFER_ADDR         | ← PARÁMETRO: buffer_addr
+0x19: 48 C7 C2               ; mov rdx, (inicio)
+0x1B: [LEN 4 BYTES]          ; ... LENGTH              | ← PARÁMETRO: length
+0x1F: 0F 05                  ; syscall                 | ejecutar
+0x21: C3                     ; ret                     | retornar resultado en rax
+
+; ═══════════════════════════════════════════════════════════════════════════════
+; BYTECODE CON PLACEHOLDERS (0xFF = parámetro):
+; ═══════════════════════════════════════════════════════════════════════════════
+;
+; 48 C7 C0 01 00 00 00       ; mov rax, 1
+; 48 C7 C7 FF FF FF FF       ; mov rdi, [FD]
+; 48 BE FF FF FF FF FF FF FF FF  ; movabs rsi, [BUFFER_ADDR]
+; 48 C7 C2 FF FF FF FF       ; mov rdx, [LENGTH]
+; 0F 05                      ; syscall
+; C3                         ; ret
+;
+; ═══════════════════════════════════════════════════════════════════════════════
+

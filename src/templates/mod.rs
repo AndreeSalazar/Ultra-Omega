@@ -2,9 +2,16 @@
 // Templates de código para Ultra Omega
 // Organizados por jerarquía: Básico → Intermedio → Avanzado
 // Incluye FastOS: Templates completos para crear un sistema operativo
+// Incluye Binary: Templates binarios/hexadecimales para ejecución directa
 // ═══════════════════════════════════════════════════════════════════════════
 
 use crate::node_graph::NodeLanguage;
+
+// ══════════════════════════════════════════
+// BINARY TEMPLATES (CPU x86_64 / GPU SPIR-V)
+// Templates ejecutables en código máquina directo
+// ══════════════════════════════════════════
+pub mod binary;
 
 // ══════════════════════════════════════════
 // ASSEMBLER (NASM x64)
@@ -179,6 +186,9 @@ pub mod fastos64 {
     // Documentación
     pub const README: &str = include_str!("fastos64/README.md");
     pub const VFIO_PASSTHROUGH: &str = include_str!("fastos64/vfio_passthrough.md");
+    
+    // FastOS XP Edition (Desktop completo estilo Windows XP)
+    pub const FASTOS_XP: &str = include_str!("fastos64/fastos_xp.asm");
 }
 
 // ══════════════════════════════════════════
@@ -1270,6 +1280,19 @@ pub fn all_templates() -> Vec<Template> {
             color: (0x76, 0xb9, 0x00),
             icon: "🎮",
             language: NodeLanguage::Text,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // FASTOS XP EDITION - Desktop completo
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "🖥️ FastOS XP Edition",
+            code: fastos64::FASTOS_XP,
+            category: "FastOS 64-bit",
+            subcategory: "Desktop XP",
+            color: (0x00, 0x78, 0xd4),
+            icon: "🖥️",
+            language: NodeLanguage::Asm,
         },
     ]
 }

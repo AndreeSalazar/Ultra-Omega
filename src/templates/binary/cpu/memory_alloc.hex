@@ -1,0 +1,46 @@
+; ═══════════════════════════════════════════════════════════════════════════════
+; ULTRA-OMEGA BINARY TEMPLATE: memory_alloc
+; Arquitectura: x86_64 Linux
+; Tamaño: 45 bytes
+; ═══════════════════════════════════════════════════════════════════════════════
+
+; ─────────────────────────────────────────────────────────────────────────────
+; SYSCALL: mmap(addr, length, prot, flags, fd, offset)
+;   rdi = addr    (NULL = 0, dejar que kernel elija)
+;   rsi = length  (tamaño a alocar)
+;   rdx = prot    (PROT_READ|PROT_WRITE|PROT_EXEC = 7)
+;   r10 = flags   (MAP_PRIVATE|MAP_ANONYMOUS = 0x22)
+;   r8  = fd      (-1 para anonymous)
+;   r9  = offset  (0)
+; ─────────────────────────────────────────────────────────────────────────────
+
+; === CÓDIGO ===
+
+0x00: 48 C7 C0 09 00 00 00    ; mov rax, 9              | syscall: mmap
+0x07: 48 31 FF                ; xor rdi, rdi            | addr = NULL
+0x0A: 48 BE                   ; movabs rsi, (inicio)
+0x0A: [SIZE 8 BYTES]          ; ... SIZE               | ← PARÁMETRO: size
+0x12: 48 C7 C2                ; mov rdx, (inicio)
+0x14: [PROT 4 BYTES]          ; ... PROT_FLAGS         | ← PARÁMETRO: prot_flags (default: 7)
+0x18: 49 C7 C2 22 00 00 00    ; mov r10, 0x22          | flags = MAP_PRIVATE|MAP_ANON
+0x1F: 49 C7 C0 FF FF FF FF    ; mov r8, -1             | fd = -1 (anonymous)
+0x26: 4D 31 C9                ; xor r9, r9             | offset = 0
+0x29: 0F 05                   ; syscall                | ejecutar
+0x2B: C3                      ; ret                    | retornar dirección en rax
+
+; ═══════════════════════════════════════════════════════════════════════════════
+; BYTECODE CON PLACEHOLDERS:
+; ═══════════════════════════════════════════════════════════════════════════════
+;
+; 48 C7 C0 09 00 00 00       ; mov rax, 9 (mmap)
+; 48 31 FF                   ; xor rdi, rdi
+; 48 BE FF FF FF FF FF FF FF FF  ; movabs rsi, [SIZE]
+; 48 C7 C2 07 00 00 00       ; mov rdx, 7 (default prot)
+; 49 C7 C2 22 00 00 00       ; mov r10, 0x22
+; 49 C7 C0 FF FF FF FF       ; mov r8, -1
+; 4D 31 C9                   ; xor r9, r9
+; 0F 05                      ; syscall
+; C3                         ; ret
+;
+; ═══════════════════════════════════════════════════════════════════════════════
+
