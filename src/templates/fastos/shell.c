@@ -12,6 +12,8 @@
 #include "timer.h"
 #include "memory.h"
 #include "string.h"
+#include "ports.h"
+#include "idt.h"
 
 /* ═══════════════════════════════════════════════════════════════════════════
  * CONSTANTES

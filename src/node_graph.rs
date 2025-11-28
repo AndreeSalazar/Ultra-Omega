@@ -887,7 +887,7 @@ impl NodeGraph {
         
         let makefile = graph.add_node(
             "🛠️ Makefile",
-            pos2(x_center, y_makefile),
+            pos2(x_center - 100.0, y_makefile),
             color_build,
             &["▲"],
             &["▼"],
@@ -898,17 +898,37 @@ impl NodeGraph {
         }
         Self::link_nodes(&mut graph, linker, makefile, color_build);
         
+        // Build.bat para Windows
+        let build_bat = graph.add_node(
+            "🖥️ build.bat",
+            pos2(x_center + 100.0, y_makefile),
+            Color32::from_rgb(0x00, 0xaa, 0xdd),  // Azul cyan
+            &["▲"],
+            &["▼"],
+            NodeLanguage::Text,
+        );
+        if let Some(n) = graph.node_mut(build_bat) {
+            n.code = fastos::BUILD_BAT.to_string();
+        }
+        // Conectar linker -> build.bat también
+        if let (Some(out_pin), Some(in_pin)) = (
+            graph.pin_id(linker, PinKind::Output, 0),
+            graph.pin_id(build_bat, PinKind::Input, 0)
+        ) {
+            graph.add_link(out_pin, in_pin, color_build);
+        }
+        
         // ═══════════════════════════════════════════════════════════════════════════
         // NODO FINAL - FASTOS COMPLETO
         // ═══════════════════════════════════════════════════════════════════════════
         
-        let y_final = y_makefile + y_spacing + 20.0;
+        let y_final = y_makefile + y_spacing + 30.0;
         
         let fastos_final = graph.add_node(
             "🔥 FASTOS",
             pos2(x_center, y_final),
             color_final,
-            &["▲"],
+            &["Make", "Bat"],  // Dos entradas
             &["💾"],
             NodeLanguage::Text,
         );
@@ -931,17 +951,49 @@ impl NodeGraph {
 ║                                      ├── shell.h / shell.c                    ║
 ║                                      └── kernel.h / kernel.c                  ║
 ║                                                                               ║
-║  📋 PARA COMPILAR:                                                            ║
-║     1. Exporta cada archivo a una carpeta                                     ║
-║     2. Ejecuta: make clean && make && make run                                ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║  📋 COMPILAR EN WINDOWS:                                                      ║
 ║                                                                               ║
-║  ⚠️  Requiere: NASM, i686-elf-gcc (cross-compiler), QEMU                      ║
+║     OPCIÓN 1 - Script batch (recomendado):                                    ║
+║       > build.bat           Compilar todo                                     ║
+║       > build.bat run       Ejecutar en QEMU                                  ║
+║       > build.bat check     Verificar herramientas                            ║
+║                                                                               ║
+║     OPCIÓN 2 - Makefile (requiere make):                                      ║
+║       > make clean && make && make run                                        ║
+║                                                                               ║
+╠═══════════════════════════════════════════════════════════════════════════════╣
+║  🛠️ CROSS-COMPILER CONFIGURADO:                                               ║
+║                                                                               ║
+║     C:\Users\Andre\Documents\Mis Programas Poderosos\FastOS\bin\              ║
+║     ├── i686-elf-gcc.exe      (Compilador C)                                  ║
+║     ├── i686-elf-ld.exe       (Linker)                                        ║
+║     └── i686-elf-objcopy.exe  (Object copy)                                   ║
+║                                                                               ║
+║  ⚠️  También necesitas:                                                       ║
+║     - NASM (https://nasm.us)                                                  ║
+║     - QEMU (https://www.qemu.org) para ejecutar                               ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
 */
 "#.to_string();
         }
-        Self::link_nodes(&mut graph, makefile, fastos_final, color_final);
+        
+        // Conectar Makefile -> FastOS final (entrada 0)
+        if let (Some(out_pin), Some(in_pin)) = (
+            graph.pin_id(makefile, PinKind::Output, 0),
+            graph.pin_id(fastos_final, PinKind::Input, 0)
+        ) {
+            graph.add_link(out_pin, in_pin, color_build);
+        }
+        
+        // Conectar build.bat -> FastOS final (entrada 1)
+        if let (Some(out_pin), Some(in_pin)) = (
+            graph.pin_id(build_bat, PinKind::Output, 0),
+            graph.pin_id(fastos_final, PinKind::Input, 1)
+        ) {
+            graph.add_link(out_pin, in_pin, Color32::from_rgb(0x00, 0xaa, 0xdd));
+        }
         
         graph
     }

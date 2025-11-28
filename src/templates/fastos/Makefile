@@ -1,190 +1,201 @@
 # ═══════════════════════════════════════════════════════════════════════════
-# FastOS - Makefile
+# FastOS - Makefile para Windows
 # Nivel: Avanzado - Sistema de compilación
 # ═══════════════════════════════════════════════════════════════════════════
 # Este Makefile compila todo el sistema operativo FastOS.
+# Configurado para Windows con i686-elf cross-compiler
 # ═══════════════════════════════════════════════════════════════════════════
 
 # ═══════════════════════════════════════════════════════════════════════════
-# CONFIGURACIÓN
+# CONFIGURACIÓN - RUTAS DEL CROSS-COMPILER
 # ═══════════════════════════════════════════════════════════════════════════
+
+# Ruta base del cross-compiler (MODIFICAR SI ES DIFERENTE)
+TOOLCHAIN_PATH = C:/Users/Andre/Documents/Mis Programas Poderosos/FastOS/bin
 
 # Nombre del proyecto
 PROJECT = FastOS
 
-# Directorios
-SRC_DIR = src
+# Directorios (relativo al proyecto)
 BUILD_DIR = build
-ISO_DIR = iso
 
-# Herramientas
+# ═══════════════════════════════════════════════════════════════════════════
+# HERRAMIENTAS
+# ═══════════════════════════════════════════════════════════════════════════
+
+# NASM (debe estar en PATH o especificar ruta completa)
 ASM = nasm
-CC = i686-elf-gcc
-LD = i686-elf-ld
-OBJCOPY = i686-elf-objcopy
 
-# Flags de ensamblador
+# Cross-compiler i686-elf
+CC = "$(TOOLCHAIN_PATH)/i686-elf-gcc.exe"
+LD = "$(TOOLCHAIN_PATH)/i686-elf-ld.exe"
+OBJCOPY = "$(TOOLCHAIN_PATH)/i686-elf-objcopy.exe"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# FLAGS DE COMPILACIÓN
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Flags de ensamblador NASM
 ASMFLAGS = -f elf32 -g
 
-# Flags de compilador C
-CFLAGS = -m32 -ffreestanding -fno-builtin -fno-stack-protector \
-         -nostdlib -nodefaultlibs -Wall -Wextra -O2 -g \
-         -I$(SRC_DIR)
+# Flags de compilador C (freestanding para kernel)
+CFLAGS = -m32 \
+         -ffreestanding \
+         -fno-builtin \
+         -fno-stack-protector \
+         -nostdlib \
+         -nodefaultlibs \
+         -Wall \
+         -Wextra \
+         -O2 \
+         -g \
+         -I.
 
 # Flags de enlazador
-LDFLAGS = -T $(SRC_DIR)/linker.ld -nostdlib
+LDFLAGS = -T linker.ld -nostdlib
 
 # ═══════════════════════════════════════════════════════════════════════════
 # ARCHIVOS FUENTE
 # ═══════════════════════════════════════════════════════════════════════════
 
-# Archivos ASM
-ASM_SOURCES = $(SRC_DIR)/boot_sector.asm \
-              $(SRC_DIR)/bootloader_stage2.asm \
-              $(SRC_DIR)/kernel_entry.asm
+# Archivos ASM del bootloader
+ASM_BOOT = boot_sector.asm
+ASM_STAGE2 = bootloader_stage2.asm
+ASM_ENTRY = kernel_entry.asm
 
-# Archivos C
-C_SOURCES = $(SRC_DIR)/kernel_main.c \
-            $(SRC_DIR)/vga_driver.c \
-            $(SRC_DIR)/keyboard_driver.c \
-            $(SRC_DIR)/idt.c \
-            $(SRC_DIR)/timer.c \
-            $(SRC_DIR)/memory.c \
-            $(SRC_DIR)/shell.c \
-            $(SRC_DIR)/string.c
+# Archivos C del kernel
+C_SOURCES = kernel_main.c \
+            vga_driver.c \
+            keyboard_driver.c \
+            idt.c \
+            timer.c \
+            memory.c \
+            shell.c \
+            string.c
 
 # Objetos
-ASM_OBJECTS = $(patsubst $(SRC_DIR)/%.asm,$(BUILD_DIR)/%.o,$(ASM_SOURCES))
-C_OBJECTS = $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(C_SOURCES))
-OBJECTS = $(BUILD_DIR)/kernel_entry.o $(filter-out $(BUILD_DIR)/kernel_entry.o,$(C_OBJECTS))
+C_OBJECTS = $(patsubst %.c,$(BUILD_DIR)/%.o,$(C_SOURCES))
 
 # ═══════════════════════════════════════════════════════════════════════════
 # REGLAS PRINCIPALES
 # ═══════════════════════════════════════════════════════════════════════════
 
-.PHONY: all clean run debug iso
+.PHONY: all clean run debug help check
 
 # Compilar todo
-all: $(BUILD_DIR)/os-image.bin
+all: $(BUILD_DIR) $(BUILD_DIR)/os-image.bin
+	@echo ═══════════════════════════════════════════════════════════════
+	@echo   FastOS compilado exitosamente!
+	@echo   Imagen: $(BUILD_DIR)/os-image.bin
+	@echo   Ejecuta: make run
+	@echo ═══════════════════════════════════════════════════════════════
+
+# Crear directorio de build
+$(BUILD_DIR):
+	@if not exist $(BUILD_DIR) mkdir $(BUILD_DIR)
 
 # Limpiar
 clean:
-	@echo "Limpiando..."
-	@rm -rf $(BUILD_DIR)
-	@rm -rf $(ISO_DIR)
-	@echo "Listo."
+	@echo Limpiando archivos generados...
+	@if exist $(BUILD_DIR) rmdir /s /q $(BUILD_DIR)
+	@echo Listo.
+
+# Verificar herramientas
+check:
+	@echo ═══════════════════════════════════════════════════════════════
+	@echo Verificando herramientas...
+	@echo ═══════════════════════════════════════════════════════════════
+	@where nasm 2>nul || echo [ERROR] NASM no encontrado. Instalar desde: https://nasm.us
+	@if exist "$(TOOLCHAIN_PATH)/i686-elf-gcc.exe" (echo [OK] i686-elf-gcc encontrado) else (echo [ERROR] i686-elf-gcc no encontrado en $(TOOLCHAIN_PATH))
+	@where qemu-system-i386 2>nul || echo [WARN] QEMU no encontrado. Necesario para: make run
+	@echo ═══════════════════════════════════════════════════════════════
 
 # Ejecutar en QEMU
 run: $(BUILD_DIR)/os-image.bin
-	@echo "Ejecutando FastOS en QEMU..."
+	@echo ═══════════════════════════════════════════════════════════════
+	@echo Ejecutando FastOS en QEMU...
+	@echo ═══════════════════════════════════════════════════════════════
 	qemu-system-i386 -drive format=raw,file=$< -m 32M
 
-# Debug con GDB
+# Debug con QEMU + GDB
 debug: $(BUILD_DIR)/os-image.bin
-	@echo "Iniciando en modo debug..."
-	qemu-system-i386 -drive format=raw,file=$< -m 32M -s -S &
-	gdb -ex "target remote localhost:1234" -ex "symbol-file $(BUILD_DIR)/kernel.elf"
-
-# Crear ISO booteable
-iso: $(BUILD_DIR)/os-image.bin
-	@echo "Creando ISO..."
-	@mkdir -p $(ISO_DIR)/boot/grub
-	@cp $< $(ISO_DIR)/boot/
-	@echo 'set timeout=0' > $(ISO_DIR)/boot/grub/grub.cfg
-	@echo 'set default=0' >> $(ISO_DIR)/boot/grub/grub.cfg
-	@echo 'menuentry "FastOS" {' >> $(ISO_DIR)/boot/grub/grub.cfg
-	@echo '    multiboot /boot/os-image.bin' >> $(ISO_DIR)/boot/grub/grub.cfg
-	@echo '    boot' >> $(ISO_DIR)/boot/grub/grub.cfg
-	@echo '}' >> $(ISO_DIR)/boot/grub/grub.cfg
-	grub-mkrescue -o $(BUILD_DIR)/$(PROJECT).iso $(ISO_DIR)
-	@echo "ISO creado: $(BUILD_DIR)/$(PROJECT).iso"
+	@echo Iniciando en modo debug (puerto 1234)...
+	@echo Conectar con: gdb -ex "target remote localhost:1234"
+	qemu-system-i386 -drive format=raw,file=$< -m 32M -s -S
 
 # ═══════════════════════════════════════════════════════════════════════════
 # REGLAS DE COMPILACIÓN
 # ═══════════════════════════════════════════════════════════════════════════
 
-# Crear directorio de build
-$(BUILD_DIR):
-	@mkdir -p $@
-
-# Imagen del sistema operativo
+# Imagen final del sistema operativo
 $(BUILD_DIR)/os-image.bin: $(BUILD_DIR)/boot_sector.bin $(BUILD_DIR)/bootloader_stage2.bin $(BUILD_DIR)/kernel.bin
-	@echo "Creando imagen del sistema..."
-	@cat $^ > $@
-	@# Rellenar hasta múltiplo de 512 bytes
-	@truncate -s %512 $@
-	@echo "Imagen creada: $@ ($(shell stat -f%z $@ 2>/dev/null || stat -c%s $@) bytes)"
+	@echo ───────────────────────────────────────────────────────────────
+	@echo Creando imagen del sistema operativo...
+	@copy /b $(BUILD_DIR)\boot_sector.bin + $(BUILD_DIR)\bootloader_stage2.bin + $(BUILD_DIR)\kernel.bin $@ >nul
+	@echo Imagen creada: $@
 
-# Boot sector
-$(BUILD_DIR)/boot_sector.bin: $(SRC_DIR)/boot_sector.asm | $(BUILD_DIR)
-	@echo "Ensamblando boot sector..."
+# Boot sector (512 bytes, binario puro)
+$(BUILD_DIR)/boot_sector.bin: $(ASM_BOOT) | $(BUILD_DIR)
+	@echo [ASM] Ensamblando boot sector...
 	$(ASM) -f bin $< -o $@
 
-# Stage 2 bootloader
-$(BUILD_DIR)/bootloader_stage2.bin: $(SRC_DIR)/bootloader_stage2.asm | $(BUILD_DIR)
-	@echo "Ensamblando stage 2..."
+# Stage 2 bootloader (binario puro)
+$(BUILD_DIR)/bootloader_stage2.bin: $(ASM_STAGE2) | $(BUILD_DIR)
+	@echo [ASM] Ensamblando stage 2 bootloader...
 	$(ASM) -f bin $< -o $@
 
-# Kernel binario
+# Kernel binario (extraído del ELF)
 $(BUILD_DIR)/kernel.bin: $(BUILD_DIR)/kernel.elf
-	@echo "Extrayendo binario del kernel..."
+	@echo [OBJCOPY] Extrayendo binario del kernel...
 	$(OBJCOPY) -O binary $< $@
 
-# Kernel ELF
-$(BUILD_DIR)/kernel.elf: $(OBJECTS) | $(BUILD_DIR)
-	@echo "Enlazando kernel..."
+# Kernel ELF (kernel_entry.o + todos los .c)
+$(BUILD_DIR)/kernel.elf: $(BUILD_DIR)/kernel_entry.o $(C_OBJECTS)
+	@echo [LD] Enlazando kernel...
 	$(LD) $(LDFLAGS) -o $@ $^
 
-# Compilar archivos ASM del kernel
-$(BUILD_DIR)/%.o: $(SRC_DIR)/%.asm | $(BUILD_DIR)
-	@echo "Ensamblando $<..."
+# Kernel entry point (ASM -> ELF object)
+$(BUILD_DIR)/kernel_entry.o: $(ASM_ENTRY) | $(BUILD_DIR)
+	@echo [ASM] Ensamblando kernel entry...
 	$(ASM) $(ASMFLAGS) $< -o $@
 
 # Compilar archivos C
-$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)
-	@echo "Compilando $<..."
+$(BUILD_DIR)/%.o: %.c | $(BUILD_DIR)
+	@echo [CC] Compilando $<...
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # ═══════════════════════════════════════════════════════════════════════════
-# REGLAS DE AYUDA
+# AYUDA
 # ═══════════════════════════════════════════════════════════════════════════
 
 help:
-	@echo "═══════════════════════════════════════════════════════════════"
-	@echo "FastOS Makefile - Comandos disponibles:"
-	@echo "═══════════════════════════════════════════════════════════════"
-	@echo "  make          - Compilar el sistema operativo"
-	@echo "  make clean    - Limpiar archivos generados"
-	@echo "  make run      - Ejecutar en QEMU"
-	@echo "  make debug    - Ejecutar con GDB"
-	@echo "  make iso      - Crear imagen ISO booteable"
-	@echo "  make help     - Mostrar esta ayuda"
-	@echo "═══════════════════════════════════════════════════════════════"
+	@echo ═══════════════════════════════════════════════════════════════
+	@echo   FastOS Makefile - Comandos disponibles
+	@echo ═══════════════════════════════════════════════════════════════
+	@echo.
+	@echo   make          Compilar el sistema operativo
+	@echo   make clean    Limpiar archivos generados
+	@echo   make run      Ejecutar en QEMU
+	@echo   make debug    Ejecutar con GDB (puerto 1234)
+	@echo   make check    Verificar herramientas instaladas
+	@echo   make help     Mostrar esta ayuda
+	@echo.
+	@echo ═══════════════════════════════════════════════════════════════
+	@echo   Requisitos:
+	@echo     - NASM (https://nasm.us)
+	@echo     - i686-elf-gcc (cross-compiler)
+	@echo     - QEMU (para ejecutar)
+	@echo ═══════════════════════════════════════════════════════════════
 
 # ═══════════════════════════════════════════════════════════════════════════
-# DEPENDENCIAS
+# DEPENDENCIAS DE HEADERS
 # ═══════════════════════════════════════════════════════════════════════════
 
-# Dependencias de headers
-$(BUILD_DIR)/kernel_main.o: $(SRC_DIR)/kernel.h $(SRC_DIR)/vga.h $(SRC_DIR)/idt.h \
-                            $(SRC_DIR)/keyboard.h $(SRC_DIR)/timer.h $(SRC_DIR)/memory.h \
-                            $(SRC_DIR)/shell.h
-
-$(BUILD_DIR)/vga_driver.o: $(SRC_DIR)/vga.h $(SRC_DIR)/ports.h $(SRC_DIR)/types.h
-
-$(BUILD_DIR)/keyboard_driver.o: $(SRC_DIR)/keyboard.h $(SRC_DIR)/ports.h $(SRC_DIR)/idt.h \
-                                 $(SRC_DIR)/vga.h $(SRC_DIR)/types.h
-
-$(BUILD_DIR)/idt.o: $(SRC_DIR)/idt.h $(SRC_DIR)/ports.h $(SRC_DIR)/vga.h $(SRC_DIR)/types.h
-
-$(BUILD_DIR)/timer.o: $(SRC_DIR)/timer.h $(SRC_DIR)/ports.h $(SRC_DIR)/idt.h \
-                      $(SRC_DIR)/vga.h $(SRC_DIR)/types.h
-
-$(BUILD_DIR)/memory.o: $(SRC_DIR)/memory.h $(SRC_DIR)/vga.h $(SRC_DIR)/types.h
-
-$(BUILD_DIR)/shell.o: $(SRC_DIR)/shell.h $(SRC_DIR)/vga.h $(SRC_DIR)/keyboard.h \
-                      $(SRC_DIR)/timer.h $(SRC_DIR)/memory.h $(SRC_DIR)/string.h \
-                      $(SRC_DIR)/types.h
-
-$(BUILD_DIR)/string.o: $(SRC_DIR)/string.h $(SRC_DIR)/types.h
-
+$(BUILD_DIR)/kernel_main.o: kernel.h vga.h idt.h keyboard.h timer.h memory.h shell.h types.h
+$(BUILD_DIR)/vga_driver.o: vga.h ports.h types.h string.h
+$(BUILD_DIR)/keyboard_driver.o: keyboard.h ports.h idt.h vga.h types.h
+$(BUILD_DIR)/idt.o: idt.h ports.h vga.h types.h
+$(BUILD_DIR)/timer.o: timer.h ports.h idt.h vga.h types.h
+$(BUILD_DIR)/memory.o: memory.h vga.h types.h
+$(BUILD_DIR)/shell.o: shell.h vga.h keyboard.h timer.h memory.h string.h types.h
+$(BUILD_DIR)/string.o: string.h types.h

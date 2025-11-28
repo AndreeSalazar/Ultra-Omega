@@ -70,6 +70,7 @@ pub mod fastos {
     // Build
     pub const LINKER: &str = include_str!("fastos/linker.ld");
     pub const MAKEFILE: &str = include_str!("fastos/Makefile");
+    pub const BUILD_BAT: &str = include_str!("fastos/build.bat");
     pub const README: &str = include_str!("fastos/README.md");
 }
 
