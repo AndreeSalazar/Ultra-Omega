@@ -633,14 +633,15 @@ impl NodeGraphApp {
                                 ui.separator();
                                 
                                 // Categorías de templates
-                                let categories = ["Assembler", "C", "C++", "Rust", "FastOS", "Vulkan"];
-                                let category_icons = ["🔧", "📘", "📗", "🦀", "🔥", "🎮"];
+                                let categories = ["Assembler", "C", "C++", "Rust", "FastOS", "FastOS 64-bit", "Vulkan"];
+                                let category_icons = ["🔧", "📘", "📗", "🦀", "🔥", "🚀", "🎮"];
                                 let category_colors = [
                                     Color32::from_rgb(0xff, 0x47, 0x00),
                                     Color32::from_rgb(0x00, 0x59, 0x9C),
                                     Color32::from_rgb(0x00, 0x44, 0x82),
                                     Color32::from_rgb(0xde, 0x39, 0x00),
                                     Color32::from_rgb(0xff, 0xd7, 0x00), // Dorado para FastOS
+                                    Color32::from_rgb(0x00, 0xd4, 0xff), // Cyan para FastOS 64-bit
                                     Color32::from_rgb(0xac, 0x14, 0x2c), // Rojo Vulkan
                                 ];
                                 

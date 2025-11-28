@@ -124,6 +124,34 @@ pub mod rust {
 }
 
 // ══════════════════════════════════════════
+// FASTOS 64-BIT (UEFI + Long Mode)
+// ══════════════════════════════════════════
+pub mod fastos64 {
+    // Bootloader UEFI
+    pub const BOOT_UEFI: &str = include_str!("fastos64/boot_uefi.asm");
+    pub const KERNEL_ENTRY64: &str = include_str!("fastos64/kernel_entry64.asm");
+    
+    // Kernel
+    pub const KERNEL_MAIN64: &str = include_str!("fastos64/kernel_main64.c");
+    pub const TYPES64_H: &str = include_str!("fastos64/types64.h");
+    pub const PORTS64_H: &str = include_str!("fastos64/ports64.h");
+    
+    // Gráficos
+    pub const FRAMEBUFFER_H: &str = include_str!("fastos64/framebuffer.h");
+    pub const FRAMEBUFFER_C: &str = include_str!("fastos64/framebuffer.c");
+    
+    // Sistema
+    pub const IDT64_H: &str = include_str!("fastos64/idt64.h");
+    
+    // PCI (para detección de GPU)
+    pub const PCI_H: &str = include_str!("fastos64/pci.h");
+    pub const PCI_C: &str = include_str!("fastos64/pci.c");
+    
+    // Documentación
+    pub const README: &str = include_str!("fastos64/README.md");
+}
+
+// ══════════════════════════════════════════
 // VULKAN API (C++)
 // ══════════════════════════════════════════
 pub mod vulkan {
@@ -918,6 +946,129 @@ pub fn all_templates() -> Vec<Template> {
             category: "Vulkan",
             subcategory: "Build",
             color: (0x06, 0x4f, 0x8c),
+            icon: "📖",
+            language: NodeLanguage::Text,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // FASTOS 64-BIT - BOOTLOADER
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "🚀 Boot UEFI",
+            code: fastos64::BOOT_UEFI,
+            category: "FastOS 64-bit",
+            subcategory: "Bootloader",
+            color: (0x00, 0xd4, 0xff),
+            icon: "💿",
+            language: NodeLanguage::Asm,
+        },
+        Template {
+            name: "🚀 Kernel Entry 64",
+            code: fastos64::KERNEL_ENTRY64,
+            category: "FastOS 64-bit",
+            subcategory: "Bootloader",
+            color: (0x00, 0xd4, 0xff),
+            icon: "⚡",
+            language: NodeLanguage::Asm,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // FASTOS 64-BIT - KERNEL
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "🚀 Kernel Main 64",
+            code: fastos64::KERNEL_MAIN64,
+            category: "FastOS 64-bit",
+            subcategory: "Kernel",
+            color: (0xff, 0x88, 0x00),
+            icon: "🧠",
+            language: NodeLanguage::C,
+        },
+        Template {
+            name: "🚀 Types 64-bit",
+            code: fastos64::TYPES64_H,
+            category: "FastOS 64-bit",
+            subcategory: "Kernel",
+            color: (0xff, 0x88, 0x00),
+            icon: "📋",
+            language: NodeLanguage::C,
+        },
+        Template {
+            name: "🚀 Ports 64-bit",
+            code: fastos64::PORTS64_H,
+            category: "FastOS 64-bit",
+            subcategory: "Kernel",
+            color: (0xff, 0x88, 0x00),
+            icon: "📋",
+            language: NodeLanguage::C,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // FASTOS 64-BIT - GRÁFICOS
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "🚀 Framebuffer Header",
+            code: fastos64::FRAMEBUFFER_H,
+            category: "FastOS 64-bit",
+            subcategory: "Gráficos",
+            color: (0x00, 0xff, 0x88),
+            icon: "🖥️",
+            language: NodeLanguage::C,
+        },
+        Template {
+            name: "🚀 Framebuffer Driver",
+            code: fastos64::FRAMEBUFFER_C,
+            category: "FastOS 64-bit",
+            subcategory: "Gráficos",
+            color: (0x00, 0xff, 0x88),
+            icon: "🖥️",
+            language: NodeLanguage::C,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // FASTOS 64-BIT - SISTEMA
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "🚀 IDT 64-bit",
+            code: fastos64::IDT64_H,
+            category: "FastOS 64-bit",
+            subcategory: "Sistema",
+            color: (0xaa, 0x00, 0xff),
+            icon: "⚡",
+            language: NodeLanguage::C,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // FASTOS 64-BIT - PCI (Para GPU)
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "🚀 PCI Header",
+            code: fastos64::PCI_H,
+            category: "FastOS 64-bit",
+            subcategory: "PCI/GPU",
+            color: (0xff, 0x00, 0x88),
+            icon: "🎮",
+            language: NodeLanguage::C,
+        },
+        Template {
+            name: "🚀 PCI Driver",
+            code: fastos64::PCI_C,
+            category: "FastOS 64-bit",
+            subcategory: "PCI/GPU",
+            color: (0xff, 0x00, 0x88),
+            icon: "🎮",
+            language: NodeLanguage::C,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // FASTOS 64-BIT - DOCUMENTACIÓN
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "🚀 README",
+            code: fastos64::README,
+            category: "FastOS 64-bit",
+            subcategory: "Docs",
+            color: (0x88, 0x88, 0x88),
             icon: "📖",
             language: NodeLanguage::Text,
         },
