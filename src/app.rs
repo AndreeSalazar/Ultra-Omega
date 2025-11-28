@@ -633,14 +633,15 @@ impl NodeGraphApp {
                                 ui.separator();
                                 
                                 // Categorías de templates
-                                let categories = ["Assembler", "C", "C++", "Rust", "FastOS"];
-                                let category_icons = ["🔧", "📘", "📗", "🦀", "🔥"];
+                                let categories = ["Assembler", "C", "C++", "Rust", "FastOS", "Vulkan"];
+                                let category_icons = ["🔧", "📘", "📗", "🦀", "🔥", "🎮"];
                                 let category_colors = [
                                     Color32::from_rgb(0xff, 0x47, 0x00),
                                     Color32::from_rgb(0x00, 0x59, 0x9C),
                                     Color32::from_rgb(0x00, 0x44, 0x82),
                                     Color32::from_rgb(0xde, 0x39, 0x00),
                                     Color32::from_rgb(0xff, 0xd7, 0x00), // Dorado para FastOS
+                                    Color32::from_rgb(0xac, 0x14, 0x2c), // Rojo Vulkan
                                 ];
                                 
                                 for (i, cat) in categories.iter().enumerate() {
@@ -750,6 +751,74 @@ impl NodeGraphApp {
                                         let templates = crate::templates::all_templates();
                                         let filtered: Vec<_> = templates.iter()
                                             .filter(|t| t.category == "FastOS")
+                                            .collect();
+                                        
+                                        // Agrupar por subcategoría
+                                        let mut subcats: Vec<&str> = filtered.iter()
+                                            .map(|t| t.subcategory)
+                                            .collect();
+                                        subcats.sort();
+                                        subcats.dedup();
+                                        
+                                        egui::ScrollArea::vertical()
+                                            .max_height(200.0)
+                                            .show(ui, |ui| {
+                                                for subcat in subcats {
+                                                    ui.label(egui::RichText::new(subcat).strong().color(Color32::from_rgb(150, 150, 150)));
+                                                    ui.add_space(4.0);
+                                                    
+                                                    for template in filtered.iter().filter(|t| t.subcategory == subcat) {
+                                                        let color = Color32::from_rgb(template.color.0, template.color.1, template.color.2);
+                                                        let btn_text = format!("{} {}", template.icon, template.name);
+                                                        
+                                                        if ui.add(egui::Button::new(
+                                                            egui::RichText::new(&btn_text).color(color)
+                                                        ).min_size(Vec2::new(180.0, 24.0))).clicked() {
+                                                            template_to_add = Some((*template).clone());
+                                                            close_menu = true;
+                                                        }
+                                                    }
+                                                    
+                                                    ui.add_space(8.0);
+                                                }
+                                            });
+                                    } else if cat == "Vulkan" {
+                                        // Panel especial para Vulkan
+                                        ui.heading(egui::RichText::new("🎮 Vulkan API").color(Color32::from_rgb(0xac, 0x14, 0x2c)));
+                                        ui.add_space(8.0);
+                                        
+                                        ui.label(egui::RichText::new("Graphics API de bajo nivel").color(Color32::GRAY));
+                                        ui.add_space(8.0);
+                                        
+                                        // Botón principal para crear proyecto completo
+                                        if ui.add(egui::Button::new(
+                                            egui::RichText::new("🎮 Crear Proyecto Vulkan Completo")
+                                                .color(Color32::from_rgb(0xff, 0xd7, 0x00))
+                                                .strong()
+                                        ).min_size(Vec2::new(250.0, 40.0))).clicked() {
+                                            // Crear el proyecto Vulkan con todos los nodos
+                                            self.graph = crate::node_graph::NodeGraph::create_vulkan_project();
+                                            self.viewport.pan = Vec2::new(0.0, 0.0);
+                                            self.viewport.zoom = 0.4; // Zoom out para ver todo
+                                            
+                                            if self.workspace.has_root() {
+                                                let _ = self.save_current_graph();
+                                            }
+                                            
+                                            close_menu = true;
+                                        }
+                                        
+                                        ui.add_space(8.0);
+                                        ui.separator();
+                                        ui.add_space(8.0);
+                                        
+                                        ui.label(egui::RichText::new("O añadir componentes individuales:").small().color(Color32::GRAY));
+                                        ui.add_space(4.0);
+                                        
+                                        // Mostrar templates de Vulkan
+                                        let templates = crate::templates::all_templates();
+                                        let filtered: Vec<_> = templates.iter()
+                                            .filter(|t| t.category == "Vulkan")
                                             .collect();
                                         
                                         // Agrupar por subcategoría

@@ -175,8 +175,39 @@ if not exist "%BUILD_DIR%\os-image.bin" (
     echo %RED%[ERROR]%RESET% No se encontro os-image.bin. Ejecuta primero: build.bat
     goto end
 )
+
+REM Buscar QEMU en rutas comunes
+set "QEMU="
+REM MSYS2/MinGW (pacman -S mingw-w64-x86_64-qemu)
+if exist "C:\msys64\mingw64\bin\qemu-system-i386.exe" set "QEMU=C:\msys64\mingw64\bin\qemu-system-i386.exe"
+if exist "C:\msys64\ucrt64\bin\qemu-system-i386.exe" set "QEMU=C:\msys64\ucrt64\bin\qemu-system-i386.exe"
+REM Instalación estándar de QEMU
+if exist "C:\Program Files\qemu\qemu-system-i386.exe" set "QEMU=C:\Program Files\qemu\qemu-system-i386.exe"
+if exist "C:\Program Files (x86)\qemu\qemu-system-i386.exe" set "QEMU=C:\Program Files (x86)\qemu\qemu-system-i386.exe"
+if exist "%USERPROFILE%\qemu\qemu-system-i386.exe" set "QEMU=%USERPROFILE%\qemu\qemu-system-i386.exe"
+
+REM Intentar en PATH
+where qemu-system-i386 >nul 2>&1
+if %errorlevel%==0 set "QEMU=qemu-system-i386"
+
+if "%QEMU%"=="" (
+    echo %RED%[ERROR]%RESET% QEMU no encontrado.
+    echo.
+    echo %YELLOW%Instala QEMU desde:%RESET%
+    echo   https://www.qemu.org/download/#windows
+    echo   https://qemu.weilnetz.de/w64/
+    echo.
+    echo %YELLOW%Luego agrega al PATH:%RESET%
+    echo   C:\Program Files\qemu
+    echo.
+    goto end
+)
+
 echo %CYAN%Ejecutando FastOS en QEMU...%RESET%
-qemu-system-i386 -drive format=raw,file="%BUILD_DIR%\os-image.bin" -m 32M
+echo %YELLOW%Presiona Ctrl+Alt+G para liberar el mouse%RESET%
+echo.
+REM Usar floppy para bootear (más compatible con bootloaders simples)
+"%QEMU%" -fda "%BUILD_DIR%\os-image.bin" -m 32M -boot a
 goto end
 
 :help

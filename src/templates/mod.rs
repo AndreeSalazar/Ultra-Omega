@@ -124,6 +124,40 @@ pub mod rust {
 }
 
 // ══════════════════════════════════════════
+// VULKAN API (C++)
+// ══════════════════════════════════════════
+pub mod vulkan {
+    // Tipos base
+    pub const TYPES_H: &str = include_str!("vulkan/vulkan_types.h");
+    
+    // Inicialización
+    pub const INSTANCE: &str = include_str!("vulkan/instance.cpp");
+    pub const DEVICE: &str = include_str!("vulkan/device.cpp");
+    pub const SWAPCHAIN: &str = include_str!("vulkan/swapchain.cpp");
+    
+    // Pipeline
+    pub const PIPELINE: &str = include_str!("vulkan/pipeline.cpp");
+    pub const SHADER_VERT: &str = include_str!("vulkan/shader.vert");
+    pub const SHADER_FRAG: &str = include_str!("vulkan/shader.frag");
+    
+    // Recursos
+    pub const BUFFERS: &str = include_str!("vulkan/buffers.cpp");
+    pub const TEXTURE: &str = include_str!("vulkan/texture.cpp");
+    
+    // Comandos y Sync
+    pub const COMMANDS: &str = include_str!("vulkan/commands.cpp");
+    pub const SYNC: &str = include_str!("vulkan/sync.cpp");
+    
+    // Renderizado
+    pub const RENDER_LOOP: &str = include_str!("vulkan/render_loop.cpp");
+    pub const MAIN: &str = include_str!("vulkan/main.cpp");
+    
+    // Build
+    pub const CMAKE: &str = include_str!("vulkan/CMakeLists.txt");
+    pub const README: &str = include_str!("vulkan/README.md");
+}
+
+// ══════════════════════════════════════════
 // Estructura de Template para el menú
 // ══════════════════════════════════════════
 #[derive(Clone)]
@@ -723,6 +757,169 @@ pub fn all_templates() -> Vec<Template> {
             color: (0x88, 0x88, 0x00),
             icon: "📖",
             language: NodeLanguage::C,  // Para resaltado
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // VULKAN - TIPOS BASE
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "🎮 Vulkan Types",
+            code: vulkan::TYPES_H,
+            category: "Vulkan",
+            subcategory: "Base",
+            color: (0xac, 0x14, 0x2c),
+            icon: "📋",
+            language: NodeLanguage::Cpp,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // VULKAN - INICIALIZACIÓN
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "🎮 Instance",
+            code: vulkan::INSTANCE,
+            category: "Vulkan",
+            subcategory: "Inicialización",
+            color: (0xac, 0x14, 0x2c),
+            icon: "🔌",
+            language: NodeLanguage::Cpp,
+        },
+        Template {
+            name: "🎮 Device",
+            code: vulkan::DEVICE,
+            category: "Vulkan",
+            subcategory: "Inicialización",
+            color: (0xac, 0x14, 0x2c),
+            icon: "🖥️",
+            language: NodeLanguage::Cpp,
+        },
+        Template {
+            name: "🎮 Swapchain",
+            code: vulkan::SWAPCHAIN,
+            category: "Vulkan",
+            subcategory: "Inicialización",
+            color: (0xac, 0x14, 0x2c),
+            icon: "🔄",
+            language: NodeLanguage::Cpp,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // VULKAN - PIPELINE
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "🎮 Graphics Pipeline",
+            code: vulkan::PIPELINE,
+            category: "Vulkan",
+            subcategory: "Pipeline",
+            color: (0x8b, 0x00, 0x8b),
+            icon: "🔧",
+            language: NodeLanguage::Cpp,
+        },
+        Template {
+            name: "🎮 Vertex Shader",
+            code: vulkan::SHADER_VERT,
+            category: "Vulkan",
+            subcategory: "Pipeline",
+            color: (0x8b, 0x00, 0x8b),
+            icon: "📐",
+            language: NodeLanguage::Cpp,
+        },
+        Template {
+            name: "🎮 Fragment Shader",
+            code: vulkan::SHADER_FRAG,
+            category: "Vulkan",
+            subcategory: "Pipeline",
+            color: (0x8b, 0x00, 0x8b),
+            icon: "🎨",
+            language: NodeLanguage::Cpp,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // VULKAN - RECURSOS
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "🎮 Buffers",
+            code: vulkan::BUFFERS,
+            category: "Vulkan",
+            subcategory: "Recursos",
+            color: (0x00, 0x80, 0x80),
+            icon: "📦",
+            language: NodeLanguage::Cpp,
+        },
+        Template {
+            name: "🎮 Texture",
+            code: vulkan::TEXTURE,
+            category: "Vulkan",
+            subcategory: "Recursos",
+            color: (0x00, 0x80, 0x80),
+            icon: "🖼️",
+            language: NodeLanguage::Cpp,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // VULKAN - COMANDOS Y SINCRONIZACIÓN
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "🎮 Commands",
+            code: vulkan::COMMANDS,
+            category: "Vulkan",
+            subcategory: "Ejecución",
+            color: (0xff, 0x8c, 0x00),
+            icon: "📋",
+            language: NodeLanguage::Cpp,
+        },
+        Template {
+            name: "🎮 Sync Objects",
+            code: vulkan::SYNC,
+            category: "Vulkan",
+            subcategory: "Ejecución",
+            color: (0xff, 0x8c, 0x00),
+            icon: "⏱️",
+            language: NodeLanguage::Cpp,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // VULKAN - RENDERIZADO
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "🎮 Render Loop",
+            code: vulkan::RENDER_LOOP,
+            category: "Vulkan",
+            subcategory: "Renderizado",
+            color: (0x00, 0xbf, 0xff),
+            icon: "↻",
+            language: NodeLanguage::Cpp,
+        },
+        Template {
+            name: "🎮 Main (Completo)",
+            code: vulkan::MAIN,
+            category: "Vulkan",
+            subcategory: "Renderizado",
+            color: (0xff, 0xd7, 0x00),
+            icon: "🎮",
+            language: NodeLanguage::Cpp,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // VULKAN - BUILD
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "🎮 CMakeLists",
+            code: vulkan::CMAKE,
+            category: "Vulkan",
+            subcategory: "Build",
+            color: (0x06, 0x4f, 0x8c),
+            icon: "🛠️",
+            language: NodeLanguage::Text,
+        },
+        Template {
+            name: "🎮 README",
+            code: vulkan::README,
+            category: "Vulkan",
+            subcategory: "Build",
+            color: (0x06, 0x4f, 0x8c),
+            icon: "📖",
+            language: NodeLanguage::Text,
         },
     ]
 }

@@ -1,287 +1,145 @@
 ; ═══════════════════════════════════════════════════════════════════════════
-; FastOS - Bootloader Stage 2
-; Nivel: Intermedio - Preparación para modo protegido
+; FastOS - Stage 2 Bootloader
 ; ═══════════════════════════════════════════════════════════════════════════
-; Este código se carga después del boot sector y prepara el sistema para
-; entrar en modo protegido de 32 bits.
-;
-; Funciones:
-; - Habilitar línea A20
-; - Configurar GDT (Global Descriptor Table)
-; - Cambiar a modo protegido
-; - Saltar al kernel de 32 bits
+; Configura modo protegido y salta al kernel
 ; ═══════════════════════════════════════════════════════════════════════════
 
 [BITS 16]
 [ORG 0x7E00]
 
+KERNEL_ADDR equ 0x10000
+
 stage2_start:
-    ; Mostrar mensaje
     mov si, msg_stage2
-    call print_string_16
+    call print16
     
-    ; Habilitar línea A20
+    ; Habilitar A20
     call enable_a20
     
-    ; Cargar kernel en memoria
-    call load_kernel
+    mov si, msg_pmode
+    call print16
     
-    ; Cargar GDT
+    ; Cargar GDT y entrar en modo protegido
     cli
     lgdt [gdt_descriptor]
     
-    ; Entrar en modo protegido
     mov eax, cr0
-    or eax, 1                ; Establecer bit PE (Protection Enable)
+    or eax, 1
     mov cr0, eax
     
-    ; Salto lejano para limpiar pipeline y cargar CS
-    jmp CODE_SEG:protected_mode_start
+    jmp CODE_SEG:pm_start
 
-; ═══════════════════════════════════════════════════════════════════════════
-; HABILITAR LÍNEA A20
-; ═══════════════════════════════════════════════════════════════════════════
-; La línea A20 permite acceder a memoria por encima de 1MB
-
+; === Habilitar A20 ===
 enable_a20:
-    push ax
-    
-    ; Método 1: Usando BIOS
+    ; Método BIOS
     mov ax, 0x2401
     int 0x15
     jnc .done
     
-    ; Método 2: Usando controlador de teclado
-    call .wait_input
-    mov al, 0xAD             ; Deshabilitar teclado
-    out 0x64, al
-    
-    call .wait_input
-    mov al, 0xD0             ; Leer output port
-    out 0x64, al
-    
-    call .wait_output
-    in al, 0x60
-    push ax
-    
-    call .wait_input
-    mov al, 0xD1             ; Escribir output port
-    out 0x64, al
-    
-    call .wait_input
-    pop ax
-    or al, 2                 ; Establecer bit A20
-    out 0x60, al
-    
-    call .wait_input
-    mov al, 0xAE             ; Habilitar teclado
-    out 0x64, al
-    
-    call .wait_input
+    ; Método Fast A20
+    in al, 0x92
+    or al, 2
+    out 0x92, al
     
 .done:
-    mov si, msg_a20_ok
-    call print_string_16
-    pop ax
+    mov si, msg_a20
+    call print16
     ret
 
-.wait_input:
-    in al, 0x64
-    test al, 2
-    jnz .wait_input
-    ret
-
-.wait_output:
-    in al, 0x64
-    test al, 1
-    jz .wait_output
-    ret
-
-; ═══════════════════════════════════════════════════════════════════════════
-; CARGAR KERNEL
-; ═══════════════════════════════════════════════════════════════════════════
-
-KERNEL_OFFSET   equ 0x10000  ; Dirección donde cargar el kernel
-KERNEL_SECTORS  equ 32       ; Sectores del kernel
-
-load_kernel:
-    push ax
-    push bx
-    push cx
-    push dx
-    push es
-    
-    mov si, msg_loading_kernel
-    call print_string_16
-    
-    ; Configurar ES:BX para destino
-    mov ax, KERNEL_OFFSET >> 4
-    mov es, ax
-    xor bx, bx
-    
-    ; Leer sectores
-    mov ah, 0x02
-    mov al, KERNEL_SECTORS
-    mov ch, 0                ; Cilindro 0
-    mov cl, 6                ; Sector 6 (después de stage 2)
-    mov dh, 0                ; Cabeza 0
-    mov dl, 0x80             ; Disco duro
-    
-    int 0x13
-    jc .error
-    
-    mov si, msg_ok_16
-    call print_string_16
-    
-    pop es
-    pop dx
-    pop cx
-    pop bx
-    pop ax
-    ret
-
-.error:
-    mov si, msg_kernel_error
-    call print_string_16
-    jmp $
-
-; ═══════════════════════════════════════════════════════════════════════════
-; FUNCIONES DE IMPRESIÓN (16 bits)
-; ═══════════════════════════════════════════════════════════════════════════
-
-print_string_16:
-    push ax
-    push bx
-    push si
-.loop:
+; === Print 16-bit ===
+print16:
     lodsb
     test al, al
     jz .done
     mov ah, 0x0E
-    mov bh, 0
     int 0x10
-    jmp .loop
+    jmp print16
 .done:
-    pop si
-    pop bx
-    pop ax
     ret
 
-; ═══════════════════════════════════════════════════════════════════════════
-; GDT - GLOBAL DESCRIPTOR TABLE
-; ═══════════════════════════════════════════════════════════════════════════
-
+; === GDT ===
 gdt_start:
+    dq 0                        ; Null descriptor
 
-; Descriptor nulo (requerido)
-gdt_null:
-    dd 0x0
-    dd 0x0
-
-; Descriptor de código
 gdt_code:
-    dw 0xFFFF                ; Límite (bits 0-15)
-    dw 0x0000                ; Base (bits 0-15)
-    db 0x00                  ; Base (bits 16-23)
-    db 10011010b             ; Flags: Present, Ring 0, Code, Executable, Readable
-    db 11001111b             ; Flags: Granularity 4K, 32-bit, Límite (bits 16-19)
-    db 0x00                  ; Base (bits 24-31)
+    dw 0xFFFF                   ; Limit
+    dw 0x0000                   ; Base low
+    db 0x00                     ; Base mid
+    db 10011010b                ; Access: Present, Ring0, Code, Exec, Read
+    db 11001111b                ; Flags: 4K granularity, 32-bit
+    db 0x00                     ; Base high
 
-; Descriptor de datos
 gdt_data:
     dw 0xFFFF
     dw 0x0000
     db 0x00
-    db 10010010b             ; Flags: Present, Ring 0, Data, Writable
+    db 10010010b                ; Access: Present, Ring0, Data, Write
     db 11001111b
     db 0x00
 
 gdt_end:
 
 gdt_descriptor:
-    dw gdt_end - gdt_start - 1   ; Tamaño de GDT
-    dd gdt_start                  ; Dirección de GDT
+    dw gdt_end - gdt_start - 1
+    dd gdt_start
 
 CODE_SEG equ gdt_code - gdt_start
 DATA_SEG equ gdt_data - gdt_start
 
+; === Mensajes 16-bit ===
+msg_stage2: db 'Stage2 loaded', 13, 10, 0
+msg_a20:    db 'A20 enabled', 13, 10, 0
+msg_pmode:  db 'Entering Protected Mode...', 13, 10, 0
+
 ; ═══════════════════════════════════════════════════════════════════════════
-; MODO PROTEGIDO (32 bits)
+; MODO PROTEGIDO 32-bit
 ; ═══════════════════════════════════════════════════════════════════════════
 
 [BITS 32]
 
-protected_mode_start:
-    ; Configurar segmentos de datos
+pm_start:
+    ; Configurar segmentos
     mov ax, DATA_SEG
     mov ds, ax
     mov es, ax
     mov fs, ax
     mov gs, ax
     mov ss, ax
-    
-    ; Configurar stack
     mov esp, 0x90000
     
-    ; Limpiar pantalla en modo protegido
-    call clear_screen_32
-    
-    ; Mostrar mensaje
-    mov esi, msg_protected
-    mov edi, 0xB8000
-    call print_string_32
-    
-    ; Saltar al kernel
-    jmp KERNEL_OFFSET
-
-; Limpiar pantalla (modo protegido)
-clear_screen_32:
-    push eax
-    push ecx
-    push edi
-    
+    ; Limpiar pantalla
     mov edi, 0xB8000
     mov ecx, 80 * 25
-    mov ax, 0x0720           ; Espacio con atributo gris
+    mov ax, 0x0F20          ; Espacio blanco sobre negro
     rep stosw
     
-    pop edi
-    pop ecx
-    pop eax
-    ret
-
-; Imprimir string (modo protegido)
-; ESI = string, EDI = posición en video memory
-print_string_32:
-    push eax
-    push esi
-    push edi
+    ; Mostrar mensaje
+    mov esi, msg_pm
+    mov edi, 0xB8000
+    call print32
     
-.loop:
+    ; Mostrar "Jumping to kernel..."
+    mov esi, msg_jump
+    mov edi, 0xB8000 + 160  ; Segunda línea
+    call print32
+    
+    ; Saltar al kernel
+    jmp KERNEL_ADDR
+
+; === Print 32-bit ===
+print32:
     lodsb
     test al, al
     jz .done
-    mov ah, 0x0F             ; Atributo: blanco sobre negro
+    mov ah, 0x0F            ; Blanco sobre negro
     stosw
-    jmp .loop
-    
+    jmp print32
 .done:
-    pop edi
-    pop esi
-    pop eax
     ret
 
-; ═══════════════════════════════════════════════════════════════════════════
-; MENSAJES
-; ═══════════════════════════════════════════════════════════════════════════
+; === Mensajes 32-bit ===
+msg_pm:   db 'Protected Mode OK!', 0
+msg_jump: db 'Jumping to kernel...', 0
 
-msg_stage2:         db 'Stage 2 cargado', 13, 10, 0
-msg_a20_ok:         db 'A20 habilitada', 13, 10, 0
-msg_loading_kernel: db 'Cargando kernel... ', 0
-msg_ok_16:          db '[OK]', 13, 10, 0
-msg_kernel_error:   db '[ERROR]', 13, 10, 0
-msg_protected:      db 'FastOS - Modo Protegido 32-bit activado!', 0
-
-; Rellenar hasta 2KB (4 sectores)
+; Padding a 2KB (4 sectores)
 times 2048 - ($ - $$) db 0
-

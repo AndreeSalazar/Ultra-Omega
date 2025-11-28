@@ -1,9 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  * FastOS - Kernel Main
- * Nivel: Avanzado - Núcleo principal del sistema operativo
- * ═══════════════════════════════════════════════════════════════════════════
- * Este es el kernel principal de FastOS. Inicializa todos los subsistemas
- * y entra en el bucle principal del sistema.
  * ═══════════════════════════════════════════════════════════════════════════
  */
 
@@ -15,162 +11,206 @@
 #include "memory.h"
 #include "shell.h"
 
-/* ═══════════════════════════════════════════════════════════════════════════
- * INFORMACIÓN DEL SISTEMA
- * ═══════════════════════════════════════════════════════════════════════════
- */
-
 #define FASTOS_VERSION      "1.0.0"
 #define FASTOS_NAME         "FastOS"
-#define FASTOS_AUTHOR       "Tu Nombre"
+#define FASTOS_AUTHOR       "Eddi Andree Salazar Matos"
 #define FASTOS_YEAR         "2024"
 
-/* ═══════════════════════════════════════════════════════════════════════════
- * PROTOTIPOS
- * ═══════════════════════════════════════════════════════════════════════════
- */
-
 static void print_banner(void);
+static void print_peru_flag(int row);
 static void init_subsystems(void);
-static void kernel_panic(const char* message);
-
-/* ═══════════════════════════════════════════════════════════════════════════
- * FUNCIÓN PRINCIPAL DEL KERNEL
- * ═══════════════════════════════════════════════════════════════════════════
- */
 
 void kernel_main(void) {
-    /* Inicializar pantalla VGA */
     vga_init();
     vga_clear();
     
-    /* Mostrar banner de bienvenida */
     print_banner();
-    
-    /* Inicializar subsistemas */
     init_subsystems();
     
-    /* Mensaje de éxito */
     vga_set_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
-    vga_print("\n[OK] FastOS iniciado correctamente!\n\n");
+    vga_print("[OK] FastOS iniciado correctamente!\n\n");
     vga_set_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
     
-    /* Iniciar shell */
     vga_print("Escribe 'help' para ver los comandos disponibles.\n\n");
     shell_init();
     
-    /* Bucle principal del kernel */
     while (1) {
         shell_update();
-        
-        /* Esperar interrupción */
         __asm__ volatile("hlt");
     }
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
- * BANNER DE BIENVENIDA
- * ═══════════════════════════════════════════════════════════════════════════
- */
-
-static void print_banner(void) {
-    vga_set_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+/* Imprimir una fila de la bandera de Peru (3 filas en total) */
+static void print_peru_flag(int row) {
+    int i;
+    (void)row; /* Todas las filas son iguales */
     
-    vga_print("╔═══════════════════════════════════════════════════════════════╗\n");
-    vga_print("║                                                               ║\n");
-    vga_print("║   ███████╗ █████╗ ███████╗████████╗ ██████╗ ███████╗         ║\n");
-    vga_print("║   ██╔════╝██╔══██╗██╔════╝╚══██╔══╝██╔═══██╗██╔════╝         ║\n");
-    vga_print("║   █████╗  ███████║███████╗   ██║   ██║   ██║███████╗         ║\n");
-    vga_print("║   ██╔══╝  ██╔══██║╚════██║   ██║   ██║   ██║╚════██║         ║\n");
-    vga_print("║   ██║     ██║  ██║███████║   ██║   ╚██████╔╝███████║         ║\n");
-    vga_print("║   ╚═╝     ╚═╝  ╚═╝╚══════╝   ╚═╝    ╚═════╝ ╚══════╝         ║\n");
-    vga_print("║                                                               ║\n");
-    vga_print("║   Version: ");
-    vga_print(FASTOS_VERSION);
-    vga_print("                                              ║\n");
-    vga_print("║   (c) ");
-    vga_print(FASTOS_YEAR);
-    vga_print(" ");
-    vga_print(FASTOS_AUTHOR);
-    vga_print("                                       ║\n");
-    vga_print("║                                                               ║\n");
-    vga_print("╚═══════════════════════════════════════════════════════════════╝\n\n");
+    /* Franja roja izquierda */
+    vga_set_color(VGA_COLOR_WHITE, VGA_COLOR_RED);
+    for (i = 0; i < 4; i++) vga_putchar(' ');
+    
+    /* Franja blanca central */
+    vga_set_color(VGA_COLOR_RED, VGA_COLOR_WHITE);
+    for (i = 0; i < 4; i++) vga_putchar(' ');
+    
+    /* Franja roja derecha */
+    vga_set_color(VGA_COLOR_WHITE, VGA_COLOR_RED);
+    for (i = 0; i < 4; i++) vga_putchar(' ');
     
     vga_set_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
- * INICIALIZACIÓN DE SUBSISTEMAS
- * ═══════════════════════════════════════════════════════════════════════════
- */
+static void print_banner(void) {
+    vga_print("\n");
+    
+    /* ========== LOGO FASTOS ========== */
+    vga_set_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+    vga_print("   ########    ###     ######  ########  #######   ######  \n");
+    vga_print("   ##         ## ##   ##    ##    ##    ##     ## ##    ## \n");
+    vga_print("   ##        ##   ##  ##          ##    ##     ## ##       \n");
+    vga_print("   ######   ##     ##  ######     ##    ##     ##  ######  \n");
+    vga_print("   ##       #########       ##    ##    ##     ##       ## \n");
+    vga_print("   ##       ##     ## ##    ##    ##    ##     ## ##    ## \n");
+    vga_print("   ##       ##     ##  ######     ##     #######   ######  \n");
+    vga_print("\n");
+    
+    /* Linea decorativa superior */
+    vga_set_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK);
+    vga_print("   ");
+    vga_set_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
+    vga_print("=====");
+    vga_set_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK);
+    vga_print("=====");
+    vga_set_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
+    vga_print("=====");
+    vga_set_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK);
+    vga_print(" Sistema Operativo Educativo ");
+    vga_set_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
+    vga_print("=====");
+    vga_set_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK);
+    vga_print("=====");
+    vga_set_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
+    vga_print("=====\n\n");
+    
+    /* Version centrada */
+    vga_set_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK);
+    vga_print("                        Version ");
+    vga_set_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
+    vga_print(FASTOS_VERSION);
+    vga_set_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK);
+    vga_print(" | ");
+    vga_set_color(VGA_COLOR_LIGHT_MAGENTA, VGA_COLOR_BLACK);
+    vga_print("x86 32-bit");
+    vga_print("\n\n");
+    
+    /* ========== SECCION DESARROLLADOR CON BANDERA ========== */
+    
+    /* Fila 1 de bandera + info */
+    vga_print("   ");
+    print_peru_flag(0);
+    vga_print("  ");
+    vga_set_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+    vga_print("Desarrollado con ");
+    vga_set_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
+    vga_print("<3");
+    vga_set_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+    vga_print(" por:\n");
+    
+    /* Fila 2 de bandera + nombre */
+    vga_print("   ");
+    print_peru_flag(1);
+    vga_print("  ");
+    vga_set_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK);
+    vga_print("Eddi Andree Salazar Matos\n");
+    
+    /* Fila 3 de bandera + titulo */
+    vga_print("   ");
+    print_peru_flag(2);
+    vga_print("  ");
+    vga_set_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
+    vga_print("Desarrollador Peruano\n");
+    
+    /* Fila 4 - info adicional */
+    vga_print("   ");
+    print_peru_flag(3);
+    vga_print("  ");
+    vga_set_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+    vga_print("Ultra-Omega Project | ");
+    vga_set_color(VGA_COLOR_CYAN, VGA_COLOR_BLACK);
+    vga_print(FASTOS_YEAR);
+    vga_print("\n\n");
+    
+    /* Linea decorativa inferior */
+    vga_set_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
+    vga_print("   =====");
+    vga_set_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK);
+    vga_print("=====");
+    vga_set_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
+    vga_print("=====");
+    vga_set_color(VGA_COLOR_YELLOW, VGA_COLOR_BLACK);
+    vga_print("==========================");
+    vga_set_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
+    vga_print("=====");
+    vga_set_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK);
+    vga_print("=====");
+    vga_set_color(VGA_COLOR_LIGHT_RED, VGA_COLOR_BLACK);
+    vga_print("=====\n\n");
+    
+    vga_set_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+}
 
 static void init_subsystems(void) {
+    vga_set_color(VGA_COLOR_WHITE, VGA_COLOR_BLACK);
     vga_print("Inicializando subsistemas...\n\n");
+    vga_set_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
     
-    /* IDT - Tabla de Descriptores de Interrupción */
-    vga_print("  [*] Configurando IDT... ");
+    vga_print("  ");
+    vga_set_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+    vga_print("[*]");
+    vga_set_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+    vga_print(" Configurando IDT............. ");
     idt_init();
     vga_set_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
     vga_print("[OK]\n");
     vga_set_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
     
-    /* Timer - Reloj del sistema */
-    vga_print("  [*] Inicializando timer... ");
-    timer_init(100);  /* 100 Hz */
+    vga_print("  ");
+    vga_set_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+    vga_print("[*]");
+    vga_set_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+    vga_print(" Inicializando timer.......... ");
+    timer_init(100);
     vga_set_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
     vga_print("[OK]\n");
     vga_set_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
     
-    /* Teclado */
-    vga_print("  [*] Inicializando teclado... ");
+    vga_print("  ");
+    vga_set_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+    vga_print("[*]");
+    vga_set_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+    vga_print(" Inicializando teclado........ ");
     keyboard_init();
     vga_set_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
     vga_print("[OK]\n");
     vga_set_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
     
-    /* Memoria */
-    vga_print("  [*] Inicializando memoria... ");
+    vga_print("  ");
+    vga_set_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+    vga_print("[*]");
+    vga_set_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+    vga_print(" Inicializando memoria........ ");
     memory_init();
     vga_set_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
     vga_print("[OK]\n");
     vga_set_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
     
-    /* Habilitar interrupciones */
-    vga_print("  [*] Habilitando interrupciones... ");
+    vga_print("  ");
+    vga_set_color(VGA_COLOR_LIGHT_CYAN, VGA_COLOR_BLACK);
+    vga_print("[*]");
+    vga_set_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+    vga_print(" Habilitando interrupciones... ");
     enable_interrupts();
     vga_set_color(VGA_COLOR_LIGHT_GREEN, VGA_COLOR_BLACK);
-    vga_print("[OK]\n");
+    vga_print("[OK]\n\n");
     vga_set_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
 }
-
-/* ═══════════════════════════════════════════════════════════════════════════
- * KERNEL PANIC
- * ═══════════════════════════════════════════════════════════════════════════
- */
-
-static void kernel_panic(const char* message) {
-    disable_interrupts();
-    
-    vga_set_color(VGA_COLOR_WHITE, VGA_COLOR_RED);
-    vga_clear();
-    
-    vga_print("\n\n");
-    vga_print("╔═══════════════════════════════════════════════════════════════╗\n");
-    vga_print("║                     KERNEL PANIC                              ║\n");
-    vga_print("╠═══════════════════════════════════════════════════════════════╣\n");
-    vga_print("║                                                               ║\n");
-    vga_print("║  Error: ");
-    vga_print(message);
-    vga_print("\n");
-    vga_print("║                                                               ║\n");
-    vga_print("║  El sistema se ha detenido.                                   ║\n");
-    vga_print("║  Por favor, reinicie el equipo.                               ║\n");
-    vga_print("║                                                               ║\n");
-    vga_print("╚═══════════════════════════════════════════════════════════════╝\n");
-    
-    /* Halt infinito */
-    while (1) {
-        __asm__ volatile("cli; hlt");
-    }
-}
-

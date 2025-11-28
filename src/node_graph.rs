@@ -1007,4 +1007,309 @@ impl NodeGraph {
             graph.add_link(out_pin, in_pin, color);
         }
     }
+    
+    /// Crear proyecto Vulkan completo como mapa de nodos
+    pub fn create_vulkan_project() -> NodeGraph {
+        use crate::templates::vulkan;
+        
+        let mut graph = NodeGraph::default();
+        
+        // Colores por categoría
+        let color_base = Color32::from_rgb(0xac, 0x14, 0x2c);      // Rojo Vulkan
+        let color_init = Color32::from_rgb(0xff, 0x44, 0x00);      // Naranja
+        let color_pipeline = Color32::from_rgb(0x8b, 0x00, 0x8b);  // Púrpura
+        let color_shader = Color32::from_rgb(0x00, 0xff, 0x88);    // Verde shader
+        let color_resources = Color32::from_rgb(0x00, 0x80, 0x80); // Cyan
+        let color_exec = Color32::from_rgb(0xff, 0x8c, 0x00);      // Naranja oscuro
+        let color_render = Color32::from_rgb(0x00, 0xbf, 0xff);    // Azul cielo
+        let color_final = Color32::from_rgb(0xff, 0xd7, 0x00);     // Dorado
+        let color_build = Color32::from_rgb(0x06, 0x4f, 0x8c);     // Azul CMake
+        
+        // Posición inicial
+        let x_center = 400.0;
+        let x_left = 200.0;
+        let x_right = 600.0;
+        let mut y = 100.0;
+        let y_spacing = 120.0;
+        
+        // ═══════════════════════════════════════════════════════════════════════════
+        // NIVEL 1: TIPOS BASE
+        // ═══════════════════════════════════════════════════════════════════════════
+        let types_h = graph.add_node(
+            "📋 vulkan_types.h",
+            pos2(x_center, y),
+            color_base,
+            &[],
+            &["▼"],
+            NodeLanguage::Cpp,
+        );
+        if let Some(n) = graph.node_mut(types_h) {
+            n.code = vulkan::TYPES_H.to_string();
+        }
+        y += y_spacing;
+        
+        // ═══════════════════════════════════════════════════════════════════════════
+        // NIVEL 2: INSTANCE
+        // ═══════════════════════════════════════════════════════════════════════════
+        let instance = graph.add_node(
+            "🔌 instance.cpp",
+            pos2(x_center, y),
+            color_init,
+            &["▲"],
+            &["▼"],
+            NodeLanguage::Cpp,
+        );
+        if let Some(n) = graph.node_mut(instance) {
+            n.code = vulkan::INSTANCE.to_string();
+        }
+        Self::link_nodes(&mut graph, types_h, instance, color_base);
+        y += y_spacing;
+        
+        // ═══════════════════════════════════════════════════════════════════════════
+        // NIVEL 3: DEVICE
+        // ═══════════════════════════════════════════════════════════════════════════
+        let device = graph.add_node(
+            "🖥️ device.cpp",
+            pos2(x_center, y),
+            color_init,
+            &["▲"],
+            &["▼"],
+            NodeLanguage::Cpp,
+        );
+        if let Some(n) = graph.node_mut(device) {
+            n.code = vulkan::DEVICE.to_string();
+        }
+        Self::link_nodes(&mut graph, instance, device, color_init);
+        y += y_spacing;
+        
+        // ═══════════════════════════════════════════════════════════════════════════
+        // NIVEL 4: SWAPCHAIN
+        // ═══════════════════════════════════════════════════════════════════════════
+        let swapchain = graph.add_node(
+            "🔄 swapchain.cpp",
+            pos2(x_center, y),
+            color_init,
+            &["▲"],
+            &["▼"],
+            NodeLanguage::Cpp,
+        );
+        if let Some(n) = graph.node_mut(swapchain) {
+            n.code = vulkan::SWAPCHAIN.to_string();
+        }
+        Self::link_nodes(&mut graph, device, swapchain, color_init);
+        y += y_spacing;
+        
+        // ═══════════════════════════════════════════════════════════════════════════
+        // NIVEL 5: PIPELINE
+        // ═══════════════════════════════════════════════════════════════════════════
+        let pipeline = graph.add_node(
+            "🔧 pipeline.cpp",
+            pos2(x_center, y),
+            color_pipeline,
+            &["▲"],
+            &["▼ Shaders", "▼ Buffers"],
+            NodeLanguage::Cpp,
+        );
+        if let Some(n) = graph.node_mut(pipeline) {
+            n.code = vulkan::PIPELINE.to_string();
+        }
+        Self::link_nodes(&mut graph, swapchain, pipeline, color_init);
+        y += y_spacing;
+        
+        // ═══════════════════════════════════════════════════════════════════════════
+        // NIVEL 6: SHADERS (izquierda) y BUFFERS (derecha)
+        // ═══════════════════════════════════════════════════════════════════════════
+        
+        // Vertex Shader
+        let shader_vert = graph.add_node(
+            "📐 shader.vert",
+            pos2(x_left, y),
+            color_shader,
+            &["▲"],
+            &["▼"],
+            NodeLanguage::Cpp,
+        );
+        if let Some(n) = graph.node_mut(shader_vert) {
+            n.code = vulkan::SHADER_VERT.to_string();
+        }
+        if let (Some(out_pin), Some(in_pin)) = (
+            graph.pin_id(pipeline, PinKind::Output, 0),
+            graph.pin_id(shader_vert, PinKind::Input, 0)
+        ) {
+            graph.add_link(out_pin, in_pin, color_pipeline);
+        }
+        
+        // Buffers
+        let buffers = graph.add_node(
+            "📦 buffers.cpp",
+            pos2(x_right, y),
+            color_resources,
+            &["▲"],
+            &["▼"],
+            NodeLanguage::Cpp,
+        );
+        if let Some(n) = graph.node_mut(buffers) {
+            n.code = vulkan::BUFFERS.to_string();
+        }
+        if let (Some(out_pin), Some(in_pin)) = (
+            graph.pin_id(pipeline, PinKind::Output, 1),
+            graph.pin_id(buffers, PinKind::Input, 0)
+        ) {
+            graph.add_link(out_pin, in_pin, color_pipeline);
+        }
+        y += y_spacing;
+        
+        // Fragment Shader
+        let shader_frag = graph.add_node(
+            "🎨 shader.frag",
+            pos2(x_left, y),
+            color_shader,
+            &["▲"],
+            &["▼"],
+            NodeLanguage::Cpp,
+        );
+        if let Some(n) = graph.node_mut(shader_frag) {
+            n.code = vulkan::SHADER_FRAG.to_string();
+        }
+        Self::link_nodes(&mut graph, shader_vert, shader_frag, color_shader);
+        
+        // Texture
+        let texture = graph.add_node(
+            "🖼️ texture.cpp",
+            pos2(x_right, y),
+            color_resources,
+            &["▲"],
+            &["▼"],
+            NodeLanguage::Cpp,
+        );
+        if let Some(n) = graph.node_mut(texture) {
+            n.code = vulkan::TEXTURE.to_string();
+        }
+        Self::link_nodes(&mut graph, buffers, texture, color_resources);
+        y += y_spacing;
+        
+        // ═══════════════════════════════════════════════════════════════════════════
+        // NIVEL 7: COMMANDS (centro, combina shaders y recursos)
+        // ═══════════════════════════════════════════════════════════════════════════
+        let commands = graph.add_node(
+            "📋 commands.cpp",
+            pos2(x_center, y),
+            color_exec,
+            &["◀ Shaders", "▶ Resources"],
+            &["▼"],
+            NodeLanguage::Cpp,
+        );
+        if let Some(n) = graph.node_mut(commands) {
+            n.code = vulkan::COMMANDS.to_string();
+        }
+        // Conectar shaders -> commands
+        if let (Some(out_pin), Some(in_pin)) = (
+            graph.pin_id(shader_frag, PinKind::Output, 0),
+            graph.pin_id(commands, PinKind::Input, 0)
+        ) {
+            graph.add_link(out_pin, in_pin, color_shader);
+        }
+        // Conectar resources -> commands
+        if let (Some(out_pin), Some(in_pin)) = (
+            graph.pin_id(texture, PinKind::Output, 0),
+            graph.pin_id(commands, PinKind::Input, 1)
+        ) {
+            graph.add_link(out_pin, in_pin, color_resources);
+        }
+        y += y_spacing;
+        
+        // ═══════════════════════════════════════════════════════════════════════════
+        // NIVEL 8: SYNC
+        // ═══════════════════════════════════════════════════════════════════════════
+        let sync = graph.add_node(
+            "⏱️ sync.cpp",
+            pos2(x_center, y),
+            color_exec,
+            &["▲"],
+            &["▼"],
+            NodeLanguage::Cpp,
+        );
+        if let Some(n) = graph.node_mut(sync) {
+            n.code = vulkan::SYNC.to_string();
+        }
+        Self::link_nodes(&mut graph, commands, sync, color_exec);
+        y += y_spacing;
+        
+        // ═══════════════════════════════════════════════════════════════════════════
+        // NIVEL 9: RENDER LOOP
+        // ═══════════════════════════════════════════════════════════════════════════
+        let render_loop = graph.add_node(
+            "↻ render_loop.cpp",
+            pos2(x_center, y),
+            color_render,
+            &["▲"],
+            &["▼"],
+            NodeLanguage::Cpp,
+        );
+        if let Some(n) = graph.node_mut(render_loop) {
+            n.code = vulkan::RENDER_LOOP.to_string();
+        }
+        Self::link_nodes(&mut graph, sync, render_loop, color_exec);
+        y += y_spacing;
+        
+        // ═══════════════════════════════════════════════════════════════════════════
+        // NIVEL 10: BUILD SYSTEM (CMAKE a la izquierda)
+        // ═══════════════════════════════════════════════════════════════════════════
+        let cmake = graph.add_node(
+            "🛠️ CMakeLists.txt",
+            pos2(x_left, y),
+            color_build,
+            &["▲"],
+            &["▼"],
+            NodeLanguage::Text,
+        );
+        if let Some(n) = graph.node_mut(cmake) {
+            n.code = vulkan::CMAKE.to_string();
+        }
+        
+        // README a la derecha
+        let readme = graph.add_node(
+            "📖 README.md",
+            pos2(x_right, y),
+            color_build,
+            &["▲"],
+            &["▼"],
+            NodeLanguage::Text,
+        );
+        if let Some(n) = graph.node_mut(readme) {
+            n.code = vulkan::README.to_string();
+        }
+        y += y_spacing;
+        
+        // ═══════════════════════════════════════════════════════════════════════════
+        // NIVEL 11: MAIN.CPP (NODO FINAL)
+        // ═══════════════════════════════════════════════════════════════════════════
+        let main = graph.add_node(
+            "🎮 VULKAN APP [main.cpp]",
+            pos2(x_center, y),
+            color_final,
+            &["◀ Loop", "▶ Build"],
+            &["📁"],
+            NodeLanguage::Cpp,
+        );
+        if let Some(n) = graph.node_mut(main) {
+            n.code = vulkan::MAIN.to_string();
+        }
+        // Conectar render_loop -> main
+        if let (Some(out_pin), Some(in_pin)) = (
+            graph.pin_id(render_loop, PinKind::Output, 0),
+            graph.pin_id(main, PinKind::Input, 0)
+        ) {
+            graph.add_link(out_pin, in_pin, color_render);
+        }
+        // Conectar cmake -> main
+        if let (Some(out_pin), Some(in_pin)) = (
+            graph.pin_id(cmake, PinKind::Output, 0),
+            graph.pin_id(main, PinKind::Input, 1)
+        ) {
+            graph.add_link(out_pin, in_pin, color_build);
+        }
+        
+        graph
+    }
 }
