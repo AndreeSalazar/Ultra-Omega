@@ -376,6 +376,7 @@ impl NodeGraphApp {
             NodeLanguage::C => crate::terminal::Language::C,
             NodeLanguage::Cpp => crate::terminal::Language::Cpp,
             NodeLanguage::Rust => crate::terminal::Language::Rust,
+            NodeLanguage::Text => crate::terminal::Language::C, // Text no se compila realmente
             NodeLanguage::Auto => {
                 let lower = node_title.to_lowercase();
                 if lower.contains("asm") {
@@ -1223,35 +1224,61 @@ impl NodeGraphApp {
                             
                             if let Some(node) = self.graph.nodes().iter().find(|n| n.id == id) {
                                 let effective_language = self.resolve_effective_language(id, &inheritance_chain);
-                                let lang = Self::language_to_terminal(effective_language, &node.title);
-                                let workspace_path = self.workspace.root_path.as_ref();
                                 
-                                // Detectar si es un nodo parámetro (título empieza con "Parámetro" o "Parametro")
-                                let is_parameter_node = node.title.starts_with("Parámetro") || node.title.starts_with("Parametro");
-                                
-                                // Combinar código heredado + propio para ejecutar
-                                let inherited_raw = self.graph.get_inherited_code(id).unwrap_or_default();
-                                // Evaluar ch() en código heredado
-                                let inherited = self.evaluate_ch_expressions_in_code(&inherited_raw, id);
-                                
-                                let full_code = if is_parameter_node {
-                                    // Para nodos parámetro: solo ejecutar código heredado
-                                    // El código propio del parámetro es solo un valor, no código ejecutable
-                                    inherited
+                                // Si es NodeLanguage::Text, mostrar mensaje informativo en lugar de compilar
+                                if effective_language == NodeLanguage::Text {
+                                    self.terminal.visible = true;
+                                    self.terminal.c_output.clear();
+                                    self.terminal.c_output.push_str(&format!(
+                                        "╔═══════════════════════════════════════════════════════════════════╗\n\
+                                         ║  📄 NODO DE DOCUMENTACIÓN / REFERENCIA                           ║\n\
+                                         ╠═══════════════════════════════════════════════════════════════════╣\n\
+                                         ║                                                                   ║\n\
+                                         ║  El nodo \"{}\" es de tipo TEXTO/DOC.             \n\
+                                         ║                                                                   ║\n\
+                                         ║  Este tipo de nodo NO se puede ejecutar directamente.            ║\n\
+                                         ║  Es código de referencia para un proyecto multi-archivo.         ║\n\
+                                         ║                                                                   ║\n\
+                                         ║  📋 OPCIONES:                                                     ║\n\
+                                         ║  • Presiona Ctrl+I para ver el código heredado                   ║\n\
+                                         ║  • Exporta los archivos y compila con make                       ║\n\
+                                         ║  • Cambia el lenguaje del nodo si deseas ejecutar                ║\n\
+                                         ║                                                                   ║\n\
+                                         ╚═══════════════════════════════════════════════════════════════════╝\n",
+                                        node.title
+                                    ));
+                                    self.terminal.active_tab = crate::terminal::TerminalTab::C;
                                 } else {
-                                    // Para nodos normales: heredado + propio
-                                    let own_code_evaluated = self.evaluate_ch_expressions_in_code(&node.code, id);
+                                    let lang = Self::language_to_terminal(effective_language, &node.title);
+                                    let workspace_path = self.workspace.root_path.as_ref();
                                     
-                                    if !inherited.is_empty() && !own_code_evaluated.is_empty() {
-                                        format!("{}\n\n{}", inherited, own_code_evaluated)
-                                    } else if !inherited.is_empty() {
+                                    // Detectar si es un nodo parámetro (título empieza con "Parámetro" o "Parametro")
+                                    let is_parameter_node = node.title.starts_with("Parámetro") || node.title.starts_with("Parametro");
+                                    
+                                    // Combinar código heredado + propio para ejecutar
+                                    let inherited_raw = self.graph.get_inherited_code(id).unwrap_or_default();
+                                    // Evaluar ch() en código heredado
+                                    let inherited = self.evaluate_ch_expressions_in_code(&inherited_raw, id);
+                                    
+                                    let full_code = if is_parameter_node {
+                                        // Para nodos parámetro: solo ejecutar código heredado
+                                        // El código propio del parámetro es solo un valor, no código ejecutable
                                         inherited
                                     } else {
-                                        own_code_evaluated
-                                    }
-                                };
-                                
-                                self.terminal.run_code(&full_code, lang, workspace_path);
+                                        // Para nodos normales: heredado + propio
+                                        let own_code_evaluated = self.evaluate_ch_expressions_in_code(&node.code, id);
+                                        
+                                        if !inherited.is_empty() && !own_code_evaluated.is_empty() {
+                                            format!("{}\n\n{}", inherited, own_code_evaluated)
+                                        } else if !inherited.is_empty() {
+                                            inherited
+                                        } else {
+                                            own_code_evaluated
+                                        }
+                                    };
+                                    
+                                    self.terminal.run_code(&full_code, lang, workspace_path);
+                                }
                             }
                         }
 
@@ -1798,6 +1825,7 @@ impl NodeGraphApp {
                                                                             NodeLanguage::C => ("C", "©", Color32::from_rgb(40, 60, 80)),
                                                                             NodeLanguage::Cpp => ("C++", "⊕", Color32::from_rgb(50, 40, 80)),
                                                                             NodeLanguage::Rust => ("Rust", "🦀", Color32::from_rgb(80, 40, 40)),
+                                                                            NodeLanguage::Text => ("Doc", "📄", Color32::from_rgb(60, 60, 40)),
                                                                             NodeLanguage::Auto => ("Auto", "⚙", Color32::from_rgb(50, 50, 50)),
                                                                         };
                                                                         let lang_color = match language {
@@ -1805,6 +1833,7 @@ impl NodeGraphApp {
                                                                             NodeLanguage::C => Color32::from_rgb(120, 200, 255),
                                                                             NodeLanguage::Cpp => Color32::from_rgb(180, 140, 255),
                                                                             NodeLanguage::Rust => Color32::from_rgb(255, 130, 100),
+                                                                            NodeLanguage::Text => Color32::from_rgb(200, 200, 150),
                                                                             NodeLanguage::Auto => Color32::from_gray(180),
                                                                         };
                                                                         
