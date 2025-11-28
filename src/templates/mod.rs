@@ -1,6 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // Templates de código para Ultra Omega
 // Organizados por jerarquía: Básico → Intermedio → Avanzado
+// Incluye FastOS: Templates completos para crear un sistema operativo
 // ═══════════════════════════════════════════════════════════════════════════
 
 use crate::node_graph::NodeLanguage;
@@ -27,6 +28,49 @@ pub mod asm {
     pub const LIB_STRING: &str = include_str!("asm/lib_string.asm");
     pub const LIB_MEMORY: &str = include_str!("asm/lib_memory.asm");
     pub const LIB_IO: &str = include_str!("asm/lib_io.asm");
+}
+
+// ══════════════════════════════════════════
+// FASTOS - Sistema Operativo Completo
+// ══════════════════════════════════════════
+pub mod fastos {
+    // Bootloader
+    pub const BOOT_SECTOR: &str = include_str!("fastos/boot_sector.asm");
+    pub const STAGE2: &str = include_str!("fastos/bootloader_stage2.asm");
+    
+    // Kernel ASM
+    pub const KERNEL_ENTRY: &str = include_str!("fastos/kernel_entry.asm");
+    
+    // Kernel C
+    pub const KERNEL_MAIN: &str = include_str!("fastos/kernel_main.c");
+    pub const KERNEL_H: &str = include_str!("fastos/kernel.h");
+    
+    // Drivers
+    pub const VGA_DRIVER: &str = include_str!("fastos/vga_driver.c");
+    pub const VGA_H: &str = include_str!("fastos/vga.h");
+    pub const KEYBOARD_DRIVER: &str = include_str!("fastos/keyboard_driver.c");
+    pub const KEYBOARD_H: &str = include_str!("fastos/keyboard.h");
+    pub const TIMER: &str = include_str!("fastos/timer.c");
+    pub const TIMER_H: &str = include_str!("fastos/timer.h");
+    
+    // Sistema
+    pub const IDT: &str = include_str!("fastos/idt.c");
+    pub const IDT_H: &str = include_str!("fastos/idt.h");
+    pub const MEMORY: &str = include_str!("fastos/memory.c");
+    pub const MEMORY_H: &str = include_str!("fastos/memory.h");
+    pub const SHELL: &str = include_str!("fastos/shell.c");
+    pub const SHELL_H: &str = include_str!("fastos/shell.h");
+    
+    // Utilidades
+    pub const STRING: &str = include_str!("fastos/string.c");
+    pub const STRING_H: &str = include_str!("fastos/string.h");
+    pub const TYPES_H: &str = include_str!("fastos/types.h");
+    pub const PORTS_H: &str = include_str!("fastos/ports.h");
+    
+    // Build
+    pub const LINKER: &str = include_str!("fastos/linker.ld");
+    pub const MAKEFILE: &str = include_str!("fastos/Makefile");
+    pub const README: &str = include_str!("fastos/README.md");
 }
 
 // ══════════════════════════════════════════
@@ -438,6 +482,246 @@ pub fn all_templates() -> Vec<Template> {
             color: (0xde, 0x39, 0x00),
             icon: "🎭",
             language: NodeLanguage::Rust,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // FASTOS - BOOTLOADER (ASM)
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "🔥 Boot Sector",
+            code: fastos::BOOT_SECTOR,
+            category: "FastOS",
+            subcategory: "Bootloader",
+            color: (0xff, 0x00, 0x00),
+            icon: "💿",
+            language: NodeLanguage::Asm,
+        },
+        Template {
+            name: "🔥 Stage 2 Bootloader",
+            code: fastos::STAGE2,
+            category: "FastOS",
+            subcategory: "Bootloader",
+            color: (0xff, 0x00, 0x00),
+            icon: "🚀",
+            language: NodeLanguage::Asm,
+        },
+        Template {
+            name: "🔥 Kernel Entry",
+            code: fastos::KERNEL_ENTRY,
+            category: "FastOS",
+            subcategory: "Bootloader",
+            color: (0xff, 0x00, 0x00),
+            icon: "⚡",
+            language: NodeLanguage::Asm,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // FASTOS - KERNEL (C)
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "🔥 Kernel Main",
+            code: fastos::KERNEL_MAIN,
+            category: "FastOS",
+            subcategory: "Kernel",
+            color: (0xff, 0x44, 0x00),
+            icon: "🧠",
+            language: NodeLanguage::C,
+        },
+        Template {
+            name: "🔥 Kernel Header",
+            code: fastos::KERNEL_H,
+            category: "FastOS",
+            subcategory: "Kernel",
+            color: (0xff, 0x44, 0x00),
+            icon: "📋",
+            language: NodeLanguage::C,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // FASTOS - DRIVERS (C)
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "🔥 VGA Driver",
+            code: fastos::VGA_DRIVER,
+            category: "FastOS",
+            subcategory: "Drivers",
+            color: (0x00, 0xaa, 0x00),
+            icon: "🖥️",
+            language: NodeLanguage::C,
+        },
+        Template {
+            name: "🔥 VGA Header",
+            code: fastos::VGA_H,
+            category: "FastOS",
+            subcategory: "Drivers",
+            color: (0x00, 0xaa, 0x00),
+            icon: "📋",
+            language: NodeLanguage::C,
+        },
+        Template {
+            name: "🔥 Keyboard Driver",
+            code: fastos::KEYBOARD_DRIVER,
+            category: "FastOS",
+            subcategory: "Drivers",
+            color: (0x00, 0xaa, 0x00),
+            icon: "⌨️",
+            language: NodeLanguage::C,
+        },
+        Template {
+            name: "🔥 Keyboard Header",
+            code: fastos::KEYBOARD_H,
+            category: "FastOS",
+            subcategory: "Drivers",
+            color: (0x00, 0xaa, 0x00),
+            icon: "📋",
+            language: NodeLanguage::C,
+        },
+        Template {
+            name: "🔥 Timer Driver",
+            code: fastos::TIMER,
+            category: "FastOS",
+            subcategory: "Drivers",
+            color: (0x00, 0xaa, 0x00),
+            icon: "⏱️",
+            language: NodeLanguage::C,
+        },
+        Template {
+            name: "🔥 Timer Header",
+            code: fastos::TIMER_H,
+            category: "FastOS",
+            subcategory: "Drivers",
+            color: (0x00, 0xaa, 0x00),
+            icon: "📋",
+            language: NodeLanguage::C,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // FASTOS - SISTEMA (C)
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "🔥 IDT (Interrupciones)",
+            code: fastos::IDT,
+            category: "FastOS",
+            subcategory: "Sistema",
+            color: (0xaa, 0x00, 0xaa),
+            icon: "⚡",
+            language: NodeLanguage::C,
+        },
+        Template {
+            name: "🔥 IDT Header",
+            code: fastos::IDT_H,
+            category: "FastOS",
+            subcategory: "Sistema",
+            color: (0xaa, 0x00, 0xaa),
+            icon: "📋",
+            language: NodeLanguage::C,
+        },
+        Template {
+            name: "🔥 Memory Manager",
+            code: fastos::MEMORY,
+            category: "FastOS",
+            subcategory: "Sistema",
+            color: (0xaa, 0x00, 0xaa),
+            icon: "💾",
+            language: NodeLanguage::C,
+        },
+        Template {
+            name: "🔥 Memory Header",
+            code: fastos::MEMORY_H,
+            category: "FastOS",
+            subcategory: "Sistema",
+            color: (0xaa, 0x00, 0xaa),
+            icon: "📋",
+            language: NodeLanguage::C,
+        },
+        Template {
+            name: "🔥 Shell",
+            code: fastos::SHELL,
+            category: "FastOS",
+            subcategory: "Sistema",
+            color: (0xaa, 0x00, 0xaa),
+            icon: "💻",
+            language: NodeLanguage::C,
+        },
+        Template {
+            name: "🔥 Shell Header",
+            code: fastos::SHELL_H,
+            category: "FastOS",
+            subcategory: "Sistema",
+            color: (0xaa, 0x00, 0xaa),
+            icon: "📋",
+            language: NodeLanguage::C,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // FASTOS - UTILIDADES (C)
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "🔥 String Library",
+            code: fastos::STRING,
+            category: "FastOS",
+            subcategory: "Utilidades",
+            color: (0x00, 0x88, 0xcc),
+            icon: "📝",
+            language: NodeLanguage::C,
+        },
+        Template {
+            name: "🔥 String Header",
+            code: fastos::STRING_H,
+            category: "FastOS",
+            subcategory: "Utilidades",
+            color: (0x00, 0x88, 0xcc),
+            icon: "📋",
+            language: NodeLanguage::C,
+        },
+        Template {
+            name: "🔥 Types Header",
+            code: fastos::TYPES_H,
+            category: "FastOS",
+            subcategory: "Utilidades",
+            color: (0x00, 0x88, 0xcc),
+            icon: "📋",
+            language: NodeLanguage::C,
+        },
+        Template {
+            name: "🔥 Ports Header",
+            code: fastos::PORTS_H,
+            category: "FastOS",
+            subcategory: "Utilidades",
+            color: (0x00, 0x88, 0xcc),
+            icon: "📋",
+            language: NodeLanguage::C,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // FASTOS - BUILD SYSTEM
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "🔥 Linker Script",
+            code: fastos::LINKER,
+            category: "FastOS",
+            subcategory: "Build",
+            color: (0x88, 0x88, 0x00),
+            icon: "🔗",
+            language: NodeLanguage::Asm,  // Para resaltado
+        },
+        Template {
+            name: "🔥 Makefile",
+            code: fastos::MAKEFILE,
+            category: "FastOS",
+            subcategory: "Build",
+            color: (0x88, 0x88, 0x00),
+            icon: "🛠️",
+            language: NodeLanguage::C,  // Para resaltado
+        },
+        Template {
+            name: "🔥 README",
+            code: fastos::README,
+            category: "FastOS",
+            subcategory: "Build",
+            color: (0x88, 0x88, 0x00),
+            icon: "📖",
+            language: NodeLanguage::C,  // Para resaltado
         },
     ]
 }
