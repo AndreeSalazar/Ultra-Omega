@@ -147,6 +147,14 @@ pub mod fastos64 {
     pub const PCI_H: &str = include_str!("fastos64/pci.h");
     pub const PCI_C: &str = include_str!("fastos64/pci.c");
     
+    // GPU NVIDIA (RTX 3060)
+    pub const GPU_NVIDIA_H: &str = include_str!("fastos64/gpu_nvidia.h");
+    pub const GPU_NVIDIA_C: &str = include_str!("fastos64/gpu_nvidia.c");
+    
+    // Vulkan-FastOS (Capa de abstracción)
+    pub const VULKAN_FASTOS_H: &str = include_str!("fastos64/vulkan_fastos.h");
+    pub const VULKAN_FASTOS_C: &str = include_str!("fastos64/vulkan_fastos.c");
+    
     // Documentación
     pub const README: &str = include_str!("fastos64/README.md");
 }
@@ -1057,6 +1065,46 @@ pub fn all_templates() -> Vec<Template> {
             subcategory: "PCI/GPU",
             color: (0xff, 0x00, 0x88),
             icon: "🎮",
+            language: NodeLanguage::C,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // FASTOS 64-BIT - GPU NVIDIA (RTX 3060)
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "🚀 GPU NVIDIA Header",
+            code: fastos64::GPU_NVIDIA_H,
+            category: "FastOS 64-bit",
+            subcategory: "GPU/Vulkan",
+            color: (0x76, 0xb9, 0x00),
+            icon: "🎮",
+            language: NodeLanguage::C,
+        },
+        Template {
+            name: "🚀 GPU NVIDIA Driver",
+            code: fastos64::GPU_NVIDIA_C,
+            category: "FastOS 64-bit",
+            subcategory: "GPU/Vulkan",
+            color: (0x76, 0xb9, 0x00),
+            icon: "🎮",
+            language: NodeLanguage::C,
+        },
+        Template {
+            name: "🚀 Vulkan-FastOS Header",
+            code: fastos64::VULKAN_FASTOS_H,
+            category: "FastOS 64-bit",
+            subcategory: "GPU/Vulkan",
+            color: (0xac, 0x14, 0x2c),
+            icon: "🔥",
+            language: NodeLanguage::C,
+        },
+        Template {
+            name: "🚀 Vulkan-FastOS Impl",
+            code: fastos64::VULKAN_FASTOS_C,
+            category: "FastOS 64-bit",
+            subcategory: "GPU/Vulkan",
+            color: (0xac, 0x14, 0x2c),
+            icon: "🔥",
             language: NodeLanguage::C,
         },
         
