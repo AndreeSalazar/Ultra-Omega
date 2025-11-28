@@ -406,4 +406,578 @@ impl NodeGraph {
         self.next_pin_id += 1;
         id
     }
+
+    /// Crear proyecto FastOS completo con todos los nodos organizados y conectados
+    pub fn create_fastos_project() -> Self {
+        use crate::templates::fastos;
+        
+        let mut graph = Self::default();
+        
+        // Colores para cada categoría
+        let color_boot = Color32::from_rgb(0xff, 0x00, 0x00);      // Rojo - Bootloader
+        let color_kernel = Color32::from_rgb(0xff, 0x44, 0x00);    // Naranja - Kernel
+        let color_drivers = Color32::from_rgb(0x00, 0xaa, 0x00);   // Verde - Drivers
+        let color_system = Color32::from_rgb(0xaa, 0x00, 0xaa);    // Púrpura - Sistema
+        let color_utils = Color32::from_rgb(0x00, 0x88, 0xcc);     // Azul - Utilidades
+        let color_build = Color32::from_rgb(0x88, 0x88, 0x00);     // Amarillo - Build
+        let color_final = Color32::from_rgb(0xff, 0xd7, 0x00);     // Dorado - Final
+        
+        // ═══════════════════════════════════════════════════════════════════
+        // FILA 1: BOOTLOADER (ASM) - Y: 0
+        // ═══════════════════════════════════════════════════════════════════
+        
+        // Boot Sector (raíz)
+        let boot_sector_id = graph.add_node(
+            "💿 Boot Sector",
+            pos2(100.0, 50.0),
+            color_boot,
+            &[],
+            &["Salida"],
+            NodeLanguage::Asm,
+        );
+        if let Some(node) = graph.node_mut(boot_sector_id) {
+            node.code = fastos::BOOT_SECTOR.to_string();
+        }
+        
+        // Stage 2
+        let stage2_id = graph.add_node(
+            "🚀 Stage 2",
+            pos2(400.0, 50.0),
+            color_boot,
+            &["Entrada"],
+            &["Salida"],
+            NodeLanguage::Asm,
+        );
+        if let Some(node) = graph.node_mut(stage2_id) {
+            node.code = fastos::STAGE2.to_string();
+        }
+        
+        // Kernel Entry
+        let kernel_entry_id = graph.add_node(
+            "⚡ Kernel Entry",
+            pos2(700.0, 50.0),
+            color_boot,
+            &["Entrada"],
+            &["Salida"],
+            NodeLanguage::Asm,
+        );
+        if let Some(node) = graph.node_mut(kernel_entry_id) {
+            node.code = fastos::KERNEL_ENTRY.to_string();
+        }
+        
+        // Conectar bootloader
+        if let (Some(out_pin), Some(in_pin)) = (
+            graph.pin_id(boot_sector_id, PinKind::Output, 0),
+            graph.pin_id(stage2_id, PinKind::Input, 0)
+        ) {
+            graph.add_link(out_pin, in_pin, color_boot);
+        }
+        
+        if let (Some(out_pin), Some(in_pin)) = (
+            graph.pin_id(stage2_id, PinKind::Output, 0),
+            graph.pin_id(kernel_entry_id, PinKind::Input, 0)
+        ) {
+            graph.add_link(out_pin, in_pin, color_boot);
+        }
+        
+        // ═══════════════════════════════════════════════════════════════════
+        // FILA 2: UTILIDADES BASE (Headers) - Y: 250
+        // ═══════════════════════════════════════════════════════════════════
+        
+        // Types Header
+        let types_h_id = graph.add_node(
+            "📋 types.h",
+            pos2(100.0, 250.0),
+            color_utils,
+            &[],
+            &["Salida"],
+            NodeLanguage::C,
+        );
+        if let Some(node) = graph.node_mut(types_h_id) {
+            node.code = fastos::TYPES_H.to_string();
+        }
+        
+        // Ports Header
+        let ports_h_id = graph.add_node(
+            "📋 ports.h",
+            pos2(400.0, 250.0),
+            color_utils,
+            &["Entrada"],
+            &["Salida"],
+            NodeLanguage::C,
+        );
+        if let Some(node) = graph.node_mut(ports_h_id) {
+            node.code = fastos::PORTS_H.to_string();
+        }
+        
+        // Conectar types -> ports
+        if let (Some(out_pin), Some(in_pin)) = (
+            graph.pin_id(types_h_id, PinKind::Output, 0),
+            graph.pin_id(ports_h_id, PinKind::Input, 0)
+        ) {
+            graph.add_link(out_pin, in_pin, color_utils);
+        }
+        
+        // ═══════════════════════════════════════════════════════════════════
+        // FILA 3: STRING LIBRARY - Y: 450
+        // ═══════════════════════════════════════════════════════════════════
+        
+        // String Header
+        let string_h_id = graph.add_node(
+            "📋 string.h",
+            pos2(100.0, 450.0),
+            color_utils,
+            &["Entrada"],
+            &["Salida"],
+            NodeLanguage::C,
+        );
+        if let Some(node) = graph.node_mut(string_h_id) {
+            node.code = fastos::STRING_H.to_string();
+        }
+        
+        // String Implementation
+        let string_c_id = graph.add_node(
+            "📝 string.c",
+            pos2(400.0, 450.0),
+            color_utils,
+            &["Entrada"],
+            &["Salida"],
+            NodeLanguage::C,
+        );
+        if let Some(node) = graph.node_mut(string_c_id) {
+            node.code = fastos::STRING.to_string();
+        }
+        
+        // Conectar ports -> string.h -> string.c
+        if let (Some(out_pin), Some(in_pin)) = (
+            graph.pin_id(ports_h_id, PinKind::Output, 0),
+            graph.pin_id(string_h_id, PinKind::Input, 0)
+        ) {
+            graph.add_link(out_pin, in_pin, color_utils);
+        }
+        
+        if let (Some(out_pin), Some(in_pin)) = (
+            graph.pin_id(string_h_id, PinKind::Output, 0),
+            graph.pin_id(string_c_id, PinKind::Input, 0)
+        ) {
+            graph.add_link(out_pin, in_pin, color_utils);
+        }
+        
+        // ═══════════════════════════════════════════════════════════════════
+        // FILA 4: VGA DRIVER - Y: 650
+        // ═══════════════════════════════════════════════════════════════════
+        
+        // VGA Header
+        let vga_h_id = graph.add_node(
+            "📋 vga.h",
+            pos2(100.0, 650.0),
+            color_drivers,
+            &["Entrada"],
+            &["Salida"],
+            NodeLanguage::C,
+        );
+        if let Some(node) = graph.node_mut(vga_h_id) {
+            node.code = fastos::VGA_H.to_string();
+        }
+        
+        // VGA Driver
+        let vga_c_id = graph.add_node(
+            "🖥️ vga_driver.c",
+            pos2(400.0, 650.0),
+            color_drivers,
+            &["Entrada"],
+            &["Salida"],
+            NodeLanguage::C,
+        );
+        if let Some(node) = graph.node_mut(vga_c_id) {
+            node.code = fastos::VGA_DRIVER.to_string();
+        }
+        
+        // Conectar string.c -> vga.h -> vga_driver.c
+        if let (Some(out_pin), Some(in_pin)) = (
+            graph.pin_id(string_c_id, PinKind::Output, 0),
+            graph.pin_id(vga_h_id, PinKind::Input, 0)
+        ) {
+            graph.add_link(out_pin, in_pin, color_drivers);
+        }
+        
+        if let (Some(out_pin), Some(in_pin)) = (
+            graph.pin_id(vga_h_id, PinKind::Output, 0),
+            graph.pin_id(vga_c_id, PinKind::Input, 0)
+        ) {
+            graph.add_link(out_pin, in_pin, color_drivers);
+        }
+        
+        // ═══════════════════════════════════════════════════════════════════
+        // FILA 5: IDT (Interrupciones) - Y: 850
+        // ═══════════════════════════════════════════════════════════════════
+        
+        // IDT Header
+        let idt_h_id = graph.add_node(
+            "📋 idt.h",
+            pos2(100.0, 850.0),
+            color_system,
+            &["Entrada"],
+            &["Salida"],
+            NodeLanguage::C,
+        );
+        if let Some(node) = graph.node_mut(idt_h_id) {
+            node.code = fastos::IDT_H.to_string();
+        }
+        
+        // IDT Implementation
+        let idt_c_id = graph.add_node(
+            "⚡ idt.c",
+            pos2(400.0, 850.0),
+            color_system,
+            &["Entrada"],
+            &["Salida"],
+            NodeLanguage::C,
+        );
+        if let Some(node) = graph.node_mut(idt_c_id) {
+            node.code = fastos::IDT.to_string();
+        }
+        
+        // Conectar vga_driver.c -> idt.h -> idt.c
+        if let (Some(out_pin), Some(in_pin)) = (
+            graph.pin_id(vga_c_id, PinKind::Output, 0),
+            graph.pin_id(idt_h_id, PinKind::Input, 0)
+        ) {
+            graph.add_link(out_pin, in_pin, color_system);
+        }
+        
+        if let (Some(out_pin), Some(in_pin)) = (
+            graph.pin_id(idt_h_id, PinKind::Output, 0),
+            graph.pin_id(idt_c_id, PinKind::Input, 0)
+        ) {
+            graph.add_link(out_pin, in_pin, color_system);
+        }
+        
+        // ═══════════════════════════════════════════════════════════════════
+        // FILA 6: KEYBOARD DRIVER - Y: 1050
+        // ═══════════════════════════════════════════════════════════════════
+        
+        // Keyboard Header
+        let keyboard_h_id = graph.add_node(
+            "📋 keyboard.h",
+            pos2(100.0, 1050.0),
+            color_drivers,
+            &["Entrada"],
+            &["Salida"],
+            NodeLanguage::C,
+        );
+        if let Some(node) = graph.node_mut(keyboard_h_id) {
+            node.code = fastos::KEYBOARD_H.to_string();
+        }
+        
+        // Keyboard Driver
+        let keyboard_c_id = graph.add_node(
+            "⌨️ keyboard_driver.c",
+            pos2(400.0, 1050.0),
+            color_drivers,
+            &["Entrada"],
+            &["Salida"],
+            NodeLanguage::C,
+        );
+        if let Some(node) = graph.node_mut(keyboard_c_id) {
+            node.code = fastos::KEYBOARD_DRIVER.to_string();
+        }
+        
+        // Conectar idt.c -> keyboard.h -> keyboard_driver.c
+        if let (Some(out_pin), Some(in_pin)) = (
+            graph.pin_id(idt_c_id, PinKind::Output, 0),
+            graph.pin_id(keyboard_h_id, PinKind::Input, 0)
+        ) {
+            graph.add_link(out_pin, in_pin, color_drivers);
+        }
+        
+        if let (Some(out_pin), Some(in_pin)) = (
+            graph.pin_id(keyboard_h_id, PinKind::Output, 0),
+            graph.pin_id(keyboard_c_id, PinKind::Input, 0)
+        ) {
+            graph.add_link(out_pin, in_pin, color_drivers);
+        }
+        
+        // ═══════════════════════════════════════════════════════════════════
+        // FILA 7: TIMER DRIVER - Y: 1250
+        // ═══════════════════════════════════════════════════════════════════
+        
+        // Timer Header
+        let timer_h_id = graph.add_node(
+            "📋 timer.h",
+            pos2(100.0, 1250.0),
+            color_drivers,
+            &["Entrada"],
+            &["Salida"],
+            NodeLanguage::C,
+        );
+        if let Some(node) = graph.node_mut(timer_h_id) {
+            node.code = fastos::TIMER_H.to_string();
+        }
+        
+        // Timer Driver
+        let timer_c_id = graph.add_node(
+            "⏱️ timer.c",
+            pos2(400.0, 1250.0),
+            color_drivers,
+            &["Entrada"],
+            &["Salida"],
+            NodeLanguage::C,
+        );
+        if let Some(node) = graph.node_mut(timer_c_id) {
+            node.code = fastos::TIMER.to_string();
+        }
+        
+        // Conectar keyboard_driver.c -> timer.h -> timer.c
+        if let (Some(out_pin), Some(in_pin)) = (
+            graph.pin_id(keyboard_c_id, PinKind::Output, 0),
+            graph.pin_id(timer_h_id, PinKind::Input, 0)
+        ) {
+            graph.add_link(out_pin, in_pin, color_drivers);
+        }
+        
+        if let (Some(out_pin), Some(in_pin)) = (
+            graph.pin_id(timer_h_id, PinKind::Output, 0),
+            graph.pin_id(timer_c_id, PinKind::Input, 0)
+        ) {
+            graph.add_link(out_pin, in_pin, color_drivers);
+        }
+        
+        // ═══════════════════════════════════════════════════════════════════
+        // FILA 8: MEMORY MANAGER - Y: 1450
+        // ═══════════════════════════════════════════════════════════════════
+        
+        // Memory Header
+        let memory_h_id = graph.add_node(
+            "📋 memory.h",
+            pos2(100.0, 1450.0),
+            color_system,
+            &["Entrada"],
+            &["Salida"],
+            NodeLanguage::C,
+        );
+        if let Some(node) = graph.node_mut(memory_h_id) {
+            node.code = fastos::MEMORY_H.to_string();
+        }
+        
+        // Memory Manager
+        let memory_c_id = graph.add_node(
+            "💾 memory.c",
+            pos2(400.0, 1450.0),
+            color_system,
+            &["Entrada"],
+            &["Salida"],
+            NodeLanguage::C,
+        );
+        if let Some(node) = graph.node_mut(memory_c_id) {
+            node.code = fastos::MEMORY.to_string();
+        }
+        
+        // Conectar timer.c -> memory.h -> memory.c
+        if let (Some(out_pin), Some(in_pin)) = (
+            graph.pin_id(timer_c_id, PinKind::Output, 0),
+            graph.pin_id(memory_h_id, PinKind::Input, 0)
+        ) {
+            graph.add_link(out_pin, in_pin, color_system);
+        }
+        
+        if let (Some(out_pin), Some(in_pin)) = (
+            graph.pin_id(memory_h_id, PinKind::Output, 0),
+            graph.pin_id(memory_c_id, PinKind::Input, 0)
+        ) {
+            graph.add_link(out_pin, in_pin, color_system);
+        }
+        
+        // ═══════════════════════════════════════════════════════════════════
+        // FILA 9: SHELL - Y: 1650
+        // ═══════════════════════════════════════════════════════════════════
+        
+        // Shell Header
+        let shell_h_id = graph.add_node(
+            "📋 shell.h",
+            pos2(100.0, 1650.0),
+            color_system,
+            &["Entrada"],
+            &["Salida"],
+            NodeLanguage::C,
+        );
+        if let Some(node) = graph.node_mut(shell_h_id) {
+            node.code = fastos::SHELL_H.to_string();
+        }
+        
+        // Shell
+        let shell_c_id = graph.add_node(
+            "💻 shell.c",
+            pos2(400.0, 1650.0),
+            color_system,
+            &["Entrada"],
+            &["Salida"],
+            NodeLanguage::C,
+        );
+        if let Some(node) = graph.node_mut(shell_c_id) {
+            node.code = fastos::SHELL.to_string();
+        }
+        
+        // Conectar memory.c -> shell.h -> shell.c
+        if let (Some(out_pin), Some(in_pin)) = (
+            graph.pin_id(memory_c_id, PinKind::Output, 0),
+            graph.pin_id(shell_h_id, PinKind::Input, 0)
+        ) {
+            graph.add_link(out_pin, in_pin, color_system);
+        }
+        
+        if let (Some(out_pin), Some(in_pin)) = (
+            graph.pin_id(shell_h_id, PinKind::Output, 0),
+            graph.pin_id(shell_c_id, PinKind::Input, 0)
+        ) {
+            graph.add_link(out_pin, in_pin, color_system);
+        }
+        
+        // ═══════════════════════════════════════════════════════════════════
+        // FILA 10: KERNEL - Y: 1850
+        // ═══════════════════════════════════════════════════════════════════
+        
+        // Kernel Header
+        let kernel_h_id = graph.add_node(
+            "📋 kernel.h",
+            pos2(100.0, 1850.0),
+            color_kernel,
+            &["Entrada"],
+            &["Salida"],
+            NodeLanguage::C,
+        );
+        if let Some(node) = graph.node_mut(kernel_h_id) {
+            node.code = fastos::KERNEL_H.to_string();
+        }
+        
+        // Kernel Main
+        let kernel_main_id = graph.add_node(
+            "🧠 kernel_main.c",
+            pos2(400.0, 1850.0),
+            color_kernel,
+            &["Entrada"],
+            &["Salida"],
+            NodeLanguage::C,
+        );
+        if let Some(node) = graph.node_mut(kernel_main_id) {
+            node.code = fastos::KERNEL_MAIN.to_string();
+        }
+        
+        // Conectar shell.c -> kernel.h -> kernel_main.c
+        if let (Some(out_pin), Some(in_pin)) = (
+            graph.pin_id(shell_c_id, PinKind::Output, 0),
+            graph.pin_id(kernel_h_id, PinKind::Input, 0)
+        ) {
+            graph.add_link(out_pin, in_pin, color_kernel);
+        }
+        
+        if let (Some(out_pin), Some(in_pin)) = (
+            graph.pin_id(kernel_h_id, PinKind::Output, 0),
+            graph.pin_id(kernel_main_id, PinKind::Input, 0)
+        ) {
+            graph.add_link(out_pin, in_pin, color_kernel);
+        }
+        
+        // ═══════════════════════════════════════════════════════════════════
+        // FILA 11: BUILD SYSTEM - Y: 2050
+        // ═══════════════════════════════════════════════════════════════════
+        
+        // Linker Script
+        let linker_id = graph.add_node(
+            "🔗 linker.ld",
+            pos2(100.0, 2050.0),
+            color_build,
+            &["Entrada"],
+            &["Salida"],
+            NodeLanguage::Asm,
+        );
+        if let Some(node) = graph.node_mut(linker_id) {
+            node.code = fastos::LINKER.to_string();
+        }
+        
+        // Makefile
+        let makefile_id = graph.add_node(
+            "🛠️ Makefile",
+            pos2(400.0, 2050.0),
+            color_build,
+            &["Entrada"],
+            &["Salida"],
+            NodeLanguage::C,
+        );
+        if let Some(node) = graph.node_mut(makefile_id) {
+            node.code = fastos::MAKEFILE.to_string();
+        }
+        
+        // Conectar kernel_main.c -> linker.ld -> Makefile
+        if let (Some(out_pin), Some(in_pin)) = (
+            graph.pin_id(kernel_main_id, PinKind::Output, 0),
+            graph.pin_id(linker_id, PinKind::Input, 0)
+        ) {
+            graph.add_link(out_pin, in_pin, color_build);
+        }
+        
+        if let (Some(out_pin), Some(in_pin)) = (
+            graph.pin_id(linker_id, PinKind::Output, 0),
+            graph.pin_id(makefile_id, PinKind::Input, 0)
+        ) {
+            graph.add_link(out_pin, in_pin, color_build);
+        }
+        
+        // ═══════════════════════════════════════════════════════════════════
+        // NODO FINAL: FASTOS COMPLETO - Y: 2250
+        // ═══════════════════════════════════════════════════════════════════
+        
+        // Nodo final que hereda todo
+        let fastos_final_id = graph.add_node(
+            "🔥 FASTOS COMPLETO",
+            pos2(250.0, 2250.0),
+            color_final,
+            &["Entrada"],
+            &["Código Final"],
+            NodeLanguage::C,
+        );
+        if let Some(node) = graph.node_mut(fastos_final_id) {
+            node.code = r#"/* ═══════════════════════════════════════════════════════════════════════════
+ * FastOS - Sistema Operativo Completo
+ * ═══════════════════════════════════════════════════════════════════════════
+ * Este nodo hereda TODO el código de los nodos anteriores.
+ * Usa Ctrl+I para ver la herencia completa.
+ * 
+ * Para compilar:
+ * 1. Exporta todos los archivos a una carpeta
+ * 2. Ejecuta 'make' para compilar
+ * 3. Ejecuta 'make run' para probar en QEMU
+ * 
+ * Estructura del proyecto:
+ * ├── boot_sector.asm    (Bootloader Stage 1)
+ * ├── bootloader_stage2.asm (Modo protegido)
+ * ├── kernel_entry.asm   (Punto de entrada)
+ * ├── kernel_main.c      (Kernel principal)
+ * ├── vga_driver.c       (Driver de video)
+ * ├── keyboard_driver.c  (Driver de teclado)
+ * ├── timer.c            (Driver de timer)
+ * ├── idt.c              (Interrupciones)
+ * ├── memory.c           (Gestor de memoria)
+ * ├── shell.c            (Intérprete de comandos)
+ * ├── string.c           (Librería de strings)
+ * ├── linker.ld          (Script de enlazado)
+ * └── Makefile           (Sistema de compilación)
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+
+// ¡Tu sistema operativo FastOS está listo!
+// Modifica los nodos anteriores para personalizar cada componente.
+"#.to_string();
+        }
+        
+        // Conectar Makefile -> FastOS Final
+        if let (Some(out_pin), Some(in_pin)) = (
+            graph.pin_id(makefile_id, PinKind::Output, 0),
+            graph.pin_id(fastos_final_id, PinKind::Input, 0)
+        ) {
+            graph.add_link(out_pin, in_pin, color_final);
+        }
+        
+        graph
+    }
 }
