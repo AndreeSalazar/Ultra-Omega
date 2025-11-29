@@ -212,6 +212,50 @@ pub mod fastos64 {
 }
 
 // ══════════════════════════════════════════
+// FASTOS 64-BIT RUST (ASM + Rust)
+// Sistema operativo combinando NASM y Rust
+// ══════════════════════════════════════════
+pub mod fastos64_rust {
+    // ═══════════════════════════════════════
+    // ASM (NASM x86_64)
+    // ═══════════════════════════════════════
+    pub mod asm {
+        pub const BOOT_UEFI: &str = include_str!("fastos64_rust/asm/boot_uefi.asm");
+        pub const KERNEL_ENTRY: &str = include_str!("fastos64_rust/asm/kernel_entry.asm");
+        pub const INTERRUPTS: &str = include_str!("fastos64_rust/asm/interrupts.asm");
+        pub const MEMORY: &str = include_str!("fastos64_rust/asm/memory.asm");
+    }
+    
+    // ═══════════════════════════════════════
+    // RUST (Kernel)
+    // ═══════════════════════════════════════
+    pub mod rust {
+        pub const KERNEL_MAIN: &str = include_str!("fastos64_rust/rust/kernel_main.rs");
+        pub const PORTS: &str = include_str!("fastos64_rust/rust/ports.rs");
+        pub const INTERRUPTS: &str = include_str!("fastos64_rust/rust/interrupts.rs");
+        pub const MEMORY: &str = include_str!("fastos64_rust/rust/memory.rs");
+        pub const DRIVERS: &str = include_str!("fastos64_rust/rust/drivers.rs");
+        pub const FFI: &str = include_str!("fastos64_rust/rust/ffi.rs");
+        pub const LIB: &str = include_str!("fastos64_rust/rust/lib.rs");
+    }
+    
+    // ═══════════════════════════════════════
+    // INTEGRATION (Build & Config)
+    // ═══════════════════════════════════════
+    pub mod integration {
+        pub const CARGO_TOML: &str = include_str!("fastos64_rust/integration/Cargo.toml");
+        pub const LINKER_LD: &str = include_str!("fastos64_rust/integration/linker.ld");
+        pub const BUILD_SH: &str = include_str!("fastos64_rust/integration/build.sh");
+        pub const BUILD_BAT: &str = include_str!("fastos64_rust/integration/build.bat");
+        pub const EXAMPLE: &str = include_str!("fastos64_rust/integration/example_integration.rs");
+        pub const README: &str = include_str!("fastos64_rust/integration/README.md");
+    }
+    
+    // README principal
+    pub const README: &str = include_str!("fastos64_rust/README.md");
+}
+
+// ══════════════════════════════════════════
 // VULKAN API (C++)
 // ══════════════════════════════════════════
 pub mod vulkan {
@@ -1421,6 +1465,157 @@ pub fn all_templates() -> Vec<Template> {
             color: (0x00, 0x78, 0xd4),
             icon: "🖥️",
             language: NodeLanguage::Asm,
+        },
+        
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // FASTOS 64-BIT RUST (ASM + Rust)
+        // ═══════════════════════════════════════════════════════════════════════════════
+        
+        // ───────────────────────────────────────────────────────────────────────────────
+        // ASM (NASM)
+        // ───────────────────────────────────────────────────────────────────────────────
+        Template {
+            name: "Bootloader UEFI (ASM)",
+            code: fastos64_rust::asm::BOOT_UEFI,
+            category: "FastOS 64-bit Rust",
+            subcategory: "ASM (NASM)",
+            color: (0xFF, 0x44, 0x00),
+            icon: "🔴",
+            language: NodeLanguage::Asm,
+        },
+        Template {
+            name: "Kernel Entry (ASM)",
+            code: fastos64_rust::asm::KERNEL_ENTRY,
+            category: "FastOS 64-bit Rust",
+            subcategory: "ASM (NASM)",
+            color: (0xFF, 0x44, 0x00),
+            icon: "🔴",
+            language: NodeLanguage::Asm,
+        },
+        Template {
+            name: "Interrupts (ASM)",
+            code: fastos64_rust::asm::INTERRUPTS,
+            category: "FastOS 64-bit Rust",
+            subcategory: "ASM (NASM)",
+            color: (0xFF, 0x44, 0x00),
+            icon: "🔴",
+            language: NodeLanguage::Asm,
+        },
+        Template {
+            name: "Memory Functions (ASM)",
+            code: fastos64_rust::asm::MEMORY,
+            category: "FastOS 64-bit Rust",
+            subcategory: "ASM (NASM)",
+            color: (0xFF, 0x44, 0x00),
+            icon: "🔴",
+            language: NodeLanguage::Asm,
+        },
+        
+        // ───────────────────────────────────────────────────────────────────────────────
+        // RUST (Kernel)
+        // ───────────────────────────────────────────────────────────────────────────────
+        Template {
+            name: "Kernel Main (Rust)",
+            code: fastos64_rust::rust::KERNEL_MAIN,
+            category: "FastOS 64-bit Rust",
+            subcategory: "Rust (Kernel)",
+            color: (0xDE, 0x39, 0x00),
+            icon: "🦀",
+            language: NodeLanguage::Rust,
+        },
+        Template {
+            name: "Port I/O (Rust)",
+            code: fastos64_rust::rust::PORTS,
+            category: "FastOS 64-bit Rust",
+            subcategory: "Rust (Kernel)",
+            color: (0xDE, 0x39, 0x00),
+            icon: "🦀",
+            language: NodeLanguage::Rust,
+        },
+        Template {
+            name: "Interrupts System (Rust)",
+            code: fastos64_rust::rust::INTERRUPTS,
+            category: "FastOS 64-bit Rust",
+            subcategory: "Rust (Kernel)",
+            color: (0xDE, 0x39, 0x00),
+            icon: "🦀",
+            language: NodeLanguage::Rust,
+        },
+        Template {
+            name: "Memory Management (Rust)",
+            code: fastos64_rust::rust::MEMORY,
+            category: "FastOS 64-bit Rust",
+            subcategory: "Rust (Kernel)",
+            color: (0xDE, 0x39, 0x00),
+            icon: "🦀",
+            language: NodeLanguage::Rust,
+        },
+        Template {
+            name: "Drivers (Rust)",
+            code: fastos64_rust::rust::DRIVERS,
+            category: "FastOS 64-bit Rust",
+            subcategory: "Rust (Kernel)",
+            color: (0xDE, 0x39, 0x00),
+            icon: "🦀",
+            language: NodeLanguage::Rust,
+        },
+        Template {
+            name: "FFI Interface (Rust)",
+            code: fastos64_rust::rust::FFI,
+            category: "FastOS 64-bit Rust",
+            subcategory: "Rust (Kernel)",
+            color: (0xDE, 0x39, 0x00),
+            icon: "🦀",
+            language: NodeLanguage::Rust,
+        },
+        
+        // ───────────────────────────────────────────────────────────────────────────────
+        // INTEGRATION (Build & Config)
+        // ───────────────────────────────────────────────────────────────────────────────
+        Template {
+            name: "Cargo.toml",
+            code: fastos64_rust::integration::CARGO_TOML,
+            category: "FastOS 64-bit Rust",
+            subcategory: "Integration",
+            color: (0x88, 0x88, 0x00),
+            icon: "⚙️",
+            language: NodeLanguage::Rust,
+        },
+        Template {
+            name: "Linker Script",
+            code: fastos64_rust::integration::LINKER_LD,
+            category: "FastOS 64-bit Rust",
+            subcategory: "Integration",
+            color: (0x88, 0x88, 0x00),
+            icon: "🔗",
+            language: NodeLanguage::Asm,
+        },
+        Template {
+            name: "Build Script (Linux/Mac)",
+            code: fastos64_rust::integration::BUILD_SH,
+            category: "FastOS 64-bit Rust",
+            subcategory: "Integration",
+            color: (0x88, 0x88, 0x00),
+            icon: "🔧",
+            language: NodeLanguage::Text,
+        },
+        Template {
+            name: "Build Script (Windows)",
+            code: fastos64_rust::integration::BUILD_BAT,
+            category: "FastOS 64-bit Rust",
+            subcategory: "Integration",
+            color: (0x88, 0x88, 0x00),
+            icon: "🔧",
+            language: NodeLanguage::Text,
+        },
+        Template {
+            name: "Integration Example",
+            code: fastos64_rust::integration::EXAMPLE,
+            category: "FastOS 64-bit Rust",
+            subcategory: "Integration",
+            color: (0x88, 0x88, 0x00),
+            icon: "📝",
+            language: NodeLanguage::Rust,
         },
     ]
 }
