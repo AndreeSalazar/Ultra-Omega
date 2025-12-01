@@ -1,5 +1,5 @@
 ; ═══════════════════════════════════════
-; Arrays y Memoria en NASM
+; Arrays y Memoria en NASM (Linux x64)
 ; ═══════════════════════════════════════
 
 default rel
@@ -16,15 +16,15 @@ extern printf
 
 ; ─────────────────────────────────────
 ; Suma de array
-; RCX = puntero, RDX = longitud
+; RDI = puntero, RSI = longitud (Linux)
 ; ─────────────────────────────────────
 suma_array:
     xor rax, rax
     xor r8, r8
 .loop:
-    cmp r8, rdx
+    cmp r8, rsi
     jge .done
-    add eax, [rcx + r8*4]
+    add eax, [rdi + r8*4]
     inc r8
     jmp .loop
 .done:
@@ -32,15 +32,15 @@ suma_array:
 
 ; ─────────────────────────────────────
 ; Encontrar máximo
-; RCX = puntero, RDX = longitud
+; RDI = puntero, RSI = longitud (Linux)
 ; ─────────────────────────────────────
 max_array:
-    mov eax, [rcx]
+    mov eax, [rdi]
     mov r8, 1
 .loop:
-    cmp r8, rdx
+    cmp r8, rsi
     jge .done
-    mov r9d, [rcx + r8*4]
+    mov r9d, [rdi + r8*4]
     cmp r9d, eax
     jle .skip
     mov eax, r9d
@@ -51,7 +51,7 @@ max_array:
     ret
 
 main:
-    sub rsp, 40
+    sub rsp, 8
     
     ; Imprimir cada elemento
     xor r12, r12
@@ -59,11 +59,11 @@ main:
     cmp r12, array_len
     jge .print_done
     
-    mov rcx, fmt_elem
-    mov rdx, r12
+    mov rdi, fmt_elem       ; Linux: primer argumento
+    mov rsi, r12            ; Linux: segundo argumento
     lea rax, [array]
-    mov r8d, [rax + r12*4]
-    xor eax, eax
+    mov rdx, [rax + r12*4]  ; Linux: tercer argumento
+    xor rax, rax
     call printf
     
     inc r12
@@ -71,26 +71,26 @@ main:
     
 .print_done:
     ; Calcular suma
-    lea rcx, [array]
-    mov rdx, array_len
+    lea rdi, [array]        ; Linux: primer argumento
+    mov rsi, array_len      ; Linux: segundo argumento
     call suma_array
     
-    mov rcx, fmt_sum
-    mov rdx, rax
-    xor eax, eax
+    mov rdi, fmt_sum
+    mov rsi, rax
+    xor rax, rax
     call printf
     
     ; Encontrar máximo
-    lea rcx, [array]
-    mov rdx, array_len
+    lea rdi, [array]
+    mov rsi, array_len
     call max_array
     
-    mov rcx, fmt_max
-    mov rdx, rax
-    xor eax, eax
+    mov rdi, fmt_max
+    mov rsi, rax
+    xor rax, rax
     call printf
     
-    add rsp, 40
-    xor eax, eax
+    add rsp, 8
+    xor rax, rax
     ret
 

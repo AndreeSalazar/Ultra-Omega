@@ -1,5 +1,5 @@
 ; ═══════════════════════════════════════════════════════════════
-; LIBRERÍA: Gestión de Memoria (NASM x64 Windows)
+; LIBRERÍA: Gestión de Memoria (NASM x64 Linux)
 ; Nivel: Avanzado - Componente independiente
 ; ═══════════════════════════════════════════════════════════════
 ; Macros y funciones para manipulación de memoria y arrays.
@@ -16,49 +16,49 @@ extern free
 ; Uso: ALLOC_ARRAY dest, num_elementos, tamaño_elemento
 ; ═══════════════════════════════════════════════════════════════
 %macro ALLOC_ARRAY 3
-    push rcx
-    mov rcx, %2
-    imul rcx, %3
-    sub rsp, 32
+    push rdi
+    mov rdi, %2               ; Linux: primer argumento
+    imul rdi, %3
+    sub rsp, 8
     call malloc
-    add rsp, 32
+    add rsp, 8
     mov %1, rax
-    pop rcx
+    pop rdi
 %endmacro
 
 ; ═══════════════════════════════════════════════════════════════
 ; Macro: FREE_MEM - Liberar memoria
 ; ═══════════════════════════════════════════════════════════════
 %macro FREE_MEM 1
-    mov rcx, %1
-    sub rsp, 32
+    mov rdi, %1               ; Linux: primer argumento
+    sub rsp, 8
     call free
-    add rsp, 32
+    add rsp, 8
 %endmacro
 
 ; ═══════════════════════════════════════════════════════════════
 ; Función: mem_set - Llenar memoria con un valor
-; RCX = destino, RDX = valor, R8 = cantidad de bytes
+; RDI = destino, RSI = valor, RDX = cantidad de bytes (Linux)
 ; ═══════════════════════════════════════════════════════════════
 mem_set:
     push rdi
-    mov rdi, rcx
-    mov rax, rdx
-    mov rcx, r8
+    mov rdi, rdi              ; Ya está en rdi
+    mov rax, rsi
+    mov rcx, rdx
     rep stosb
     pop rdi
     ret
 
 ; ═══════════════════════════════════════════════════════════════
 ; Función: mem_copy - Copiar bloque de memoria
-; RCX = destino, RDX = origen, R8 = cantidad
+; RDI = destino, RSI = origen, RDX = cantidad (Linux)
 ; ═══════════════════════════════════════════════════════════════
 mem_copy:
     push rsi
     push rdi
-    mov rdi, rcx
-    mov rsi, rdx
-    mov rcx, r8
+    mov rdi, rdi              ; Ya está en rdi
+    mov rsi, rsi              ; Ya está en rsi
+    mov rcx, rdx
     rep movsb
     pop rdi
     pop rsi
@@ -69,23 +69,24 @@ main:
     ALLOC_ARRAY rbx, 10, 4    ; rbx = puntero al array
     
     ; Llenar con ceros
-    mov rcx, rbx
-    xor rdx, rdx
-    mov r8, 40                ; 10 * 4 bytes
+    mov rdi, rbx              ; Linux: primer argumento
+    xor rsi, rsi              ; Linux: segundo argumento (valor 0)
+    mov rdx, 40               ; Linux: tercer argumento (10 * 4 bytes)
     call mem_set
     
-    ; Imprimir confirmación
-    sub rsp, 40
-    lea rcx, [msg]
+    ; Imprimir confirmación (Linux: rdi)
+    sub rsp, 8
+    lea rdi, [msg]
+    xor rax, rax
     call printf
-    add rsp, 40
+    add rsp, 8
     
     ; Liberar memoria
     FREE_MEM rbx
     
-    xor eax, eax
+    xor rax, rax
     ret
 
 section .data
-    msg db 'Memoria gestionada correctamente', 10, 0
+    msg db 'Memoria gestionada correctamente (Linux)', 10, 0
 

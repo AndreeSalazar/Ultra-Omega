@@ -7,6 +7,8 @@ mod templates;
 mod config;
 mod editor_history;
 mod expressions;
+#[cfg(feature = "mojo")]
+mod mojo;
 
 use crate::app::NodeGraphApp;
 use crate::config::AppConfig;

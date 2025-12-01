@@ -8,7 +8,9 @@ pub mod channels;
 // Ejemplos de uso (opcional, no se carga por defecto)
 // pub mod examples;
 
-pub use parser::{ExpressionParser, Expression, ExpressionToken};
+pub use parser::ExpressionParser;
+#[allow(dead_code)] // Exportados para uso futuro
+pub use parser::{Expression, ExpressionToken};
 pub use evaluator::ExpressionEvaluator;
 pub use channels::{ChannelManager, ChannelValue};
 

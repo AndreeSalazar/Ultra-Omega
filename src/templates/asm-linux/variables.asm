@@ -1,5 +1,5 @@
 ; ═══════════════════════════════════════
-; Variables y Tipos de Datos en NASM
+; Variables y Tipos de Datos en NASM (Linux)
 ; ═══════════════════════════════════════
 
 default rel
@@ -17,7 +17,7 @@ section .data
     qword_var   dq 10000000000
     
     ; Strings
-    msg         db 'Hola Variables!', 10, 0
+    msg         db 'Hola Variables Linux!', 10, 0
     
     ; Arrays
     array       dd 1, 2, 3, 4, 5
@@ -33,7 +33,7 @@ global main
 extern printf
 
 main:
-    sub rsp, 40
+    sub rsp, 8
     
     ; Acceder a variables
     mov al, [byte_var]
@@ -41,12 +41,12 @@ main:
     mov eax, [dword_var]
     mov rax, [qword_var]
     
-    ; Imprimir mensaje
-    mov rcx, msg
-    xor eax, eax
+    ; Imprimir mensaje (Linux: rdi)
+    mov rdi, msg
+    xor rax, rax
     call printf
     
-    add rsp, 40
-    xor eax, eax
+    add rsp, 8
+    xor rax, rax
     ret
 

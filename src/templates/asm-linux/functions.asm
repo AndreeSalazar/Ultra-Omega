@@ -1,5 +1,5 @@
 ; ═══════════════════════════════════════
-; Funciones en NASM (Windows x64)
+; Funciones en NASM (Linux x64)
 ; ═══════════════════════════════════════
 
 default rel
@@ -13,38 +13,38 @@ extern printf
 
 ; ─────────────────────────────────────
 ; Función: sumar
-; Parámetros: RCX = a, RDX = b
+; Parámetros: RDI = a, RSI = b (Linux)
 ; Retorno: RAX = a + b
 ; ─────────────────────────────────────
 sumar:
-    mov rax, rcx
-    add rax, rdx
+    mov rax, rdi
+    add rax, rsi
     ret
 
 ; ─────────────────────────────────────
 ; Función: multiplicar
-; Parámetros: RCX = a, RDX = b
+; Parámetros: RDI = a, RSI = b (Linux)
 ; Retorno: RAX = a * b
 ; ─────────────────────────────────────
 multiplicar:
-    mov rax, rcx
-    imul rax, rdx
+    mov rax, rdi
+    imul rax, rsi
     ret
 
 ; ─────────────────────────────────────
 ; Función: factorial (recursiva)
-; Parámetros: RCX = n
+; Parámetros: RDI = n (Linux)
 ; Retorno: RAX = n!
 ; ─────────────────────────────────────
 factorial:
     push rbx
-    sub rsp, 32
+    sub rsp, 8
     
-    cmp rcx, 1
+    cmp rdi, 1
     jle .base_case
     
-    mov rbx, rcx
-    dec rcx
+    mov rbx, rdi
+    dec rdi
     call factorial
     imul rax, rbx
     jmp .done
@@ -53,7 +53,7 @@ factorial:
     mov rax, 1
     
 .done:
-    add rsp, 32
+    add rsp, 8
     pop rbx
     ret
 
@@ -61,29 +61,29 @@ factorial:
 ; Main
 ; ─────────────────────────────────────
 main:
-    sub rsp, 40
+    sub rsp, 8
     
-    ; Llamar sumar(5, 3)
-    mov rcx, 5
-    mov rdx, 3
+    ; Llamar sumar(5, 3) - Linux: rdi, rsi
+    mov rdi, 5
+    mov rsi, 3
     call sumar
     
-    ; Imprimir resultado
-    mov rcx, fmt_sum
-    mov rdx, rax
-    xor eax, eax
+    ; Imprimir resultado (Linux: rdi, rsi)
+    mov rdi, fmt_sum
+    mov rsi, rax
+    xor rax, rax
     call printf
     
-    ; Llamar factorial(5)
-    mov rcx, 5
+    ; Llamar factorial(5) - Linux: rdi
+    mov rdi, 5
     call factorial
     
-    mov rcx, fmt_result
-    mov rdx, rax
-    xor eax, eax
+    mov rdi, fmt_result
+    mov rsi, rax
+    xor rax, rax
     call printf
     
-    add rsp, 40
-    xor eax, eax
+    add rsp, 8
+    xor rax, rax
     ret
 

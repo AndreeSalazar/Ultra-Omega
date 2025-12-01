@@ -14,27 +14,57 @@ use crate::node_graph::NodeLanguage;
 pub mod binary;
 
 // ══════════════════════════════════════════
-// ASSEMBLER (NASM x64)
+// ASSEMBLER (NASM x64) - WINDOWS
 // ══════════════════════════════════════════
-pub mod asm {
+pub mod asm_windows {
     // Básicos
-    pub const HELLO: &str = include_str!("asm/hello_world.asm");
-    pub const SUM: &str = include_str!("asm/sum.asm");
-    pub const LOOP: &str = include_str!("asm/loop.asm");
-    pub const CONDITIONAL: &str = include_str!("asm/conditional.asm");
+    pub const HELLO: &str = include_str!("asm-windows/hello_world.asm");
+    pub const SUM: &str = include_str!("asm-windows/sum.asm");
+    pub const LOOP: &str = include_str!("asm-windows/loop.asm");
+    pub const CONDITIONAL: &str = include_str!("asm-windows/conditional.asm");
     
     // Intermedio
-    pub const VARIABLES: &str = include_str!("asm/variables.asm");
-    pub const FUNCTIONS: &str = include_str!("asm/functions.asm");
-    pub const STRINGS: &str = include_str!("asm/strings.asm");
-    pub const ARRAYS: &str = include_str!("asm/arrays.asm");
+    pub const VARIABLES: &str = include_str!("asm-windows/variables.asm");
+    pub const FUNCTIONS: &str = include_str!("asm-windows/functions.asm");
+    pub const STRINGS: &str = include_str!("asm-windows/strings.asm");
+    pub const ARRAYS: &str = include_str!("asm-windows/arrays.asm");
     
     // Librerías independientes (para herencia)
-    pub const LIB_PRINT: &str = include_str!("asm/lib_print.asm");
-    pub const LIB_MATH: &str = include_str!("asm/lib_math.asm");
-    pub const LIB_STRING: &str = include_str!("asm/lib_string.asm");
-    pub const LIB_MEMORY: &str = include_str!("asm/lib_memory.asm");
-    pub const LIB_IO: &str = include_str!("asm/lib_io.asm");
+    pub const LIB_PRINT: &str = include_str!("asm-windows/lib_print.asm");
+    pub const LIB_MATH: &str = include_str!("asm-windows/lib_math.asm");
+    pub const LIB_STRING: &str = include_str!("asm-windows/lib_string.asm");
+    pub const LIB_MEMORY: &str = include_str!("asm-windows/lib_memory.asm");
+    pub const LIB_IO: &str = include_str!("asm-windows/lib_io.asm");
+}
+
+// ══════════════════════════════════════════
+// ASSEMBLER (NASM x64) - LINUX
+// ══════════════════════════════════════════
+pub mod asm_linux {
+    // Básicos
+    pub const HELLO: &str = include_str!("asm-linux/hello_world.asm");
+    pub const SUM: &str = include_str!("asm-linux/sum.asm");
+    pub const LOOP: &str = include_str!("asm-linux/loop.asm");
+    pub const CONDITIONAL: &str = include_str!("asm-linux/conditional.asm");
+    
+    // Intermedio
+    pub const VARIABLES: &str = include_str!("asm-linux/variables.asm");
+    pub const FUNCTIONS: &str = include_str!("asm-linux/functions.asm");
+    pub const STRINGS: &str = include_str!("asm-linux/strings.asm");
+    pub const ARRAYS: &str = include_str!("asm-linux/arrays.asm");
+    
+    // Librerías independientes (para herencia)
+    pub const LIB_PRINT: &str = include_str!("asm-linux/lib_print.asm");
+    pub const LIB_MATH: &str = include_str!("asm-linux/lib_math.asm");
+    pub const LIB_STRING: &str = include_str!("asm-linux/lib_string.asm");
+    pub const LIB_MEMORY: &str = include_str!("asm-linux/lib_memory.asm");
+    pub const LIB_IO: &str = include_str!("asm-linux/lib_io.asm");
+}
+
+// Compatibilidad: mantener asm apuntando a asm_windows por defecto
+#[allow(deprecated)]
+pub mod asm {
+    pub use super::asm_windows::*;
 }
 
 // ══════════════════════════════════════════
@@ -307,12 +337,12 @@ pub struct Template {
 pub fn all_templates() -> Vec<Template> {
     vec![
         // ══════════════════════════════════════════════════════════════
-        // ASM/NASM - BÁSICO
+        // ASM/NASM - WINDOWS - BÁSICO
         // ══════════════════════════════════════════════════════════════
         Template {
             name: "Hola Mundo",
-            code: asm::HELLO,
-            category: "Assembler",
+            code: asm_windows::HELLO,
+            category: "Assembler (Windows)",
             subcategory: "Básico",
             color: (0xff, 0x47, 0x00),
             icon: "⏵",
@@ -320,8 +350,8 @@ pub fn all_templates() -> Vec<Template> {
         },
         Template {
             name: "Suma Básica",
-            code: asm::SUM,
-            category: "Assembler",
+            code: asm_windows::SUM,
+            category: "Assembler (Windows)",
             subcategory: "Básico",
             color: (0xff, 0x47, 0x00),
             icon: "➕",
@@ -329,8 +359,8 @@ pub fn all_templates() -> Vec<Template> {
         },
         Template {
             name: "Bucle Simple",
-            code: asm::LOOP,
-            category: "Assembler",
+            code: asm_windows::LOOP,
+            category: "Assembler (Windows)",
             subcategory: "Básico",
             color: (0xff, 0x47, 0x00),
             icon: "↻",
@@ -338,8 +368,8 @@ pub fn all_templates() -> Vec<Template> {
         },
         Template {
             name: "Condicional If/Else",
-            code: asm::CONDITIONAL,
-            category: "Assembler",
+            code: asm_windows::CONDITIONAL,
+            category: "Assembler (Windows)",
             subcategory: "Básico",
             color: (0xff, 0x47, 0x00),
             icon: "🔀",
@@ -347,12 +377,12 @@ pub fn all_templates() -> Vec<Template> {
         },
         
         // ══════════════════════════════════════════════════════════════
-        // ASM/NASM - INTERMEDIO
+        // ASM/NASM - WINDOWS - INTERMEDIO
         // ══════════════════════════════════════════════════════════════
         Template {
             name: "Variables y Datos",
-            code: asm::VARIABLES,
-            category: "Assembler",
+            code: asm_windows::VARIABLES,
+            category: "Assembler (Windows)",
             subcategory: "Intermedio",
             color: (0xff, 0x47, 0x00),
             icon: "📦",
@@ -360,8 +390,8 @@ pub fn all_templates() -> Vec<Template> {
         },
         Template {
             name: "Funciones y Llamadas",
-            code: asm::FUNCTIONS,
-            category: "Assembler",
+            code: asm_windows::FUNCTIONS,
+            category: "Assembler (Windows)",
             subcategory: "Intermedio",
             color: (0xff, 0x47, 0x00),
             icon: "⚡",
@@ -369,8 +399,8 @@ pub fn all_templates() -> Vec<Template> {
         },
         Template {
             name: "Manejo de Strings",
-            code: asm::STRINGS,
-            category: "Assembler",
+            code: asm_windows::STRINGS,
+            category: "Assembler (Windows)",
             subcategory: "Intermedio",
             color: (0xff, 0x47, 0x00),
             icon: "📝",
@@ -378,8 +408,8 @@ pub fn all_templates() -> Vec<Template> {
         },
         Template {
             name: "Arrays y Memoria",
-            code: asm::ARRAYS,
-            category: "Assembler",
+            code: asm_windows::ARRAYS,
+            category: "Assembler (Windows)",
             subcategory: "Intermedio",
             color: (0xff, 0x47, 0x00),
             icon: "📊",
@@ -387,12 +417,12 @@ pub fn all_templates() -> Vec<Template> {
         },
         
         // ══════════════════════════════════════════════════════════════
-        // ASM/NASM - LIBRERÍAS (Componentes independientes)
+        // ASM/NASM - WINDOWS - LIBRERÍAS (Componentes independientes)
         // ══════════════════════════════════════════════════════════════
         Template {
             name: "📚 Lib: Impresión",
-            code: asm::LIB_PRINT,
-            category: "Assembler",
+            code: asm_windows::LIB_PRINT,
+            category: "Assembler (Windows)",
             subcategory: "Librerías",
             color: (0x80, 0x40, 0x00),
             icon: "🖨️",
@@ -400,8 +430,8 @@ pub fn all_templates() -> Vec<Template> {
         },
         Template {
             name: "📚 Lib: Matemáticas",
-            code: asm::LIB_MATH,
-            category: "Assembler",
+            code: asm_windows::LIB_MATH,
+            category: "Assembler (Windows)",
             subcategory: "Librerías",
             color: (0x80, 0x40, 0x00),
             icon: "🔢",
@@ -409,8 +439,8 @@ pub fn all_templates() -> Vec<Template> {
         },
         Template {
             name: "📚 Lib: Strings",
-            code: asm::LIB_STRING,
-            category: "Assembler",
+            code: asm_windows::LIB_STRING,
+            category: "Assembler (Windows)",
             subcategory: "Librerías",
             color: (0x80, 0x40, 0x00),
             icon: "📝",
@@ -418,8 +448,8 @@ pub fn all_templates() -> Vec<Template> {
         },
         Template {
             name: "📚 Lib: Memoria",
-            code: asm::LIB_MEMORY,
-            category: "Assembler",
+            code: asm_windows::LIB_MEMORY,
+            category: "Assembler (Windows)",
             subcategory: "Librerías",
             color: (0x80, 0x40, 0x00),
             icon: "💾",
@@ -427,10 +457,139 @@ pub fn all_templates() -> Vec<Template> {
         },
         Template {
             name: "📚 Lib: Entrada/Salida",
-            code: asm::LIB_IO,
-            category: "Assembler",
+            code: asm_windows::LIB_IO,
+            category: "Assembler (Windows)",
             subcategory: "Librerías",
             color: (0x80, 0x40, 0x00),
+            icon: "⌨️",
+            language: NodeLanguage::Asm,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // ASM/NASM - LINUX - BÁSICO
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "Hola Mundo",
+            code: asm_linux::HELLO,
+            category: "Assembler (Linux)",
+            subcategory: "Básico",
+            color: (0x00, 0xaa, 0xff),
+            icon: "⏵",
+            language: NodeLanguage::Asm,
+        },
+        Template {
+            name: "Suma Básica",
+            code: asm_linux::SUM,
+            category: "Assembler (Linux)",
+            subcategory: "Básico",
+            color: (0x00, 0xaa, 0xff),
+            icon: "➕",
+            language: NodeLanguage::Asm,
+        },
+        Template {
+            name: "Bucle Simple",
+            code: asm_linux::LOOP,
+            category: "Assembler (Linux)",
+            subcategory: "Básico",
+            color: (0x00, 0xaa, 0xff),
+            icon: "↻",
+            language: NodeLanguage::Asm,
+        },
+        Template {
+            name: "Condicional If/Else",
+            code: asm_linux::CONDITIONAL,
+            category: "Assembler (Linux)",
+            subcategory: "Básico",
+            color: (0x00, 0xaa, 0xff),
+            icon: "🔀",
+            language: NodeLanguage::Asm,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // ASM/NASM - LINUX - INTERMEDIO
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "Variables y Datos",
+            code: asm_linux::VARIABLES,
+            category: "Assembler (Linux)",
+            subcategory: "Intermedio",
+            color: (0x00, 0xaa, 0xff),
+            icon: "📦",
+            language: NodeLanguage::Asm,
+        },
+        Template {
+            name: "Funciones y Llamadas",
+            code: asm_linux::FUNCTIONS,
+            category: "Assembler (Linux)",
+            subcategory: "Intermedio",
+            color: (0x00, 0xaa, 0xff),
+            icon: "⚡",
+            language: NodeLanguage::Asm,
+        },
+        Template {
+            name: "Manejo de Strings",
+            code: asm_linux::STRINGS,
+            category: "Assembler (Linux)",
+            subcategory: "Intermedio",
+            color: (0x00, 0xaa, 0xff),
+            icon: "📝",
+            language: NodeLanguage::Asm,
+        },
+        Template {
+            name: "Arrays y Memoria",
+            code: asm_linux::ARRAYS,
+            category: "Assembler (Linux)",
+            subcategory: "Intermedio",
+            color: (0x00, 0xaa, 0xff),
+            icon: "📊",
+            language: NodeLanguage::Asm,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // ASM/NASM - LINUX - LIBRERÍAS (Componentes independientes)
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "📚 Lib: Impresión",
+            code: asm_linux::LIB_PRINT,
+            category: "Assembler (Linux)",
+            subcategory: "Librerías",
+            color: (0x00, 0x80, 0xcc),
+            icon: "🖨️",
+            language: NodeLanguage::Asm,
+        },
+        Template {
+            name: "📚 Lib: Matemáticas",
+            code: asm_linux::LIB_MATH,
+            category: "Assembler (Linux)",
+            subcategory: "Librerías",
+            color: (0x00, 0x80, 0xcc),
+            icon: "🔢",
+            language: NodeLanguage::Asm,
+        },
+        Template {
+            name: "📚 Lib: Strings",
+            code: asm_linux::LIB_STRING,
+            category: "Assembler (Linux)",
+            subcategory: "Librerías",
+            color: (0x00, 0x80, 0xcc),
+            icon: "📝",
+            language: NodeLanguage::Asm,
+        },
+        Template {
+            name: "📚 Lib: Memoria",
+            code: asm_linux::LIB_MEMORY,
+            category: "Assembler (Linux)",
+            subcategory: "Librerías",
+            color: (0x00, 0x80, 0xcc),
+            icon: "💾",
+            language: NodeLanguage::Asm,
+        },
+        Template {
+            name: "📚 Lib: Entrada/Salida",
+            code: asm_linux::LIB_IO,
+            category: "Assembler (Linux)",
+            subcategory: "Librerías",
+            color: (0x00, 0x80, 0xcc),
             icon: "⌨️",
             language: NodeLanguage::Asm,
         },
@@ -1622,13 +1781,13 @@ pub fn all_templates() -> Vec<Template> {
 
 // Compatibilidad con código anterior
 #[allow(unused_imports)]
-pub use asm::HELLO as ASM_HELLO;
+pub use asm_windows::HELLO as ASM_HELLO;
 #[allow(unused_imports)]
-pub use asm::SUM as ASM_SUM;
+pub use asm_windows::SUM as ASM_SUM;
 #[allow(unused_imports)]
-pub use asm::LOOP as ASM_LOOP;
+pub use asm_windows::LOOP as ASM_LOOP;
 #[allow(unused_imports)]
-pub use asm::CONDITIONAL as ASM_CONDITIONAL;
+pub use asm_windows::CONDITIONAL as ASM_CONDITIONAL;
 #[allow(unused_imports)]
 pub use c::HELLO as C_HELLO;
 #[allow(unused_imports)]

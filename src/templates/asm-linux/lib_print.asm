@@ -1,5 +1,5 @@
 ; ═══════════════════════════════════════════════════════════════
-; LIBRERÍA: Impresión de texto (NASM x64 Windows)
+; LIBRERÍA: Impresión de texto (NASM x64 Linux)
 ; Nivel: Básico - Componente independiente
 ; ═══════════════════════════════════════════════════════════════
 ; Este módulo proporciona funcionalidad de impresión.
@@ -14,19 +14,20 @@ extern printf
 ; Macro para imprimir string (uso: PRINT msg)
 ; ═══════════════════════════════════════════════════════════════
 %macro PRINT 1
-    sub rsp, 40
-    lea rcx, [%1]
+    sub rsp, 8
+    lea rdi, [%1]       ; Linux: primer argumento en rdi
+    xor rax, rax
     call printf
-    add rsp, 40
+    add rsp, 8
 %endmacro
 
 main:
     ; Ejemplo de uso
     PRINT mensaje
     
-    xor eax, eax
+    xor rax, rax
     ret
 
 section .data
-    mensaje db 'Librería de impresión cargada', 10, 0
+    mensaje db 'Librería de impresión cargada (Linux)', 10, 0
 

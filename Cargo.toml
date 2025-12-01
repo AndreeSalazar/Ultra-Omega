@@ -3,6 +3,10 @@ name = "ultra-omega"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+default = []
+mojo = []  # Habilitar soporte para Mojo
+
 [dependencies]
 eframe = { version = "0.27", features = ["wgpu"] }
 serde = { version = "1.0", features = ["derive"] }

@@ -3,7 +3,7 @@ use eframe::egui::text_selection::CursorRange;
 use crate::node_graph::{self, NodeGraph, NodeId, NodeLanguage, PinId, PinKind};
 use crate::terminal::{TerminalManager, TerminalTab};
 use crate::ui::viewport::Viewport2D;
-use crate::ui::layout::{LayoutStyle, LayoutConfig};
+use crate::ui::layout::LayoutConfig;
 use crate::workspace::Workspace;
 use crate::config::AppConfig;
 
@@ -214,7 +214,7 @@ impl eframe::App for NodeGraphApp {
                     for node_id in &self.interaction.selected_nodes {
                         self.channel_manager.clear_node_channels(*node_id);
                         // También limpiar por nombre si existe
-                        if let Some(node) = self.graph.nodes().iter().find(|n| n.id == *node_id) {
+                        if let Some(_node) = self.graph.nodes().iter().find(|n| n.id == *node_id) {
                             // Nota: No podemos eliminar del HashMap directamente aquí, pero el canal quedará obsoleto
                             // Se actualizará cuando se registre un nuevo nodo con el mismo nombre
                         }
@@ -381,6 +381,8 @@ impl NodeGraphApp {
             NodeLanguage::Cpp => crate::terminal::Language::Cpp,
             NodeLanguage::Rust => crate::terminal::Language::Rust,
             NodeLanguage::Text => crate::terminal::Language::C, // Text no se compila realmente
+            NodeLanguage::Mojo => crate::terminal::Language::Mojo,
+            NodeLanguage::MojoAI => crate::terminal::Language::Mojo, // MojoAI también usa Mojo
             NodeLanguage::Auto => {
                 let lower = node_title.to_lowercase();
                 if lower.contains("asm") {
@@ -582,6 +584,7 @@ impl NodeGraphApp {
                         TerminalTab::C => &mut self.terminal.c_output,
                         TerminalTab::Cpp => &mut self.terminal.cpp_output,
                         TerminalTab::Rust => &mut self.terminal.rust_output,
+                        TerminalTab::Mojo => &mut self.terminal.rust_output, // Mojo usa el buffer de Rust por ahora
                     };
                     
                     ui.add(
@@ -637,22 +640,34 @@ impl NodeGraphApp {
                                 ui.separator();
                                 
                                 // Categorías de templates
-                                let categories = ["Assembler", "C", "C++", "Rust", "FastOS", "FastOS 64-bit", "Vulkan"];
-                                let category_icons = ["🔧", "📘", "📗", "🦀", "🔥", "🚀", "🎮"];
+                                let categories = ["Assembler (Windows)", "Assembler (Linux)", "C", "C++", "Rust", "FastOS", "FastOS 64-bit", "Vulkan", "Mojo", "MojoAI"];
+                                let category_icons = ["🔧", "🐧", "📘", "📗", "🦀", "🔥", "🚀", "🎮", "🔥", "🤖"];
                                 let category_colors = [
-                                    Color32::from_rgb(0xff, 0x47, 0x00),
+                                    Color32::from_rgb(0xff, 0x47, 0x00), // Naranja para Windows
+                                    Color32::from_rgb(0x00, 0xaa, 0xff), // Cyan para Linux
                                     Color32::from_rgb(0x00, 0x59, 0x9C),
                                     Color32::from_rgb(0x00, 0x44, 0x82),
                                     Color32::from_rgb(0xde, 0x39, 0x00),
                                     Color32::from_rgb(0xff, 0xd7, 0x00), // Dorado para FastOS
                                     Color32::from_rgb(0x00, 0xd4, 0xff), // Cyan para FastOS 64-bit
                                     Color32::from_rgb(0xac, 0x14, 0x2c), // Rojo Vulkan
+                                    Color32::from_rgb(0xff, 0x64, 0x64), // Rojo para Mojo
+                                    Color32::from_rgb(0xff, 0xa0, 0x64), // Naranja para MojoAI
                                 ];
                                 
                                 for (i, cat) in categories.iter().enumerate() {
                                     let selected = self.selected_category.as_deref() == Some(*cat);
                                     let response = ui.horizontal(|ui| {
-                                        ui.label(egui::RichText::new(category_icons[i]).color(category_colors[i]));
+                                        // Icono cuadrado con tamaño fijo (20x20)
+                                        ui.allocate_ui(Vec2::new(20.0, 20.0), |ui| {
+                                            ui.centered_and_justified(|ui| {
+                                                ui.label(
+                                                    egui::RichText::new(category_icons[i])
+                                                        .color(category_colors[i])
+                                                        .size(16.0) // Tamaño fijo para iconos cuadrados
+                                                );
+                                            });
+                                        });
                                         ui.selectable_label(selected, *cat)
                                     }).inner;
                                     
@@ -855,6 +870,108 @@ impl NodeGraphApp {
                                                     ui.add_space(8.0);
                                                 }
                                             });
+                                    } else if cat == "Mojo" {
+                                        // Panel especial para Mojo
+                                        ui.heading(egui::RichText::new("🔥 Mojo").color(Color32::from_rgb(0xff, 0x64, 0x64)));
+                                        ui.add_space(8.0);
+                                        
+                                        ui.label(egui::RichText::new("Lenguaje de alto rendimiento para IA/ML").color(Color32::GRAY));
+                                        ui.add_space(8.0);
+                                        
+                                        // Botón para crear nodo Mojo vacío
+                                        if ui.add(egui::Button::new(
+                                            egui::RichText::new("🔥 Crear Nodo Mojo")
+                                                .color(Color32::from_rgb(0xff, 0x64, 0x64))
+                                                .strong()
+                                        ).min_size(Vec2::new(200.0, 35.0))).clicked() {
+                                            let world_pos = self.viewport.screen_to_world(self.node_menu_pos, Rect::from_min_size(Pos2::ZERO, Vec2::new(10000.0, 10000.0)));
+                                            let id = self.graph.add_node(
+                                                "🔥 Nodo Mojo",
+                                                world_pos,
+                                                Color32::from_rgb(0xff, 0x64, 0x64),
+                                                &["Input"],
+                                                &["Output"],
+                                                NodeLanguage::Mojo,
+                                            );
+                                            
+                                            if let Some(node) = self.graph.nodes().iter().find(|n| n.id == id) {
+                                                let title_clone = node.title.clone();
+                                                let code_clone = node.code.clone();
+                                                use crate::expressions::ChannelValue;
+                                                self.channel_manager.set_channel(title_clone.clone(), ChannelValue::Code(code_clone.clone()));
+                                                self.channel_manager.set_channel(format!("{}/code", title_clone.clone()), ChannelValue::Code(code_clone.clone()));
+                                                self.channel_manager.set_node_channel(id, "code".to_string(), ChannelValue::Code(code_clone));
+                                            }
+                                            
+                                            if self.workspace.has_root() {
+                                                let _ = self.save_current_graph();
+                                            }
+                                            
+                                            close_menu = true;
+                                        }
+                                        
+                                        ui.add_space(8.0);
+                                        ui.separator();
+                                        ui.add_space(8.0);
+                                        
+                                        ui.label(egui::RichText::new("Ejemplo de código Mojo:").small().color(Color32::GRAY));
+                                        ui.add_space(4.0);
+                                        let mut example_code = "fn main() -> Int:\n    return 42".to_string();
+                                        ui.add(
+                                            egui::TextEdit::multiline(&mut example_code)
+                                                .font(egui::TextStyle::Monospace)
+                                                .code_editor()
+                                        );
+                                        
+                                    } else if cat == "MojoAI" {
+                                        // Panel especial para MojoAI
+                                        ui.heading(egui::RichText::new("🤖 MojoAI").color(Color32::from_rgb(0xff, 0xa0, 0x64)));
+                                        ui.add_space(8.0);
+                                        
+                                        ui.label(egui::RichText::new("Nodos especializados con capacidades de IA").color(Color32::GRAY));
+                                        ui.add_space(8.0);
+                                        
+                                        // Botón para crear nodo MojoAI vacío
+                                        if ui.add(egui::Button::new(
+                                            egui::RichText::new("🤖 Crear Nodo MojoAI")
+                                                .color(Color32::from_rgb(0xff, 0xa0, 0x64))
+                                                .strong()
+                                        ).min_size(Vec2::new(200.0, 35.0))).clicked() {
+                                            let world_pos = self.viewport.screen_to_world(self.node_menu_pos, Rect::from_min_size(Pos2::ZERO, Vec2::new(10000.0, 10000.0)));
+                                            let id = self.graph.add_node(
+                                                "🤖 Nodo MojoAI",
+                                                world_pos,
+                                                Color32::from_rgb(0xff, 0xa0, 0x64),
+                                                &["Prompt", "Input"],
+                                                &["Output"],
+                                                NodeLanguage::MojoAI,
+                                            );
+                                            
+                                            if let Some(node) = self.graph.nodes().iter().find(|n| n.id == id) {
+                                                let title_clone = node.title.clone();
+                                                let code_clone = node.code.clone();
+                                                use crate::expressions::ChannelValue;
+                                                self.channel_manager.set_channel(title_clone.clone(), ChannelValue::Code(code_clone.clone()));
+                                                self.channel_manager.set_channel(format!("{}/code", title_clone.clone()), ChannelValue::Code(code_clone.clone()));
+                                                self.channel_manager.set_node_channel(id, "code".to_string(), ChannelValue::Code(code_clone));
+                                            }
+                                            
+                                            if self.workspace.has_root() {
+                                                let _ = self.save_current_graph();
+                                            }
+                                            
+                                            close_menu = true;
+                                        }
+                                        
+                                        ui.add_space(8.0);
+                                        ui.separator();
+                                        ui.add_space(8.0);
+                                        
+                                        ui.label(egui::RichText::new("Capacidades:").small().color(Color32::GRAY));
+                                        ui.label("• Generación de código con IA");
+                                        ui.label("• Análisis inteligente de código");
+                                        ui.label("• Optimización automática");
+                                        
                                     } else {
                                         // Mostrar templates de la categoría seleccionada
                                         let templates = crate::templates::all_templates();
@@ -1206,7 +1323,7 @@ impl NodeGraphApp {
                             .find(|n| n.id == id)
                             .map(|n| n.title.clone())
                             .unwrap_or_default();
-                        let node_code_len = self.graph.nodes().iter()
+                        let _node_code_len = self.graph.nodes().iter()
                             .find(|n| n.id == id)
                             .map(|n| n.code.lines().count())
                             .unwrap_or(1);
@@ -1900,6 +2017,8 @@ impl NodeGraphApp {
                                                                             NodeLanguage::Cpp => ("C++", "⊕", Color32::from_rgb(50, 40, 80)),
                                                                             NodeLanguage::Rust => ("Rust", "🦀", Color32::from_rgb(80, 40, 40)),
                                                                             NodeLanguage::Text => ("Doc", "📄", Color32::from_rgb(60, 60, 40)),
+                                                                            NodeLanguage::Mojo => ("Mojo", "🔥", Color32::from_rgb(200, 50, 50)),
+                                                                            NodeLanguage::MojoAI => ("MojoAI", "🤖", Color32::from_rgb(200, 100, 50)),
                                                                             NodeLanguage::Auto => ("Auto", "⚙", Color32::from_rgb(50, 50, 50)),
                                                                         };
                                                                         let lang_color = match language {
@@ -1908,6 +2027,8 @@ impl NodeGraphApp {
                                                                             NodeLanguage::Cpp => Color32::from_rgb(180, 140, 255),
                                                                             NodeLanguage::Rust => Color32::from_rgb(255, 130, 100),
                                                                             NodeLanguage::Text => Color32::from_rgb(200, 200, 150),
+                                                                            NodeLanguage::Mojo => Color32::from_rgb(255, 100, 100), // Rojo para Mojo
+                                                                            NodeLanguage::MojoAI => Color32::from_rgb(255, 150, 100), // Naranja para MojoAI
                                                                             NodeLanguage::Auto => Color32::from_gray(180),
                                                                         };
                                                                         
@@ -2825,7 +2946,7 @@ impl NodeGraphApp {
     
     /// Evaluar todas las expresiones ch() en un bloque de código
     fn evaluate_ch_expressions_in_code(&self, code: &str, current_node_id: NodeId) -> String {
-        use crate::expressions::{ExpressionParser, ExpressionEvaluator};
+        use crate::expressions::ExpressionEvaluator;
         use crate::expressions::ChannelValue;
         
         // Crear evaluador con el channel_manager actual

@@ -22,6 +22,10 @@ pub enum NodeLanguage {
     Rust,
     /// Texto/Documentación - NO se compila, solo visualización
     Text,
+    /// Mojo - Lenguaje de alto rendimiento para IA/ML
+    Mojo,
+    /// MojoAI - Nodos especializados con capacidades de IA
+    MojoAI,
 }
 
 impl Default for NodeLanguage {

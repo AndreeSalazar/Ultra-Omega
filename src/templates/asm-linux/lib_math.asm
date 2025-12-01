@@ -1,5 +1,5 @@
 ; ═══════════════════════════════════════════════════════════════
-; LIBRERÍA: Operaciones Matemáticas (NASM x64 Windows)
+; LIBRERÍA: Operaciones Matemáticas (NASM x64 Linux)
 ; Nivel: Básico - Componente independiente
 ; ═══════════════════════════════════════════════════════════════
 ; Proporciona macros y funciones para operaciones matemáticas.
@@ -47,14 +47,15 @@ main:
     ADD_VALUES rax, 10, 5      ; rax = 15
     MUL_VALUES rbx, rax, 2     ; rbx = 30
     
-    ; Imprimir resultado
-    sub rsp, 40
-    lea rcx, [fmt]
-    mov rdx, rbx
+    ; Imprimir resultado (Linux: rdi, rsi)
+    sub rsp, 8
+    lea rdi, [fmt]             ; Linux: primer argumento
+    mov rsi, rbx               ; Linux: segundo argumento
+    xor rax, rax
     call printf
-    add rsp, 40
+    add rsp, 8
     
-    xor eax, eax
+    xor rax, rax
     ret
 
 section .data

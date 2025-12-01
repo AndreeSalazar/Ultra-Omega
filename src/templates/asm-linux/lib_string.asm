@@ -1,5 +1,5 @@
 ; ═══════════════════════════════════════════════════════════════
-; LIBRERÍA: Manipulación de Strings (NASM x64 Windows)
+; LIBRERÍA: Manipulación de Strings (NASM x64 Linux)
 ; Nivel: Intermedio - Componente independiente
 ; ═══════════════════════════════════════════════════════════════
 ; Funciones para trabajar con cadenas de texto.
@@ -12,14 +12,14 @@ extern strlen
 
 ; ═══════════════════════════════════════════════════════════════
 ; Función: str_length - Obtener longitud de string
-; Entrada: RCX = puntero al string
+; Entrada: RDI = puntero al string (Linux)
 ; Salida: RAX = longitud
 ; ═══════════════════════════════════════════════════════════════
 str_length:
     push rbx
     xor rax, rax
 .loop:
-    mov bl, [rcx + rax]
+    mov bl, [rdi + rax]
     test bl, bl
     jz .done
     inc rax
@@ -30,13 +30,13 @@ str_length:
 
 ; ═══════════════════════════════════════════════════════════════
 ; Función: str_copy - Copiar string
-; Entrada: RCX = destino, RDX = origen
+; Entrada: RDI = destino, RSI = origen (Linux)
 ; ═══════════════════════════════════════════════════════════════
 str_copy:
     push rsi
     push rdi
-    mov rdi, rcx
-    mov rsi, rdx
+    mov rdi, rdi              ; Ya está en rdi
+    mov rsi, rsi              ; Ya está en rsi
 .copy_loop:
     lodsb
     stosb
@@ -47,19 +47,20 @@ str_copy:
     ret
 
 main:
-    ; Ejemplo: obtener longitud de un string
-    lea rcx, [test_string]
+    ; Ejemplo: obtener longitud de un string (Linux: rdi)
+    lea rdi, [test_string]
     call str_length
     mov rbx, rax              ; Guardar longitud
     
-    ; Imprimir resultado
-    sub rsp, 40
-    lea rcx, [fmt]
-    mov rdx, rbx
+    ; Imprimir resultado (Linux: rdi, rsi)
+    sub rsp, 8
+    lea rdi, [fmt]
+    mov rsi, rbx
+    xor rax, rax
     call printf
-    add rsp, 40
+    add rsp, 8
     
-    xor eax, eax
+    xor rax, rax
     ret
 
 section .data
