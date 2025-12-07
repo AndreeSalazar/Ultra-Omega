@@ -21,6 +21,7 @@ pub struct TerminalManager {
     pub c_output: String,
     pub cpp_output: String,
     pub rust_output: String,
+    pub zig_output: String,
     pub active_tab: TerminalTab,
     pub visible: bool,
     pub pinned: bool,
@@ -34,6 +35,7 @@ pub enum TerminalTab {
     C,
     Cpp,
     Rust,
+    Zig,
     Mojo,
 }
 
@@ -44,6 +46,7 @@ impl Default for TerminalManager {
             c_output: String::new(),
             cpp_output: String::new(),
             rust_output: String::new(),
+            zig_output: String::new(),
             active_tab: TerminalTab::default(),
             visible: false,
             pinned: false,
@@ -58,6 +61,7 @@ pub enum Language {
     C,
     Cpp,
     Rust,
+    Zig,
     Mojo,
 }
 
@@ -71,6 +75,7 @@ impl TerminalManager {
             Language::C => (&mut self.c_output, TerminalTab::C),
             Language::Cpp => (&mut self.cpp_output, TerminalTab::Cpp),
             Language::Rust => (&mut self.rust_output, TerminalTab::Rust),
+            Language::Zig => (&mut self.zig_output, TerminalTab::Zig),
             Language::Mojo => {
                 // Mojo usa el buffer de Rust por ahora (o se puede crear uno específico)
                 (&mut self.rust_output, TerminalTab::Mojo)
@@ -95,6 +100,7 @@ impl TerminalManager {
             Language::C => Self::compile_c(code, &work_dir, exe_file_str, output_buffer),
             Language::Cpp => Self::compile_cpp(code, &work_dir, exe_file_str, output_buffer),
             Language::Rust => Self::compile_rust(code, &work_dir, exe_file_str, output_buffer),
+            Language::Zig => Self::compile_zig(code, &work_dir, exe_file_str, output_buffer),
             Language::Mojo => Self::compile_mojo(code, &work_dir, exe_file_str, output_buffer),
         }
 
@@ -521,6 +527,66 @@ impl TerminalManager {
                 }
                 Err(e) => {
                     output.push_str(&format!("Error linkeando: {}\n", e));
+                }
+            }
+        }
+    }
+
+    fn compile_zig(code: &str, work_dir: &Path, exe_file: &str, output: &mut String) {
+        let temp_file = work_dir.join("temp.zig");
+        if let Err(e) = std::fs::write(&temp_file, code) {
+            output.push_str(&format!("Error guardando archivo: {}\n", e));
+            return;
+        }
+
+        let exe_path = work_dir.join(exe_file);
+        
+        // Zig puede compilar directamente desde archivo fuente
+        // zig run temp.zig  - ejecuta directamente
+        // zig build-exe temp.zig -o program - compila a ejecutable
+        let cmd_output = Command::new("zig")
+            .current_dir(work_dir)
+            .args(&["build-exe", temp_file.file_name().unwrap().to_str().unwrap(), "-fno-strip", "-O", "Debug", "--name", exe_file])
+            .output();
+
+        match cmd_output {
+            Ok(out) => {
+                let stderr = String::from_utf8_lossy(&out.stderr);
+                let stdout = String::from_utf8_lossy(&out.stdout);
+                
+                if !stdout.is_empty() {
+                    output.push_str("Zig Output:\n");
+                    output.push_str(&stdout);
+                }
+                
+                if !stderr.is_empty() {
+                    output.push_str("Zig Log:\n");
+                    output.push_str(&stderr);
+                }
+                
+                if out.status.success() {
+                    output.push_str(">>> Zig: Compilación exitosa.\n");
+                } else {
+                    output.push_str(">>> Zig: Error de compilación.\n");
+                    let _ = std::fs::remove_file(&exe_path);
+                }
+            }
+            Err(e) => {
+                output.push_str(&format!("Error ejecutando Zig: {}\n", e));
+                output.push_str(">>> Zig no está instalado o no está en PATH.\n");
+                output.push_str(">>> Instala Zig desde: https://ziglang.org/download/\n");
+                #[cfg(target_os = "linux")]
+                {
+                    output.push_str(">>>   O desde repositorio: sudo apt install zig\n");
+                }
+                #[cfg(target_os = "windows")]
+                {
+                    output.push_str(">>>   Descarga desde: https://ziglang.org/download/\n");
+                    output.push_str(">>>   O con chocolatey: choco install zig\n");
+                }
+                #[cfg(target_os = "macos")]
+                {
+                    output.push_str(">>>   O con Homebrew: brew install zig\n");
                 }
             }
         }

@@ -380,6 +380,7 @@ impl NodeGraphApp {
             NodeLanguage::C => crate::terminal::Language::C,
             NodeLanguage::Cpp => crate::terminal::Language::Cpp,
             NodeLanguage::Rust => crate::terminal::Language::Rust,
+            NodeLanguage::Zig => crate::terminal::Language::Zig,
             NodeLanguage::Text => crate::terminal::Language::C, // Text no se compila realmente
             NodeLanguage::Mojo => crate::terminal::Language::Mojo,
             NodeLanguage::MojoAI => crate::terminal::Language::Mojo, // MojoAI también usa Mojo
@@ -387,6 +388,8 @@ impl NodeGraphApp {
                 let lower = node_title.to_lowercase();
                 if lower.contains("asm") {
                     crate::terminal::Language::Nasm
+                } else if lower.contains("zig") {
+                    crate::terminal::Language::Zig
                 } else if lower.contains("cpp") || lower.contains("c++") {
                     crate::terminal::Language::Cpp
                 } else if lower.contains("rust") {
@@ -559,6 +562,7 @@ impl NodeGraphApp {
                     ui.selectable_value(&mut self.terminal.active_tab, TerminalTab::C, "Terminal C");
                     ui.selectable_value(&mut self.terminal.active_tab, TerminalTab::Cpp, "Terminal C++");
                     ui.selectable_value(&mut self.terminal.active_tab, TerminalTab::Rust, "Terminal Rust");
+                    ui.selectable_value(&mut self.terminal.active_tab, TerminalTab::Zig, "Terminal Zig");
                     
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         // Pin button
@@ -584,6 +588,7 @@ impl NodeGraphApp {
                         TerminalTab::C => &mut self.terminal.c_output,
                         TerminalTab::Cpp => &mut self.terminal.cpp_output,
                         TerminalTab::Rust => &mut self.terminal.rust_output,
+                        TerminalTab::Zig => &mut self.terminal.zig_output,
                         TerminalTab::Mojo => &mut self.terminal.rust_output, // Mojo usa el buffer de Rust por ahora
                     };
                     
@@ -640,14 +645,15 @@ impl NodeGraphApp {
                                 ui.separator();
                                 
                                 // Categorías de templates
-                                let categories = ["Assembler (Windows)", "Assembler (Linux)", "C", "C++", "Rust", "FastOS", "FastOS 64-bit", "Vulkan", "Mojo", "MojoAI"];
-                                let category_icons = ["🔧", "🐧", "📘", "📗", "🦀", "🔥", "🚀", "🎮", "🔥", "🤖"];
+                                let categories = ["Assembler (Windows)", "Assembler (Linux)", "C", "C++", "Rust", "Zig", "FastOS", "FastOS 64-bit", "Vulkan", "Mojo", "MojoAI"];
+                                let category_icons = ["🔧", "🐧", "📘", "📗", "🦀", "⚡", "🔥", "🚀", "🎮", "🔥", "🤖"];
                                 let category_colors = [
                                     Color32::from_rgb(0xff, 0x47, 0x00), // Naranja para Windows
                                     Color32::from_rgb(0x00, 0xaa, 0xff), // Cyan para Linux
                                     Color32::from_rgb(0x00, 0x59, 0x9C),
                                     Color32::from_rgb(0x00, 0x44, 0x82),
                                     Color32::from_rgb(0xde, 0x39, 0x00),
+                                    Color32::from_rgb(0xf0, 0xaa, 0x00), // Amarillo/naranja para Zig
                                     Color32::from_rgb(0xff, 0xd7, 0x00), // Dorado para FastOS
                                     Color32::from_rgb(0x00, 0xd4, 0xff), // Cyan para FastOS 64-bit
                                     Color32::from_rgb(0xac, 0x14, 0x2c), // Rojo Vulkan
@@ -2016,6 +2022,7 @@ impl NodeGraphApp {
                                                                             NodeLanguage::C => ("C", "©", Color32::from_rgb(40, 60, 80)),
                                                                             NodeLanguage::Cpp => ("C++", "⊕", Color32::from_rgb(50, 40, 80)),
                                                                             NodeLanguage::Rust => ("Rust", "🦀", Color32::from_rgb(80, 40, 40)),
+                                                                            NodeLanguage::Zig => ("Zig", "⚡", Color32::from_rgb(240, 170, 0)),
                                                                             NodeLanguage::Text => ("Doc", "📄", Color32::from_rgb(60, 60, 40)),
                                                                             NodeLanguage::Mojo => ("Mojo", "🔥", Color32::from_rgb(200, 50, 50)),
                                                                             NodeLanguage::MojoAI => ("MojoAI", "🤖", Color32::from_rgb(200, 100, 50)),
@@ -2026,6 +2033,7 @@ impl NodeGraphApp {
                                                                             NodeLanguage::C => Color32::from_rgb(120, 200, 255),
                                                                             NodeLanguage::Cpp => Color32::from_rgb(180, 140, 255),
                                                                             NodeLanguage::Rust => Color32::from_rgb(255, 130, 100),
+                                                                            NodeLanguage::Zig => Color32::from_rgb(240, 170, 0), // Amarillo/naranja para Zig
                                                                             NodeLanguage::Text => Color32::from_rgb(200, 200, 150),
                                                                             NodeLanguage::Mojo => Color32::from_rgb(255, 100, 100), // Rojo para Mojo
                                                                             NodeLanguage::MojoAI => Color32::from_rgb(255, 150, 100), // Naranja para MojoAI

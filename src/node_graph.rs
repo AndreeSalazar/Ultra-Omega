@@ -20,6 +20,8 @@ pub enum NodeLanguage {
     C,
     Cpp,
     Rust,
+    /// Zig - Lenguaje de sistemas moderno y seguro
+    Zig,
     /// Texto/Documentación - NO se compila, solo visualización
     Text,
     /// Mojo - Lenguaje de alto rendimiento para IA/ML

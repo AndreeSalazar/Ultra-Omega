@@ -2,16 +2,9 @@
 // Templates de código para Ultra Omega
 // Organizados por jerarquía: Básico → Intermedio → Avanzado
 // Incluye FastOS: Templates completos para crear un sistema operativo
-// Incluye Binary: Templates binarios/hexadecimales para ejecución directa
 // ═══════════════════════════════════════════════════════════════════════════
 
 use crate::node_graph::NodeLanguage;
-
-// ══════════════════════════════════════════
-// BINARY TEMPLATES (CPU x86_64 / GPU SPIR-V)
-// Templates ejecutables en código máquina directo
-// ══════════════════════════════════════════
-pub mod binary;
 
 // ══════════════════════════════════════════
 // ASSEMBLER (NASM x64) - WINDOWS
@@ -181,108 +174,68 @@ pub mod rust {
 }
 
 // ══════════════════════════════════════════
-// FASTOS 64-BIT (UEFI + Long Mode)
+// ZIG
+// Lenguaje de sistemas moderno y seguro
 // ══════════════════════════════════════════
-pub mod fastos64 {
-    // Bootloader UEFI
-    pub const BOOT_UEFI: &str = include_str!("fastos64/boot_uefi.asm");
-    pub const KERNEL_ENTRY64: &str = include_str!("fastos64/kernel_entry64.asm");
-    pub const BOOT_MULTIBOOT2: &str = include_str!("fastos64/boot_multiboot2.asm");
-    
-    // Kernel
-    pub const KERNEL_MAIN64: &str = include_str!("fastos64/kernel_main64.c");
-    pub const TYPES64_H: &str = include_str!("fastos64/types64.h");
-    pub const PORTS64_H: &str = include_str!("fastos64/ports64.h");
-    
-    // Gráficos
-    pub const FRAMEBUFFER_H: &str = include_str!("fastos64/framebuffer.h");
-    pub const FRAMEBUFFER_C: &str = include_str!("fastos64/framebuffer.c");
-    pub const FONT8X16_H: &str = include_str!("fastos64/font8x16.h");
-    
-    // Sistema
-    pub const IDT64_H: &str = include_str!("fastos64/idt64.h");
-    pub const MEMORY64_H: &str = include_str!("fastos64/memory64.h");
-    pub const KEYBOARD64_H: &str = include_str!("fastos64/keyboard64.h");
-    pub const SHELL64_H: &str = include_str!("fastos64/shell64.h");
-    
-    // PCI (para detección de GPU)
-    pub const PCI_H: &str = include_str!("fastos64/pci.h");
-    pub const PCI_C: &str = include_str!("fastos64/pci.c");
-    
-    // GPU NVIDIA (RTX 3060)
-    pub const GPU_NVIDIA_H: &str = include_str!("fastos64/gpu_nvidia.h");
-    pub const GPU_NVIDIA_C: &str = include_str!("fastos64/gpu_nvidia.c");
-    
-    // Vulkan-FastOS (Capa de abstracción)
-    pub const VULKAN_FASTOS_H: &str = include_str!("fastos64/vulkan_fastos.h");
-    pub const VULKAN_FASTOS_C: &str = include_str!("fastos64/vulkan_fastos.c");
-    
-    // Vulkan Nativo (para GPU Passthrough)
-    pub const VULKAN_NATIVE_H: &str = include_str!("fastos64/vulkan_native.h");
-    pub const VULKAN_NATIVE_C: &str = include_str!("fastos64/vulkan_native.c");
-    
-    // Desktop (Window Manager estilo Windows 11)
-    pub const WINDOW_C: &str = include_str!("fastos64/desktop/window.c");
-    pub const TASKBAR_C: &str = include_str!("fastos64/desktop/taskbar.c");
-    pub const GRAPHICS_C: &str = include_str!("fastos64/desktop/graphics.c");
-    pub const MOUSE_C: &str = include_str!("fastos64/desktop/mouse.c");
-    
-    // Build System
-    pub const LINKER64_LD: &str = include_str!("fastos64/linker64.ld");
-    pub const MAKEFILE: &str = include_str!("fastos64/Makefile");
-    pub const BUILD64_BAT: &str = include_str!("fastos64/build64.bat");
-    pub const BUILD_SIMPLE_BAT: &str = include_str!("fastos64/build_simple.bat");
-    
-    // Documentación
-    pub const README: &str = include_str!("fastos64/README.md");
-    pub const VFIO_PASSTHROUGH: &str = include_str!("fastos64/vfio_passthrough.md");
-    
-    // FastOS XP Edition (Desktop completo estilo Windows XP)
-    pub const FASTOS_XP: &str = include_str!("fastos64/fastos_xp.asm");
+pub mod zig {
+    // ═══════════════════════════════════════
+    // BÁSICO
+    // ═══════════════════════════════════════
+    pub const HELLO: &str = include_str!("zig/hello_world.zig");
+    pub const VARIABLES: &str = include_str!("zig/variables.zig");
+    pub const FUNCTIONS: &str = include_str!("zig/functions.zig");
 }
 
 // ══════════════════════════════════════════
-// FASTOS 64-BIT RUST (ASM + Rust)
-// Sistema operativo combinando NASM y Rust
+// FASTOS ASM+RUST+ZIG (Sistema Operativo Multi-Lenguaje)
 // ══════════════════════════════════════════
-pub mod fastos64_rust {
+pub mod fastos_asm_rust_zig {
     // ═══════════════════════════════════════
-    // ASM (NASM x86_64)
+    // ASM (NASM x86_64) - Bootloader y bajo nivel
     // ═══════════════════════════════════════
     pub mod asm {
-        pub const BOOT_UEFI: &str = include_str!("fastos64_rust/asm/boot_uefi.asm");
-        pub const KERNEL_ENTRY: &str = include_str!("fastos64_rust/asm/kernel_entry.asm");
-        pub const INTERRUPTS: &str = include_str!("fastos64_rust/asm/interrupts.asm");
-        pub const MEMORY: &str = include_str!("fastos64_rust/asm/memory.asm");
+        pub const BOOT_UEFI: &str = include_str!("fastos_asm_rust_zig/asm/boot_uefi.asm");
+        pub const KERNEL_ENTRY: &str = include_str!("fastos_asm_rust_zig/asm/kernel_entry.asm");
+        pub const INTERRUPTS: &str = include_str!("fastos_asm_rust_zig/asm/interrupts.asm");
+        pub const MEMORY_LOW: &str = include_str!("fastos_asm_rust_zig/asm/memory_low.asm");
     }
     
     // ═══════════════════════════════════════
-    // RUST (Kernel)
+    // RUST (Kernel) - Seguridad y drivers
     // ═══════════════════════════════════════
     pub mod rust {
-        pub const KERNEL_MAIN: &str = include_str!("fastos64_rust/rust/kernel_main.rs");
-        pub const PORTS: &str = include_str!("fastos64_rust/rust/ports.rs");
-        pub const INTERRUPTS: &str = include_str!("fastos64_rust/rust/interrupts.rs");
-        pub const MEMORY: &str = include_str!("fastos64_rust/rust/memory.rs");
-        pub const DRIVERS: &str = include_str!("fastos64_rust/rust/drivers.rs");
-        pub const FFI: &str = include_str!("fastos64_rust/rust/ffi.rs");
-        pub const LIB: &str = include_str!("fastos64_rust/rust/lib.rs");
+        pub const KERNEL_MAIN: &str = include_str!("fastos_asm_rust_zig/rust/kernel_main.rs");
+        pub const PORTS: &str = include_str!("fastos_asm_rust_zig/rust/ports.rs");
+        pub const INTERRUPTS: &str = include_str!("fastos_asm_rust_zig/rust/interrupts.rs");
+        pub const MEMORY: &str = include_str!("fastos_asm_rust_zig/rust/memory.rs");
+        pub const DRIVERS: &str = include_str!("fastos_asm_rust_zig/rust/drivers.rs");
+        pub const FFI: &str = include_str!("fastos_asm_rust_zig/rust/ffi.rs");
+    }
+    
+    // ═══════════════════════════════════════
+    // ZIG (Sistema) - Performance y simplicidad
+    // ═══════════════════════════════════════
+    pub mod zig {
+        pub const SYSTEM: &str = include_str!("fastos_asm_rust_zig/zig/system.zig");
+        pub const ALLOCATOR: &str = include_str!("fastos_asm_rust_zig/zig/allocator.zig");
+        pub const FS: &str = include_str!("fastos_asm_rust_zig/zig/filesystem.zig");
+        pub const SCHEDULER: &str = include_str!("fastos_asm_rust_zig/zig/scheduler.zig");
     }
     
     // ═══════════════════════════════════════
     // INTEGRATION (Build & Config)
     // ═══════════════════════════════════════
     pub mod integration {
-        pub const CARGO_TOML: &str = include_str!("fastos64_rust/integration/Cargo.toml");
-        pub const LINKER_LD: &str = include_str!("fastos64_rust/integration/linker.ld");
-        pub const BUILD_SH: &str = include_str!("fastos64_rust/integration/build.sh");
-        pub const BUILD_BAT: &str = include_str!("fastos64_rust/integration/build.bat");
-        pub const EXAMPLE: &str = include_str!("fastos64_rust/integration/example_integration.rs");
-        pub const README: &str = include_str!("fastos64_rust/integration/README.md");
+        pub const CARGO_TOML: &str = include_str!("fastos_asm_rust_zig/integration/Cargo.toml");
+        pub const BUILD_SH: &str = include_str!("fastos_asm_rust_zig/integration/build.sh");
+        pub const BUILD_BAT: &str = include_str!("fastos_asm_rust_zig/integration/build.bat");
+        pub const LINKER_LD: &str = include_str!("fastos_asm_rust_zig/integration/linker.ld");
+        pub const README: &str = include_str!("fastos_asm_rust_zig/integration/README.md");
     }
     
     // README principal
-    pub const README: &str = include_str!("fastos64_rust/README.md");
+    pub const README: &str = include_str!("fastos_asm_rust_zig/README.md");
+    pub const POTENCIAL: &str = include_str!("fastos_asm_rust_zig/POTENCIAL.md");
 }
 
 // ══════════════════════════════════════════
@@ -919,6 +872,37 @@ pub fn all_templates() -> Vec<Template> {
         },
         
         // ══════════════════════════════════════════════════════════════
+        // ZIG - BÁSICO
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "Hola Mundo",
+            code: zig::HELLO,
+            category: "Zig",
+            subcategory: "Básico",
+            color: (0xf0, 0xaa, 0x00),
+            icon: "⚡",
+            language: NodeLanguage::Zig,
+        },
+        Template {
+            name: "Variables y Tipos",
+            code: zig::VARIABLES,
+            category: "Zig",
+            subcategory: "Básico",
+            color: (0xf0, 0xaa, 0x00),
+            icon: "📦",
+            language: NodeLanguage::Zig,
+        },
+        Template {
+            name: "Funciones",
+            code: zig::FUNCTIONS,
+            category: "Zig",
+            subcategory: "Básico",
+            color: (0xf0, 0xaa, 0x00),
+            icon: "⚡",
+            language: NodeLanguage::Zig,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
         // FASTOS - BOOTLOADER (ASM)
         // ══════════════════════════════════════════════════════════════
         Template {
@@ -1322,459 +1306,203 @@ pub fn all_templates() -> Vec<Template> {
         },
         
         // ══════════════════════════════════════════════════════════════
-        // FASTOS 64-BIT - BOOTLOADER
+        // FASTOS ASM+RUST+ZIG - BOOTLOADER
         // ══════════════════════════════════════════════════════════════
         Template {
-            name: "🚀 Boot UEFI",
-            code: fastos64::BOOT_UEFI,
-            category: "FastOS 64-bit",
-            subcategory: "Bootloader",
-            color: (0x00, 0xd4, 0xff),
+            name: "🚀 Bootloader UEFI (ASM)",
+            code: fastos_asm_rust_zig::asm::BOOT_UEFI,
+            category: "FastOS ASM+Rust+Zig",
+            subcategory: "ASM (Bootloader)",
+            color: (0xFF, 0x44, 0x00),
             icon: "💿",
             language: NodeLanguage::Asm,
         },
         Template {
-            name: "🚀 Kernel Entry 64",
-            code: fastos64::KERNEL_ENTRY64,
-            category: "FastOS 64-bit",
-            subcategory: "Bootloader",
-            color: (0x00, 0xd4, 0xff),
+            name: "🚀 Kernel Entry (ASM)",
+            code: fastos_asm_rust_zig::asm::KERNEL_ENTRY,
+            category: "FastOS ASM+Rust+Zig",
+            subcategory: "ASM (Bootloader)",
+            color: (0xFF, 0x44, 0x00),
             icon: "⚡",
+            language: NodeLanguage::Asm,
+        },
+        Template {
+            name: "🚀 Interrupts (ASM)",
+            code: fastos_asm_rust_zig::asm::INTERRUPTS,
+            category: "FastOS ASM+Rust+Zig",
+            subcategory: "ASM (Bootloader)",
+            color: (0xFF, 0x44, 0x00),
+            icon: "🔴",
+            language: NodeLanguage::Asm,
+        },
+        Template {
+            name: "🚀 Memory Low Level (ASM)",
+            code: fastos_asm_rust_zig::asm::MEMORY_LOW,
+            category: "FastOS ASM+Rust+Zig",
+            subcategory: "ASM (Bootloader)",
+            color: (0xFF, 0x44, 0x00),
+            icon: "💾",
             language: NodeLanguage::Asm,
         },
         
         // ══════════════════════════════════════════════════════════════
-        // FASTOS 64-BIT - KERNEL
+        // FASTOS ASM+RUST+ZIG - RUST (KERNEL)
         // ══════════════════════════════════════════════════════════════
         Template {
-            name: "🚀 Kernel Main 64",
-            code: fastos64::KERNEL_MAIN64,
-            category: "FastOS 64-bit",
-            subcategory: "Kernel",
-            color: (0xff, 0x88, 0x00),
-            icon: "🧠",
-            language: NodeLanguage::C,
+            name: "🦀 Kernel Main (Rust)",
+            code: fastos_asm_rust_zig::rust::KERNEL_MAIN,
+            category: "FastOS ASM+Rust+Zig",
+            subcategory: "Rust (Kernel)",
+            color: (0xDE, 0x39, 0x00),
+            icon: "🦀",
+            language: NodeLanguage::Rust,
         },
         Template {
-            name: "🚀 Types 64-bit",
-            code: fastos64::TYPES64_H,
-            category: "FastOS 64-bit",
-            subcategory: "Kernel",
-            color: (0xff, 0x88, 0x00),
-            icon: "📋",
-            language: NodeLanguage::C,
+            name: "🦀 Port I/O (Rust)",
+            code: fastos_asm_rust_zig::rust::PORTS,
+            category: "FastOS ASM+Rust+Zig",
+            subcategory: "Rust (Kernel)",
+            color: (0xDE, 0x39, 0x00),
+            icon: "🦀",
+            language: NodeLanguage::Rust,
         },
         Template {
-            name: "🚀 Ports 64-bit",
-            code: fastos64::PORTS64_H,
-            category: "FastOS 64-bit",
-            subcategory: "Kernel",
-            color: (0xff, 0x88, 0x00),
-            icon: "📋",
-            language: NodeLanguage::C,
+            name: "🦀 Interrupts System (Rust)",
+            code: fastos_asm_rust_zig::rust::INTERRUPTS,
+            category: "FastOS ASM+Rust+Zig",
+            subcategory: "Rust (Kernel)",
+            color: (0xDE, 0x39, 0x00),
+            icon: "🦀",
+            language: NodeLanguage::Rust,
+        },
+        Template {
+            name: "🦀 Memory Management (Rust)",
+            code: fastos_asm_rust_zig::rust::MEMORY,
+            category: "FastOS ASM+Rust+Zig",
+            subcategory: "Rust (Kernel)",
+            color: (0xDE, 0x39, 0x00),
+            icon: "🦀",
+            language: NodeLanguage::Rust,
+        },
+        Template {
+            name: "🦀 Drivers (Rust)",
+            code: fastos_asm_rust_zig::rust::DRIVERS,
+            category: "FastOS ASM+Rust+Zig",
+            subcategory: "Rust (Kernel)",
+            color: (0xDE, 0x39, 0x00),
+            icon: "🦀",
+            language: NodeLanguage::Rust,
+        },
+        Template {
+            name: "🦀 FFI Interface (Rust)",
+            code: fastos_asm_rust_zig::rust::FFI,
+            category: "FastOS ASM+Rust+Zig",
+            subcategory: "Rust (Kernel)",
+            color: (0xDE, 0x39, 0x00),
+            icon: "🦀",
+            language: NodeLanguage::Rust,
         },
         
         // ══════════════════════════════════════════════════════════════
-        // FASTOS 64-BIT - GRÁFICOS
+        // FASTOS ASM+RUST+ZIG - ZIG (SISTEMA)
         // ══════════════════════════════════════════════════════════════
         Template {
-            name: "🚀 Framebuffer Header",
-            code: fastos64::FRAMEBUFFER_H,
-            category: "FastOS 64-bit",
-            subcategory: "Gráficos",
-            color: (0x00, 0xff, 0x88),
-            icon: "🖥️",
-            language: NodeLanguage::C,
-        },
-        Template {
-            name: "🚀 Framebuffer Driver",
-            code: fastos64::FRAMEBUFFER_C,
-            category: "FastOS 64-bit",
-            subcategory: "Gráficos",
-            color: (0x00, 0xff, 0x88),
-            icon: "🖥️",
-            language: NodeLanguage::C,
-        },
-        
-        // ══════════════════════════════════════════════════════════════
-        // FASTOS 64-BIT - SISTEMA
-        // ══════════════════════════════════════════════════════════════
-        Template {
-            name: "🚀 IDT 64-bit",
-            code: fastos64::IDT64_H,
-            category: "FastOS 64-bit",
-            subcategory: "Sistema",
-            color: (0xaa, 0x00, 0xff),
+            name: "⚡ Sistema (Zig)",
+            code: fastos_asm_rust_zig::zig::SYSTEM,
+            category: "FastOS ASM+Rust+Zig",
+            subcategory: "Zig (Sistema)",
+            color: (0xF7, 0xA4, 0x1D),
             icon: "⚡",
-            language: NodeLanguage::C,
+            language: NodeLanguage::Zig,
+        },
+        Template {
+            name: "⚡ Allocator (Zig)",
+            code: fastos_asm_rust_zig::zig::ALLOCATOR,
+            category: "FastOS ASM+Rust+Zig",
+            subcategory: "Zig (Sistema)",
+            color: (0xF7, 0xA4, 0x1D),
+            icon: "⚡",
+            language: NodeLanguage::Zig,
+        },
+        Template {
+            name: "⚡ Filesystem (Zig)",
+            code: fastos_asm_rust_zig::zig::FS,
+            category: "FastOS ASM+Rust+Zig",
+            subcategory: "Zig (Sistema)",
+            color: (0xF7, 0xA4, 0x1D),
+            icon: "⚡",
+            language: NodeLanguage::Zig,
+        },
+        Template {
+            name: "⚡ Scheduler (Zig)",
+            code: fastos_asm_rust_zig::zig::SCHEDULER,
+            category: "FastOS ASM+Rust+Zig",
+            subcategory: "Zig (Sistema)",
+            color: (0xF7, 0xA4, 0x1D),
+            icon: "⚡",
+            language: NodeLanguage::Zig,
         },
         
         // ══════════════════════════════════════════════════════════════
-        // FASTOS 64-BIT - PCI (Para GPU)
+        // FASTOS ASM+RUST+ZIG - INTEGRATION
         // ══════════════════════════════════════════════════════════════
         Template {
-            name: "🚀 PCI Header",
-            code: fastos64::PCI_H,
-            category: "FastOS 64-bit",
-            subcategory: "PCI/GPU",
-            color: (0xff, 0x00, 0x88),
-            icon: "🎮",
-            language: NodeLanguage::C,
+            name: "🔗 Cargo.toml",
+            code: fastos_asm_rust_zig::integration::CARGO_TOML,
+            category: "FastOS ASM+Rust+Zig",
+            subcategory: "Integration",
+            color: (0x88, 0x88, 0x00),
+            icon: "⚙️",
+            language: NodeLanguage::Rust,
         },
         Template {
-            name: "🚀 PCI Driver",
-            code: fastos64::PCI_C,
-            category: "FastOS 64-bit",
-            subcategory: "PCI/GPU",
-            color: (0xff, 0x00, 0x88),
-            icon: "🎮",
-            language: NodeLanguage::C,
-        },
-        
-        // ══════════════════════════════════════════════════════════════
-        // FASTOS 64-BIT - GPU NVIDIA (RTX 3060)
-        // ══════════════════════════════════════════════════════════════
-        Template {
-            name: "🚀 GPU NVIDIA Header",
-            code: fastos64::GPU_NVIDIA_H,
-            category: "FastOS 64-bit",
-            subcategory: "GPU/Vulkan",
-            color: (0x76, 0xb9, 0x00),
-            icon: "🎮",
-            language: NodeLanguage::C,
-        },
-        Template {
-            name: "🚀 GPU NVIDIA Driver",
-            code: fastos64::GPU_NVIDIA_C,
-            category: "FastOS 64-bit",
-            subcategory: "GPU/Vulkan",
-            color: (0x76, 0xb9, 0x00),
-            icon: "🎮",
-            language: NodeLanguage::C,
-        },
-        Template {
-            name: "🚀 Vulkan-FastOS Header",
-            code: fastos64::VULKAN_FASTOS_H,
-            category: "FastOS 64-bit",
-            subcategory: "GPU/Vulkan",
-            color: (0xac, 0x14, 0x2c),
-            icon: "🔥",
-            language: NodeLanguage::C,
-        },
-        Template {
-            name: "🚀 Vulkan-FastOS Impl",
-            code: fastos64::VULKAN_FASTOS_C,
-            category: "FastOS 64-bit",
-            subcategory: "GPU/Vulkan",
-            color: (0xac, 0x14, 0x2c),
-            icon: "🔥",
-            language: NodeLanguage::C,
-        },
-        
-        // ══════════════════════════════════════════════════════════════
-        // FASTOS 64-BIT - VULKAN NATIVO (GPU Passthrough)
-        // ══════════════════════════════════════════════════════════════
-        Template {
-            name: "🚀 Vulkan Native Header",
-            code: fastos64::VULKAN_NATIVE_H,
-            category: "FastOS 64-bit",
-            subcategory: "Vulkan Native",
-            color: (0xac, 0x14, 0x2c),
-            icon: "🎮",
-            language: NodeLanguage::C,
-        },
-        Template {
-            name: "🚀 Vulkan Native Impl",
-            code: fastos64::VULKAN_NATIVE_C,
-            category: "FastOS 64-bit",
-            subcategory: "Vulkan Native",
-            color: (0xac, 0x14, 0x2c),
-            icon: "🎮",
-            language: NodeLanguage::C,
-        },
-        
-        // ══════════════════════════════════════════════════════════════
-        // FASTOS 64-BIT - DESKTOP (Window Manager)
-        // ══════════════════════════════════════════════════════════════
-        Template {
-            name: "🚀 Window Manager",
-            code: fastos64::WINDOW_C,
-            category: "FastOS 64-bit",
-            subcategory: "Desktop",
-            color: (0x00, 0x78, 0xd4),
-            icon: "🪟",
-            language: NodeLanguage::C,
-        },
-        Template {
-            name: "🚀 Taskbar",
-            code: fastos64::TASKBAR_C,
-            category: "FastOS 64-bit",
-            subcategory: "Desktop",
-            color: (0x00, 0x78, 0xd4),
-            icon: "📊",
-            language: NodeLanguage::C,
-        },
-        Template {
-            name: "🚀 Graphics Primitives",
-            code: fastos64::GRAPHICS_C,
-            category: "FastOS 64-bit",
-            subcategory: "Desktop",
-            color: (0x00, 0x78, 0xd4),
-            icon: "🎨",
-            language: NodeLanguage::C,
-        },
-        Template {
-            name: "🚀 Mouse Driver",
-            code: fastos64::MOUSE_C,
-            category: "FastOS 64-bit",
-            subcategory: "Desktop",
-            color: (0x00, 0x78, 0xd4),
-            icon: "🖱️",
-            language: NodeLanguage::C,
-        },
-        Template {
-            name: "🚀 Font 8x16",
-            code: fastos64::FONT8X16_H,
-            category: "FastOS 64-bit",
-            subcategory: "Desktop",
-            color: (0x00, 0x78, 0xd4),
-            icon: "🔤",
-            language: NodeLanguage::C,
-        },
-        
-        // ══════════════════════════════════════════════════════════════
-        // FASTOS 64-BIT - BUILD SYSTEM
-        // ══════════════════════════════════════════════════════════════
-        Template {
-            name: "🚀 Linker Script 64",
-            code: fastos64::LINKER64_LD,
-            category: "FastOS 64-bit",
-            subcategory: "Build",
+            name: "🔗 Linker Script",
+            code: fastos_asm_rust_zig::integration::LINKER_LD,
+            category: "FastOS ASM+Rust+Zig",
+            subcategory: "Integration",
             color: (0x88, 0x88, 0x00),
             icon: "🔗",
             language: NodeLanguage::Text,
         },
         Template {
-            name: "🚀 Makefile",
-            code: fastos64::MAKEFILE,
-            category: "FastOS 64-bit",
-            subcategory: "Build",
+            name: "🔗 Build Script (Linux/Mac)",
+            code: fastos_asm_rust_zig::integration::BUILD_SH,
+            category: "FastOS ASM+Rust+Zig",
+            subcategory: "Integration",
             color: (0x88, 0x88, 0x00),
-            icon: "🛠️",
+            icon: "🔧",
             language: NodeLanguage::Text,
         },
         Template {
-            name: "🚀 Build Script (Full)",
-            code: fastos64::BUILD64_BAT,
-            category: "FastOS 64-bit",
-            subcategory: "Build",
+            name: "🔗 Build Script (Windows)",
+            code: fastos_asm_rust_zig::integration::BUILD_BAT,
+            category: "FastOS ASM+Rust+Zig",
+            subcategory: "Integration",
             color: (0x88, 0x88, 0x00),
-            icon: "⚙️",
+            icon: "🔧",
             language: NodeLanguage::Text,
-        },
-        Template {
-            name: "🚀 Build Script (Simple)",
-            code: fastos64::BUILD_SIMPLE_BAT,
-            category: "FastOS 64-bit",
-            subcategory: "Build",
-            color: (0x88, 0x88, 0x00),
-            icon: "⚙️",
-            language: NodeLanguage::Text,
-        },
-        Template {
-            name: "🚀 Boot Multiboot2",
-            code: fastos64::BOOT_MULTIBOOT2,
-            category: "FastOS 64-bit",
-            subcategory: "Bootloader",
-            color: (0x00, 0xd4, 0xff),
-            icon: "💿",
-            language: NodeLanguage::Asm,
         },
         
         // ══════════════════════════════════════════════════════════════
-        // FASTOS 64-BIT - DOCUMENTACIÓN
+        // FASTOS ASM+RUST+ZIG - DOCUMENTACIÓN
         // ══════════════════════════════════════════════════════════════
         Template {
-            name: "🚀 README",
-            code: fastos64::README,
-            category: "FastOS 64-bit",
+            name: "📖 README",
+            code: fastos_asm_rust_zig::README,
+            category: "FastOS ASM+Rust+Zig",
             subcategory: "Docs",
             color: (0x88, 0x88, 0x88),
             icon: "📖",
             language: NodeLanguage::Text,
         },
         Template {
-            name: "🚀 VFIO GPU Passthrough",
-            code: fastos64::VFIO_PASSTHROUGH,
-            category: "FastOS 64-bit",
+            name: "🔥 POTENCIAL.md",
+            code: fastos_asm_rust_zig::POTENCIAL,
+            category: "FastOS ASM+Rust+Zig",
             subcategory: "Docs",
-            color: (0x76, 0xb9, 0x00),
-            icon: "🎮",
+            color: (0xFF, 0x44, 0x00),
+            icon: "🔥",
             language: NodeLanguage::Text,
-        },
-        
-        // ══════════════════════════════════════════════════════════════
-        // FASTOS XP EDITION - Desktop completo
-        // ══════════════════════════════════════════════════════════════
-        Template {
-            name: "🖥️ FastOS XP Edition",
-            code: fastos64::FASTOS_XP,
-            category: "FastOS 64-bit",
-            subcategory: "Desktop XP",
-            color: (0x00, 0x78, 0xd4),
-            icon: "🖥️",
-            language: NodeLanguage::Asm,
-        },
-        
-        // ═══════════════════════════════════════════════════════════════════════════════
-        // FASTOS 64-BIT RUST (ASM + Rust)
-        // ═══════════════════════════════════════════════════════════════════════════════
-        
-        // ───────────────────────────────────────────────────────────────────────────────
-        // ASM (NASM)
-        // ───────────────────────────────────────────────────────────────────────────────
-        Template {
-            name: "Bootloader UEFI (ASM)",
-            code: fastos64_rust::asm::BOOT_UEFI,
-            category: "FastOS 64-bit Rust",
-            subcategory: "ASM (NASM)",
-            color: (0xFF, 0x44, 0x00),
-            icon: "🔴",
-            language: NodeLanguage::Asm,
-        },
-        Template {
-            name: "Kernel Entry (ASM)",
-            code: fastos64_rust::asm::KERNEL_ENTRY,
-            category: "FastOS 64-bit Rust",
-            subcategory: "ASM (NASM)",
-            color: (0xFF, 0x44, 0x00),
-            icon: "🔴",
-            language: NodeLanguage::Asm,
-        },
-        Template {
-            name: "Interrupts (ASM)",
-            code: fastos64_rust::asm::INTERRUPTS,
-            category: "FastOS 64-bit Rust",
-            subcategory: "ASM (NASM)",
-            color: (0xFF, 0x44, 0x00),
-            icon: "🔴",
-            language: NodeLanguage::Asm,
-        },
-        Template {
-            name: "Memory Functions (ASM)",
-            code: fastos64_rust::asm::MEMORY,
-            category: "FastOS 64-bit Rust",
-            subcategory: "ASM (NASM)",
-            color: (0xFF, 0x44, 0x00),
-            icon: "🔴",
-            language: NodeLanguage::Asm,
-        },
-        
-        // ───────────────────────────────────────────────────────────────────────────────
-        // RUST (Kernel)
-        // ───────────────────────────────────────────────────────────────────────────────
-        Template {
-            name: "Kernel Main (Rust)",
-            code: fastos64_rust::rust::KERNEL_MAIN,
-            category: "FastOS 64-bit Rust",
-            subcategory: "Rust (Kernel)",
-            color: (0xDE, 0x39, 0x00),
-            icon: "🦀",
-            language: NodeLanguage::Rust,
-        },
-        Template {
-            name: "Port I/O (Rust)",
-            code: fastos64_rust::rust::PORTS,
-            category: "FastOS 64-bit Rust",
-            subcategory: "Rust (Kernel)",
-            color: (0xDE, 0x39, 0x00),
-            icon: "🦀",
-            language: NodeLanguage::Rust,
-        },
-        Template {
-            name: "Interrupts System (Rust)",
-            code: fastos64_rust::rust::INTERRUPTS,
-            category: "FastOS 64-bit Rust",
-            subcategory: "Rust (Kernel)",
-            color: (0xDE, 0x39, 0x00),
-            icon: "🦀",
-            language: NodeLanguage::Rust,
-        },
-        Template {
-            name: "Memory Management (Rust)",
-            code: fastos64_rust::rust::MEMORY,
-            category: "FastOS 64-bit Rust",
-            subcategory: "Rust (Kernel)",
-            color: (0xDE, 0x39, 0x00),
-            icon: "🦀",
-            language: NodeLanguage::Rust,
-        },
-        Template {
-            name: "Drivers (Rust)",
-            code: fastos64_rust::rust::DRIVERS,
-            category: "FastOS 64-bit Rust",
-            subcategory: "Rust (Kernel)",
-            color: (0xDE, 0x39, 0x00),
-            icon: "🦀",
-            language: NodeLanguage::Rust,
-        },
-        Template {
-            name: "FFI Interface (Rust)",
-            code: fastos64_rust::rust::FFI,
-            category: "FastOS 64-bit Rust",
-            subcategory: "Rust (Kernel)",
-            color: (0xDE, 0x39, 0x00),
-            icon: "🦀",
-            language: NodeLanguage::Rust,
-        },
-        
-        // ───────────────────────────────────────────────────────────────────────────────
-        // INTEGRATION (Build & Config)
-        // ───────────────────────────────────────────────────────────────────────────────
-        Template {
-            name: "Cargo.toml",
-            code: fastos64_rust::integration::CARGO_TOML,
-            category: "FastOS 64-bit Rust",
-            subcategory: "Integration",
-            color: (0x88, 0x88, 0x00),
-            icon: "⚙️",
-            language: NodeLanguage::Rust,
-        },
-        Template {
-            name: "Linker Script",
-            code: fastos64_rust::integration::LINKER_LD,
-            category: "FastOS 64-bit Rust",
-            subcategory: "Integration",
-            color: (0x88, 0x88, 0x00),
-            icon: "🔗",
-            language: NodeLanguage::Asm,
-        },
-        Template {
-            name: "Build Script (Linux/Mac)",
-            code: fastos64_rust::integration::BUILD_SH,
-            category: "FastOS 64-bit Rust",
-            subcategory: "Integration",
-            color: (0x88, 0x88, 0x00),
-            icon: "🔧",
-            language: NodeLanguage::Text,
-        },
-        Template {
-            name: "Build Script (Windows)",
-            code: fastos64_rust::integration::BUILD_BAT,
-            category: "FastOS 64-bit Rust",
-            subcategory: "Integration",
-            color: (0x88, 0x88, 0x00),
-            icon: "🔧",
-            language: NodeLanguage::Text,
-        },
-        Template {
-            name: "Integration Example",
-            code: fastos64_rust::integration::EXAMPLE,
-            category: "FastOS 64-bit Rust",
-            subcategory: "Integration",
-            color: (0x88, 0x88, 0x00),
-            icon: "📝",
-            language: NodeLanguage::Rust,
         },
     ]
 }
