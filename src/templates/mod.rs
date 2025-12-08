@@ -273,6 +273,45 @@ pub mod vulkan {
 }
 
 // ══════════════════════════════════════════
+// DIRECTX12 API (C++)
+// ══════════════════════════════════════════
+pub mod directx12 {
+    // Tipos base
+    pub const TYPES_H: &str = include_str!("directx12/directx12_types.h");
+    
+    // Inicialización
+    pub const ADAPTER: &str = include_str!("directx12/adapter.cpp");
+    pub const DEVICE: &str = include_str!("directx12/device.cpp");
+    pub const SWAPCHAIN: &str = include_str!("directx12/swapchain.cpp");
+    
+    // Comandos
+    pub const COMMAND_ALLOCATOR: &str = include_str!("directx12/command_allocator.cpp");
+    pub const COMMAND_LIST: &str = include_str!("directx12/command_list.cpp");
+    
+    // Pipeline
+    pub const ROOT_SIGNATURE: &str = include_str!("directx12/root_signature.cpp");
+    pub const PIPELINE_STATE: &str = include_str!("directx12/pipeline_state.cpp");
+    pub const SHADER_HLSL: &str = include_str!("directx12/shader.hlsl");
+    
+    // Recursos
+    pub const BUFFERS: &str = include_str!("directx12/buffers.cpp");
+    
+    // Renderizado
+    pub const RENDER_LOOP: &str = include_str!("directx12/render_loop.cpp");
+    pub const MAIN: &str = include_str!("directx12/main.cpp");
+    
+    // Librerías (helpers y utilidades reutilizables)
+    pub const HELPERS: &str = include_str!("directx12/helpers.cpp");
+    pub const RESOURCE_MANAGER: &str = include_str!("directx12/resource_manager.cpp");
+    pub const WINDOW_MANAGER: &str = include_str!("directx12/window_manager.cpp");
+    pub const SYNC_MANAGER: &str = include_str!("directx12/sync_manager.cpp");
+    
+    // Build
+    pub const CMAKE: &str = include_str!("directx12/CMakeLists.txt");
+    pub const README: &str = include_str!("directx12/README.md");
+}
+
+// ══════════════════════════════════════════
 // Estructura de Template para el menú
 // ══════════════════════════════════════════
 #[derive(Clone)]
@@ -903,246 +942,6 @@ pub fn all_templates() -> Vec<Template> {
         },
         
         // ══════════════════════════════════════════════════════════════
-        // FASTOS - BOOTLOADER (ASM)
-        // ══════════════════════════════════════════════════════════════
-        Template {
-            name: "🔥 Boot Sector",
-            code: fastos::BOOT_SECTOR,
-            category: "FastOS",
-            subcategory: "Bootloader",
-            color: (0xff, 0x00, 0x00),
-            icon: "💿",
-            language: NodeLanguage::Asm,
-        },
-        Template {
-            name: "🔥 Stage 2 Bootloader",
-            code: fastos::STAGE2,
-            category: "FastOS",
-            subcategory: "Bootloader",
-            color: (0xff, 0x00, 0x00),
-            icon: "🚀",
-            language: NodeLanguage::Asm,
-        },
-        Template {
-            name: "🔥 Kernel Entry",
-            code: fastos::KERNEL_ENTRY,
-            category: "FastOS",
-            subcategory: "Bootloader",
-            color: (0xff, 0x00, 0x00),
-            icon: "⚡",
-            language: NodeLanguage::Asm,
-        },
-        
-        // ══════════════════════════════════════════════════════════════
-        // FASTOS - KERNEL (C)
-        // ══════════════════════════════════════════════════════════════
-        Template {
-            name: "🔥 Kernel Main",
-            code: fastos::KERNEL_MAIN,
-            category: "FastOS",
-            subcategory: "Kernel",
-            color: (0xff, 0x44, 0x00),
-            icon: "🧠",
-            language: NodeLanguage::C,
-        },
-        Template {
-            name: "🔥 Kernel Header",
-            code: fastos::KERNEL_H,
-            category: "FastOS",
-            subcategory: "Kernel",
-            color: (0xff, 0x44, 0x00),
-            icon: "📋",
-            language: NodeLanguage::C,
-        },
-        
-        // ══════════════════════════════════════════════════════════════
-        // FASTOS - DRIVERS (C)
-        // ══════════════════════════════════════════════════════════════
-        Template {
-            name: "🔥 VGA Driver",
-            code: fastos::VGA_DRIVER,
-            category: "FastOS",
-            subcategory: "Drivers",
-            color: (0x00, 0xaa, 0x00),
-            icon: "🖥️",
-            language: NodeLanguage::C,
-        },
-        Template {
-            name: "🔥 VGA Header",
-            code: fastos::VGA_H,
-            category: "FastOS",
-            subcategory: "Drivers",
-            color: (0x00, 0xaa, 0x00),
-            icon: "📋",
-            language: NodeLanguage::C,
-        },
-        Template {
-            name: "🔥 Keyboard Driver",
-            code: fastos::KEYBOARD_DRIVER,
-            category: "FastOS",
-            subcategory: "Drivers",
-            color: (0x00, 0xaa, 0x00),
-            icon: "⌨️",
-            language: NodeLanguage::C,
-        },
-        Template {
-            name: "🔥 Keyboard Header",
-            code: fastos::KEYBOARD_H,
-            category: "FastOS",
-            subcategory: "Drivers",
-            color: (0x00, 0xaa, 0x00),
-            icon: "📋",
-            language: NodeLanguage::C,
-        },
-        Template {
-            name: "🔥 Timer Driver",
-            code: fastos::TIMER,
-            category: "FastOS",
-            subcategory: "Drivers",
-            color: (0x00, 0xaa, 0x00),
-            icon: "⏱️",
-            language: NodeLanguage::C,
-        },
-        Template {
-            name: "🔥 Timer Header",
-            code: fastos::TIMER_H,
-            category: "FastOS",
-            subcategory: "Drivers",
-            color: (0x00, 0xaa, 0x00),
-            icon: "📋",
-            language: NodeLanguage::C,
-        },
-        
-        // ══════════════════════════════════════════════════════════════
-        // FASTOS - SISTEMA (C)
-        // ══════════════════════════════════════════════════════════════
-        Template {
-            name: "🔥 IDT (Interrupciones)",
-            code: fastos::IDT,
-            category: "FastOS",
-            subcategory: "Sistema",
-            color: (0xaa, 0x00, 0xaa),
-            icon: "⚡",
-            language: NodeLanguage::C,
-        },
-        Template {
-            name: "🔥 IDT Header",
-            code: fastos::IDT_H,
-            category: "FastOS",
-            subcategory: "Sistema",
-            color: (0xaa, 0x00, 0xaa),
-            icon: "📋",
-            language: NodeLanguage::C,
-        },
-        Template {
-            name: "🔥 Memory Manager",
-            code: fastos::MEMORY,
-            category: "FastOS",
-            subcategory: "Sistema",
-            color: (0xaa, 0x00, 0xaa),
-            icon: "💾",
-            language: NodeLanguage::C,
-        },
-        Template {
-            name: "🔥 Memory Header",
-            code: fastos::MEMORY_H,
-            category: "FastOS",
-            subcategory: "Sistema",
-            color: (0xaa, 0x00, 0xaa),
-            icon: "📋",
-            language: NodeLanguage::C,
-        },
-        Template {
-            name: "🔥 Shell",
-            code: fastos::SHELL,
-            category: "FastOS",
-            subcategory: "Sistema",
-            color: (0xaa, 0x00, 0xaa),
-            icon: "💻",
-            language: NodeLanguage::C,
-        },
-        Template {
-            name: "🔥 Shell Header",
-            code: fastos::SHELL_H,
-            category: "FastOS",
-            subcategory: "Sistema",
-            color: (0xaa, 0x00, 0xaa),
-            icon: "📋",
-            language: NodeLanguage::C,
-        },
-        
-        // ══════════════════════════════════════════════════════════════
-        // FASTOS - UTILIDADES (C)
-        // ══════════════════════════════════════════════════════════════
-        Template {
-            name: "🔥 String Library",
-            code: fastos::STRING,
-            category: "FastOS",
-            subcategory: "Utilidades",
-            color: (0x00, 0x88, 0xcc),
-            icon: "📝",
-            language: NodeLanguage::C,
-        },
-        Template {
-            name: "🔥 String Header",
-            code: fastos::STRING_H,
-            category: "FastOS",
-            subcategory: "Utilidades",
-            color: (0x00, 0x88, 0xcc),
-            icon: "📋",
-            language: NodeLanguage::C,
-        },
-        Template {
-            name: "🔥 Types Header",
-            code: fastos::TYPES_H,
-            category: "FastOS",
-            subcategory: "Utilidades",
-            color: (0x00, 0x88, 0xcc),
-            icon: "📋",
-            language: NodeLanguage::C,
-        },
-        Template {
-            name: "🔥 Ports Header",
-            code: fastos::PORTS_H,
-            category: "FastOS",
-            subcategory: "Utilidades",
-            color: (0x00, 0x88, 0xcc),
-            icon: "📋",
-            language: NodeLanguage::C,
-        },
-        
-        // ══════════════════════════════════════════════════════════════
-        // FASTOS - BUILD SYSTEM
-        // ══════════════════════════════════════════════════════════════
-        Template {
-            name: "🔥 Linker Script",
-            code: fastos::LINKER,
-            category: "FastOS",
-            subcategory: "Build",
-            color: (0x88, 0x88, 0x00),
-            icon: "🔗",
-            language: NodeLanguage::Asm,  // Para resaltado
-        },
-        Template {
-            name: "🔥 Makefile",
-            code: fastos::MAKEFILE,
-            category: "FastOS",
-            subcategory: "Build",
-            color: (0x88, 0x88, 0x00),
-            icon: "🛠️",
-            language: NodeLanguage::C,  // Para resaltado
-        },
-        Template {
-            name: "🔥 README",
-            code: fastos::README,
-            category: "FastOS",
-            subcategory: "Build",
-            color: (0x88, 0x88, 0x00),
-            icon: "📖",
-            language: NodeLanguage::C,  // Para resaltado
-        },
-        
-        // ══════════════════════════════════════════════════════════════
         // VULKAN - TIPOS BASE
         // ══════════════════════════════════════════════════════════════
         Template {
@@ -1502,6 +1301,200 @@ pub fn all_templates() -> Vec<Template> {
             subcategory: "Docs",
             color: (0xFF, 0x44, 0x00),
             icon: "🔥",
+            language: NodeLanguage::Text,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // DIRECTX12 - TIPOS BASE
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "💎 DirectX12 Types",
+            code: directx12::TYPES_H,
+            category: "DirectX12",
+            subcategory: "Base",
+            color: (0x00, 0x7a, 0xcc),
+            icon: "📋",
+            language: NodeLanguage::Cpp,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // DIRECTX12 - INICIALIZACIÓN
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "💎 Adapter (GPU)",
+            code: directx12::ADAPTER,
+            category: "DirectX12",
+            subcategory: "Inicialización",
+            color: (0x00, 0x7a, 0xcc),
+            icon: "🎮",
+            language: NodeLanguage::Cpp,
+        },
+        Template {
+            name: "💎 Device",
+            code: directx12::DEVICE,
+            category: "DirectX12",
+            subcategory: "Inicialización",
+            color: (0x00, 0x7a, 0xcc),
+            icon: "🖥️",
+            language: NodeLanguage::Cpp,
+        },
+        Template {
+            name: "💎 Swapchain",
+            code: directx12::SWAPCHAIN,
+            category: "DirectX12",
+            subcategory: "Inicialización",
+            color: (0x00, 0x7a, 0xcc),
+            icon: "🔄",
+            language: NodeLanguage::Cpp,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // DIRECTX12 - COMANDOS
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "💎 Command Allocator",
+            code: directx12::COMMAND_ALLOCATOR,
+            category: "DirectX12",
+            subcategory: "Comandos",
+            color: (0x00, 0x9a, 0xff),
+            icon: "⚙️",
+            language: NodeLanguage::Cpp,
+        },
+        Template {
+            name: "💎 Command List",
+            code: directx12::COMMAND_LIST,
+            category: "DirectX12",
+            subcategory: "Comandos",
+            color: (0x00, 0x9a, 0xff),
+            icon: "📋",
+            language: NodeLanguage::Cpp,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // DIRECTX12 - PIPELINE
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "💎 Root Signature",
+            code: directx12::ROOT_SIGNATURE,
+            category: "DirectX12",
+            subcategory: "Pipeline",
+            color: (0x8b, 0x00, 0x8b),
+            icon: "🔧",
+            language: NodeLanguage::Cpp,
+        },
+        Template {
+            name: "💎 Pipeline State",
+            code: directx12::PIPELINE_STATE,
+            category: "DirectX12",
+            subcategory: "Pipeline",
+            color: (0x8b, 0x00, 0x8b),
+            icon: "📐",
+            language: NodeLanguage::Cpp,
+        },
+        Template {
+            name: "💎 Shader (HLSL)",
+            code: directx12::SHADER_HLSL,
+            category: "DirectX12",
+            subcategory: "Pipeline",
+            color: (0x8b, 0x00, 0x8b),
+            icon: "🎨",
+            language: NodeLanguage::Cpp,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // DIRECTX12 - RECURSOS
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "💎 Buffers",
+            code: directx12::BUFFERS,
+            category: "DirectX12",
+            subcategory: "Recursos",
+            color: (0x00, 0x80, 0x80),
+            icon: "📦",
+            language: NodeLanguage::Cpp,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // DIRECTX12 - LIBRERÍAS (Funciones independientes reutilizables)
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "📚 Helpers (Utilidades)",
+            code: directx12::HELPERS,
+            category: "DirectX12",
+            subcategory: "Librerías",
+            color: (0x80, 0x40, 0x00),
+            icon: "🛠️",
+            language: NodeLanguage::Cpp,
+        },
+        Template {
+            name: "📚 Resource Manager",
+            code: directx12::RESOURCE_MANAGER,
+            category: "DirectX12",
+            subcategory: "Librerías",
+            color: (0x80, 0x40, 0x00),
+            icon: "📦",
+            language: NodeLanguage::Cpp,
+        },
+        Template {
+            name: "📚 Window Manager",
+            code: directx12::WINDOW_MANAGER,
+            category: "DirectX12",
+            subcategory: "Librerías",
+            color: (0x80, 0x40, 0x00),
+            icon: "🪟",
+            language: NodeLanguage::Cpp,
+        },
+        Template {
+            name: "📚 Sync Manager",
+            code: directx12::SYNC_MANAGER,
+            category: "DirectX12",
+            subcategory: "Librerías",
+            color: (0x80, 0x40, 0x00),
+            icon: "⏱️",
+            language: NodeLanguage::Cpp,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // DIRECTX12 - RENDERIZADO
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "💎 Render Loop",
+            code: directx12::RENDER_LOOP,
+            category: "DirectX12",
+            subcategory: "Renderizado",
+            color: (0x00, 0xbf, 0xff),
+            icon: "↻",
+            language: NodeLanguage::Cpp,
+        },
+        Template {
+            name: "💎 Main (Completo)",
+            code: directx12::MAIN,
+            category: "DirectX12",
+            subcategory: "Renderizado",
+            color: (0xff, 0xd7, 0x00),
+            icon: "💎",
+            language: NodeLanguage::Cpp,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // DIRECTX12 - BUILD
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "💎 CMakeLists",
+            code: directx12::CMAKE,
+            category: "DirectX12",
+            subcategory: "Build",
+            color: (0x06, 0x4f, 0x8c),
+            icon: "🛠️",
+            language: NodeLanguage::Text,
+        },
+        Template {
+            name: "💎 README",
+            code: directx12::README,
+            category: "DirectX12",
+            subcategory: "Build",
+            color: (0x06, 0x4f, 0x8c),
+            icon: "📖",
             language: NodeLanguage::Text,
         },
     ]

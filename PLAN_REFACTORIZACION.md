@@ -389,6 +389,56 @@ src/
 
 ---
 
+### 🆕 Fase 7: Librerías Modulares y Reutilizables 🆕
+
+#### 💡 Concepto:
+Crear templates de **librerías independientes** que puedan heredarse fácilmente entre nodos sin dependencias circulares. Esto permite:
+- **Reutilización**: Nodo B hereda funciones del nodo A sin preocuparse por implementación
+- **Modularidad**: Cada librería es independiente y autocontenida
+- **Facilidad**: Conectar nodos para heredar código automáticamente
+
+#### ✅ **COMPLETADO RECIENTEMENTE:**
+- [x] Crear librerías DirectX12 modulares ✅
+  - [x] `helpers.cpp` - Utilidades matemáticas y debug ✅
+  - [x] `resource_manager.cpp` - Wrappers para gestión de recursos ✅
+  - [x] `window_manager.cpp` - Gestión de ventanas ✅
+  - [x] `sync_manager.cpp` - Gestión de sincronización (fences) ✅
+- [x] Agregar subcategoría "Librerías" a DirectX12 ✅
+- [x] Organizar templates por subcategorías lógicas ✅
+
+#### 🎯 **PRINCIPIOS DE DISEÑO:**
+1. **Independencia**: Cada librería debe funcionar por sí sola
+2. **Herencia Simple**: Usar `ch("nombre_nodo")` para acceder al código heredado
+3. **Sin Dependencias Circulares**: Librerías no deben depender entre sí
+4. **Documentación Clara**: Cada librería documenta cómo usarla
+
+#### 📋 **EJEMPLO DE USO:**
+```
+Nodo A: "Helpers (Utilidades)"
+  - Contiene funciones: CreateProjectionMatrix(), CreateViewMatrix()
+  
+Nodo B: "Render Loop"
+  - Conecta a Nodo A (hereda código)
+  - Usa: ch("Helpers (Utilidades)") para acceder a las funciones
+  - Agrega su propio código que usa las funciones heredadas
+```
+
+#### ⏳ **PENDIENTE:**
+- [ ] Aplicar mismo patrón a otras categorías (Vulkan, Rust, etc.)
+- [ ] Crear templates de librerías para:
+  - [ ] Matemáticas (vectores, matrices, quaterniones)
+  - [ ] I/O (archivos, networking)
+  - [ ] Utilidades de strings
+  - [ ] Parsing y serialización
+- [ ] Documentar mejor el sistema de herencia en templates
+- [ ] Crear ejemplos de proyectos usando librerías modulares
+
+**Estado**: 🆕 **EN PROGRESO** - DirectX12 completado, aplicar a otros módulos
+
+**Esfuerzo estimado restante**: 2-3 horas (aplicar patrón a otros templates)
+
+---
+
 ### 🔄 Fase 5: Inspiración Houdini - Sistema Avanzado de Nodos 🔄 (Continuación - detalles arriba)
 
 #### 🎨 Ideas de Houdini para implementar:
@@ -952,7 +1002,7 @@ impl Workspace {
 
 ## 📊 Estado General del Proyecto
 
-**Última actualización**: 2025-01-07 (Fase 5: Subnetworks COMPLETADO - 100%)
+**Última actualización**: 2025-01-07 (Fase 7: Librerías Modulares - DirectX12 completado)
 
 ### Progreso por Fases:
 
@@ -964,6 +1014,7 @@ impl Workspace {
 | **Fase 4: GitHub Ready** | ⏳ PENDIENTE | 10% | Baja |
 | **Fase 5: Inspiración Houdini** | ✅ COMPLETADO | 100% | Media-Alta |
 | **Fase 6: Inspiración VS Code** | 🆕 PLANIFICADO | 0% | Media |
+| **Fase 7: Librerías Modulares** | 🆕 EN PROGRESO | 30% | Alta |
 
 ### Resumen:
 - ✅ **Sistema de código separado funcionando** - Los nodos ahora guardan código en archivos separados
@@ -972,15 +1023,17 @@ impl Workspace {
 - ✅ **Migración automática implementada** - Con UI completa y diálogo de usuario
 - ✅ **Tema visual mejorado** - Fondo negro con líneas blancas para mejor visibilidad
 - ✅ **Subnetworks COMPLETO** - Estructura base, navegación UI, y guardado/carga recursivo implementados (100%)
+- ✅ **Librerías Modulares DirectX12** - Templates independientes y reutilizables creados
 - 🆕 **Otras fases planificadas** - HDAs, Parameter Editor, File Explorer, Quick Search
 - ⏳ **Testing pendiente** - Validar migración con proyectos reales
 - ⏳ **Preparación para GitHub pendiente** - Documentación y CI/CD
 
 ### Próximos Pasos Recomendados:
-1. **Inmediato**: Testing de Subnetworks - Validar navegación y guardado/carga (Fase 5)
-2. **Corto plazo**: Testing de migración automática con proyectos reales (Fase 3)
-3. **Medio plazo**: File Explorer mejorado y Quick Search (Fase 6)
-4. **Largo plazo**: HDAs exportables y preparar para GitHub (Fases 5 y 4)
+1. **Inmediato**: Aplicar patrón de librerías modulares a otros templates (Vulkan, Rust, etc.) - Fase 7
+2. **Corto plazo**: Testing de Subnetworks - Validar navegación y guardado/carga (Fase 5)
+3. **Corto plazo**: Testing de migración automática con proyectos reales (Fase 3)
+4. **Medio plazo**: File Explorer mejorado y Quick Search (Fase 6)
+5. **Largo plazo**: HDAs exportables y preparar para GitHub (Fases 5 y 4)
 
 ### 🎨 Roadmap Inspirado en Houdini + VS Code:
 

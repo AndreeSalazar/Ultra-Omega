@@ -760,25 +760,78 @@ impl NodeGraphApp {
                         ui.horizontal(|ui| {
                             // Panel izquierdo: Categorías
                             ui.vertical(|ui| {
-                                ui.set_width(140.0);
+                                ui.set_width(200.0);
                                 
-                                ui.horizontal(|ui| {
-                                    ui.label(egui::RichText::new("➕").color(Color32::from_rgb(100, 200, 255)));
-                                    ui.label(egui::RichText::new("Add").strong());
-                                    ui.label(egui::RichText::new("Shift A").small().color(Color32::GRAY));
-                                });
-                                ui.separator();
+                                // Header mejorado
+                                egui::Frame::none()
+                                    .fill(Color32::from_rgba_unmultiplied(40, 45, 55, 200))
+                                    .stroke(egui::Stroke::new(1.0, Color32::from_rgb(100, 150, 255)))
+                                    .rounding(egui::Rounding::same(6.0))
+                                    .inner_margin(egui::Margin::symmetric(10.0, 8.0))
+                                    .show(ui, |ui| {
+                                        ui.horizontal(|ui| {
+                                            ui.label(egui::RichText::new("➕").size(18.0).color(Color32::from_rgb(100, 200, 255)));
+                                            ui.label(egui::RichText::new("Add").strong().size(14.0));
+                                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                ui.label(egui::RichText::new("Shift+A").small().color(Color32::from_rgb(150, 180, 200)));
+                                            });
+                                        });
+                                    });
+                                ui.add_space(8.0);
                                 
-                                // Nodo nuevo
-                                if ui.selectable_label(self.selected_category.as_deref() == Some("new"), "✨ Nuevo Nodo").clicked() {
+                                // Nodo nuevo con mejor diseño
+                                let new_selected = self.selected_category.as_deref() == Some("new");
+                                let new_bg = if new_selected {
+                                    Color32::from_rgba_unmultiplied(100, 150, 255, 120)
+                                } else {
+                                    Color32::from_rgba_unmultiplied(40, 45, 55, 100)
+                                };
+                                let new_border = if new_selected {
+                                    Color32::from_rgb(150, 200, 255)
+                                } else {
+                                    Color32::from_rgb(80, 90, 100)
+                                };
+                                
+                                let new_response = egui::Frame::none()
+                                    .fill(new_bg)
+                                    .stroke(egui::Stroke::new(if new_selected { 2.0 } else { 1.0 }, new_border))
+                                    .rounding(egui::Rounding::same(5.0))
+                                    .inner_margin(egui::Margin::symmetric(10.0, 8.0))
+                                    .show(ui, |ui| {
+                                        ui.horizontal(|ui| {
+                                            ui.label(egui::RichText::new("✨").size(16.0));
+                                            ui.label(egui::RichText::new("Nuevo Nodo")
+                                                .size(13.0)
+                                                .color(if new_selected { Color32::WHITE } else { Color32::from_rgb(220, 220, 230) }));
+                                        });
+                                    }).response;
+                                
+                                if new_response.clicked() {
                                     self.selected_category = Some("new".to_string());
                                 }
                                 
-                                ui.separator();
+                                ui.add_space(6.0);
                                 
-                                // Categorías de templates
-                                let categories = ["Assembler (Windows)", "Assembler (Linux)", "C", "C++", "Rust", "Zig", "FastOS", "FastOS 64-bit", "Vulkan", "Mojo", "MojoAI"];
-                                let category_icons = ["🔧", "🐧", "📘", "📗", "🦀", "⚡", "🔥", "🚀", "🎮", "🔥", "🤖"];
+                                // Separador visual mejorado
+                                let (rect, _) = ui.allocate_exact_size(
+                                    egui::vec2(ui.available_width(), 1.0),
+                                    egui::Sense::hover()
+                                );
+                                ui.painter().rect_filled(
+                                    rect,
+                                    0.0,
+                                    Color32::from_rgba_unmultiplied(100, 150, 255, 60)
+                                );
+                                ui.add_space(6.0);
+                                
+                                // Inicializar categoría por defecto si no hay ninguna seleccionada
+                                if self.selected_category.is_none() {
+                                    self.selected_category = Some("C++".to_string());
+                                }
+                                
+                                // Categorías de templates con mejor diseño
+                                let categories = ["Assembler (Windows)", "Assembler (Linux)", "C", "C++", "Rust", "Zig", "FastOS ASM+Rust+Zig", "Vulkan", "DirectX12"];
+                                let category_icons = ["🔧", "🐧", "📘", "📗", "🦀", "⚡", "🚀", "🎮", "💎"];
                                 let category_colors = [
                                     Color32::from_rgb(0xff, 0x47, 0x00), // Naranja para Windows
                                     Color32::from_rgb(0x00, 0xaa, 0xff), // Cyan para Linux
@@ -786,44 +839,103 @@ impl NodeGraphApp {
                                     Color32::from_rgb(0x00, 0x44, 0x82),
                                     Color32::from_rgb(0xde, 0x39, 0x00),
                                     Color32::from_rgb(0xf0, 0xaa, 0x00), // Amarillo/naranja para Zig
-                                    Color32::from_rgb(0xff, 0xd7, 0x00), // Dorado para FastOS
-                                    Color32::from_rgb(0x00, 0xd4, 0xff), // Cyan para FastOS 64-bit
+                                    Color32::from_rgb(0xFF, 0x44, 0x00), // Naranja/Rojo para FastOS ASM+Rust+Zig
                                     Color32::from_rgb(0xac, 0x14, 0x2c), // Rojo Vulkan
-                                    Color32::from_rgb(0xff, 0x64, 0x64), // Rojo para Mojo
-                                    Color32::from_rgb(0xff, 0xa0, 0x64), // Naranja para MojoAI
+                                    Color32::from_rgb(0x00, 0x7a, 0xcc), // Azul DirectX12
                                 ];
                                 
                                 for (i, cat) in categories.iter().enumerate() {
                                     let selected = self.selected_category.as_deref() == Some(*cat);
-                                    let response = ui.horizontal(|ui| {
-                                        // Icono cuadrado con tamaño fijo (20x20)
-                                        ui.allocate_ui(Vec2::new(20.0, 20.0), |ui| {
-                                            ui.centered_and_justified(|ui| {
-                                                ui.label(
-                                                    egui::RichText::new(category_icons[i])
-                                                        .color(category_colors[i])
-                                                        .size(16.0) // Tamaño fijo para iconos cuadrados
-                                                );
-                                            });
-                                        });
-                                        ui.selectable_label(selected, *cat)
-                                    }).inner;
+                                    
+                                    // Crear área interactiva primero
+                                    let (rect, response) = ui.allocate_exact_size(
+                                        egui::vec2(ui.available_width(), 38.0),
+                                        egui::Sense::click()
+                                    );
+                                    
+                                    let is_hovered = response.hovered();
+                                    
+                                    // Determinar colores según estado
+                                    let bg_color = if selected {
+                                        Color32::from_rgba_unmultiplied(category_colors[i].r(), category_colors[i].g(), category_colors[i].b(), 150)
+                                    } else if is_hovered {
+                                        Color32::from_rgba_unmultiplied(category_colors[i].r(), category_colors[i].g(), category_colors[i].b(), 70)
+                                    } else {
+                                        Color32::from_rgba_unmultiplied(40, 45, 55, 100)
+                                    };
+                                    let border_color = if selected {
+                                        category_colors[i]
+                                    } else if is_hovered {
+                                        Color32::from_rgba_unmultiplied(category_colors[i].r(), category_colors[i].g(), category_colors[i].b(), 200)
+                                    } else {
+                                        Color32::from_rgb(70, 75, 85)
+                                    };
+                                    
+                                    // Dibujar fondo y borde
+                                    ui.painter().rect_filled(
+                                        rect,
+                                        5.0,
+                                        bg_color
+                                    );
+                                    ui.painter().rect_stroke(
+                                        rect,
+                                        5.0,
+                                        egui::Stroke::new(if selected { 2.5 } else { 1.0 }, border_color)
+                                    );
+                                    
+                                    // Dibujar contenido
+                                    let icon_pos = rect.left_top() + egui::vec2(12.0, 19.0);
+                                    ui.painter().text(
+                                        icon_pos,
+                                        egui::Align2::LEFT_CENTER,
+                                        category_icons[i],
+                                        egui::FontId::proportional(18.0),
+                                        category_colors[i]
+                                    );
+                                    
+                                    let text_pos = rect.left_top() + egui::vec2(40.0, 19.0);
+                                    ui.painter().text(
+                                        text_pos,
+                                        egui::Align2::LEFT_CENTER,
+                                        *cat,
+                                        egui::FontId::proportional(12.5),
+                                        if selected {
+                                            Color32::WHITE
+                                        } else {
+                                            Color32::from_rgb(220, 220, 230)
+                                        }
+                                    );
                                     
                                     if response.clicked() {
                                         self.selected_category = Some(cat.to_string());
                                     }
+                                    
+                                    ui.add_space(2.0);
                                 }
                                 
                                 ui.add_space(8.0);
-                                ui.separator();
-                                ui.add_space(4.0);
                                 
-                                // Shortcuts
-                                ui.label(egui::RichText::new("Buscar").small().color(Color32::GRAY));
-                                ui.horizontal(|ui| {
-                                    ui.label(egui::RichText::new("🔍 Find...").small());
-                                    ui.label(egui::RichText::new("F3").small().color(Color32::from_rgb(100, 150, 200)));
-                                });
+                                // Separador visual
+                                let (rect, _) = ui.allocate_exact_size(
+                                    egui::vec2(ui.available_width(), 1.0),
+                                    egui::Sense::hover()
+                                );
+                                ui.painter().rect_filled(
+                                    rect,
+                                    0.0,
+                                    Color32::from_rgba_unmultiplied(100, 150, 255, 60)
+                                );
+                                ui.add_space(6.0);
+                                
+                                // Shortcuts mejorados
+                                egui::Frame::none()
+                                    .fill(Color32::from_rgba_unmultiplied(30, 35, 45, 150))
+                                    .rounding(egui::Rounding::same(4.0))
+                                    .inner_margin(egui::Margin::symmetric(8.0, 6.0))
+                                    .show(ui, |ui| {
+                                        ui.label(egui::RichText::new("🔍 Buscar").small().size(11.0).color(Color32::from_rgb(150, 180, 200)));
+                                        ui.label(egui::RichText::new("F3").small().size(10.0).color(Color32::from_rgb(100, 200, 255)));
+                                    });
                             });
                             
                             ui.separator();
@@ -872,43 +984,18 @@ impl NodeGraphApp {
                                             
                                             close_menu = true;
                                         }
-                                    } else if cat == "FastOS" {
-                                        // Panel especial para FastOS
-                                        ui.heading(egui::RichText::new("🔥 FastOS").color(Color32::from_rgb(0xff, 0xd7, 0x00)));
+                                    } else if cat == "FastOS ASM+Rust+Zig" {
+                                        // Panel especial para FastOS ASM+Rust+Zig
+                                        ui.heading(egui::RichText::new("🚀 FastOS ASM+Rust+Zig").color(Color32::from_rgb(0xFF, 0x44, 0x00)));
                                         ui.add_space(8.0);
                                         
-                                        ui.label(egui::RichText::new("Sistema Operativo Completo").color(Color32::GRAY));
+                                        ui.label(egui::RichText::new("Sistema Operativo Multi-Lenguaje").color(Color32::GRAY));
                                         ui.add_space(8.0);
                                         
-                                        // Botón principal para crear proyecto completo
-                                        if ui.add(egui::Button::new(
-                                            egui::RichText::new("🚀 CREAR PROYECTO FASTOS COMPLETO")
-                                                .color(Color32::from_rgb(0xff, 0xd7, 0x00))
-                                                .strong()
-                                        ).min_size(Vec2::new(250.0, 40.0))).clicked() {
-                                            // Crear el proyecto FastOS con todos los nodos
-                                            self.graph = NodeGraph::create_fastos_project();
-                                            self.viewport.pan = Vec2::new(0.0, 0.0);
-                                            self.viewport.zoom = 0.3; // Zoom out para ver todo
-                                            
-                                            if self.workspace.has_root() {
-                                                let _ = self.save_current_graph();
-                                            }
-                                            
-                                            close_menu = true;
-                                        }
-                                        
-                                        ui.add_space(8.0);
-                                        ui.separator();
-                                        ui.add_space(8.0);
-                                        
-                                        ui.label(egui::RichText::new("O añadir componentes individuales:").small().color(Color32::GRAY));
-                                        ui.add_space(4.0);
-                                        
-                                        // Mostrar templates de FastOS
+                                        // Mostrar templates de FastOS ASM+Rust+Zig
                                         let templates = crate::templates::all_templates();
                                         let filtered: Vec<_> = templates.iter()
-                                            .filter(|t| t.category == "FastOS")
+                                            .filter(|t| t.category == "FastOS ASM+Rust+Zig")
                                             .collect();
                                         
                                         // Agrupar por subcategoría
@@ -919,41 +1006,143 @@ impl NodeGraphApp {
                                         subcats.dedup();
                                         
                                         egui::ScrollArea::vertical()
-                                            .max_height(200.0)
+                                            .max_height(400.0)
                                             .show(ui, |ui| {
                                                 for subcat in subcats {
-                                                    ui.label(egui::RichText::new(subcat).strong().color(Color32::from_rgb(150, 150, 150)));
-                                                    ui.add_space(4.0);
+                                                    // Header de subcategoría mejorado
+                                                    egui::Frame::none()
+                                                        .fill(Color32::from_rgba_unmultiplied(50, 55, 65, 150))
+                                                        .stroke(egui::Stroke::new(1.0, Color32::from_rgb(100, 150, 255)))
+                                                        .rounding(egui::Rounding::same(4.0))
+                                                        .inner_margin(egui::Margin::symmetric(8.0, 6.0))
+                                                        .show(ui, |ui| {
+                                                            ui.label(egui::RichText::new(subcat)
+                                                                .strong()
+                                                                .size(13.0)
+                                                                .color(Color32::from_rgb(200, 210, 220)));
+                                                        });
+                                                    ui.add_space(6.0);
                                                     
+                                                    // Templates con mejor diseño
                                                     for template in filtered.iter().filter(|t| t.subcategory == subcat) {
                                                         let color = Color32::from_rgb(template.color.0, template.color.1, template.color.2);
                                                         let btn_text = format!("{} {}", template.icon, template.name);
                                                         
-                                                        if ui.add(egui::Button::new(
-                                                            egui::RichText::new(&btn_text).color(color)
-                                                        ).min_size(Vec2::new(180.0, 24.0))).clicked() {
+                                                        let btn_response = egui::Frame::none()
+                                                            .fill(Color32::from_rgba_unmultiplied(40, 45, 55, 150))
+                                                            .stroke(egui::Stroke::new(1.5, color))
+                                                            .rounding(egui::Rounding::same(5.0))
+                                                            .inner_margin(egui::Margin::symmetric(10.0, 8.0))
+                                                            .show(ui, |ui| {
+                                                                ui.horizontal(|ui| {
+                                                                    ui.label(egui::RichText::new(template.icon).size(16.0).color(color));
+                                                                    ui.add_space(6.0);
+                                                                    ui.label(egui::RichText::new(template.name)
+                                                                        .size(12.0)
+                                                                        .color(Color32::from_rgb(230, 230, 235)));
+                                                                });
+                                                            }).response;
+                                                        
+                                                        // Efecto hover visual mejorado
+                                                        if btn_response.hovered() {
+                                                            let hover_rect = btn_response.rect.expand(2.0);
+                                                            ui.painter().rect_filled(
+                                                                hover_rect,
+                                                                3.0,
+                                                                Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 50)
+                                                            );
+                                                        }
+                                                        
+                                                        if btn_response.clicked() {
                                                             template_to_add = Some((*template).clone());
                                                             close_menu = true;
                                                         }
+                                                        
+                                                        ui.add_space(4.0);
                                                     }
                                                     
-                                                    ui.add_space(8.0);
+                                                    ui.add_space(10.0);
                                                 }
                                             });
                                     } else if cat == "Vulkan" {
-                                        // Panel especial para Vulkan
-                                        ui.heading(egui::RichText::new("🎮 Vulkan API").color(Color32::from_rgb(0xac, 0x14, 0x2c)));
-                                        ui.add_space(8.0);
+                                        // Panel especial para Vulkan mejorado
+                                        let vulkan_color = Color32::from_rgb(0xac, 0x14, 0x2c);
+                                        let vulkan_gold = Color32::from_rgb(0xff, 0xd7, 0x00);
                                         
-                                        ui.label(egui::RichText::new("Graphics API de bajo nivel").color(Color32::GRAY));
-                                        ui.add_space(8.0);
+                                        // Header mejorado de Vulkan
+                                        egui::Frame::none()
+                                            .fill(Color32::from_rgba_unmultiplied(172, 20, 44, 30))
+                                            .stroke(egui::Stroke::new(2.0, vulkan_color))
+                                            .rounding(egui::Rounding::same(8.0))
+                                            .inner_margin(egui::Margin::symmetric(14.0, 10.0))
+                                            .show(ui, |ui| {
+                                                ui.horizontal(|ui| {
+                                                    ui.label(egui::RichText::new("🎮").size(24.0));
+                                                    ui.add_space(8.0);
+                                                    ui.vertical(|ui| {
+                                                        ui.label(egui::RichText::new("Vulkan API")
+                                                            .strong()
+                                                            .size(18.0)
+                                                            .color(vulkan_color));
+                                                        ui.label(egui::RichText::new("Graphics API de bajo nivel")
+                                                            .small()
+                                                            .color(Color32::from_rgb(180, 180, 190)));
+                                                    });
+                                                });
+                                            });
+                                        ui.add_space(12.0);
                                         
-                                        // Botón principal para crear proyecto completo
-                                        if ui.add(egui::Button::new(
-                                            egui::RichText::new("🎮 Crear Proyecto Vulkan Completo")
-                                                .color(Color32::from_rgb(0xff, 0xd7, 0x00))
-                                                .strong()
-                                        ).min_size(Vec2::new(250.0, 40.0))).clicked() {
+                                        // Botón principal mejorado para crear proyecto completo
+                                        let create_project_response = egui::Frame::none()
+                                            .fill(Color32::from_rgba_unmultiplied(
+                                                vulkan_gold.r(),
+                                                vulkan_gold.g(),
+                                                vulkan_gold.b(),
+                                                40
+                                            ))
+                                            .stroke(egui::Stroke::new(2.5, vulkan_gold))
+                                            .rounding(egui::Rounding::same(8.0))
+                                            .inner_margin(egui::Margin::symmetric(14.0, 12.0))
+                                            .show(ui, |ui| {
+                                                ui.horizontal(|ui| {
+                                                    ui.label(egui::RichText::new("🎮").size(20.0).color(vulkan_gold));
+                                                    ui.add_space(10.0);
+                                                    ui.vertical(|ui| {
+                                                        ui.label(egui::RichText::new("Crear Proyecto Vulkan Completo")
+                                                            .strong()
+                                                            .size(14.0)
+                                                            .color(vulkan_gold));
+                                                        ui.label(egui::RichText::new("Incluye todos los componentes necesarios")
+                                                            .small()
+                                                            .color(Color32::from_rgb(200, 200, 180)));
+                                                    });
+                                                });
+                                            }).response;
+                                        
+                                        if create_project_response.clicked() || create_project_response.hovered() {
+                                            let hover_bg = if create_project_response.hovered() {
+                                                Color32::from_rgba_unmultiplied(
+                                                    vulkan_gold.r(),
+                                                    vulkan_gold.g(),
+                                                    vulkan_gold.b(),
+                                                    80
+                                                )
+                                            } else {
+                                                Color32::from_rgba_unmultiplied(
+                                                    vulkan_gold.r(),
+                                                    vulkan_gold.g(),
+                                                    vulkan_gold.b(),
+                                                    40
+                                                )
+                                            };
+                                            ui.painter().rect_filled(
+                                                create_project_response.rect.expand(2.0),
+                                                8.0,
+                                                hover_bg
+                                            );
+                                        }
+                                        
+                                        if create_project_response.clicked() {
                                             // Crear el proyecto Vulkan con todos los nodos
                                             self.graph = NodeGraph::create_vulkan_project();
                                             self.viewport.pan = Vec2::new(0.0, 0.0);
@@ -966,191 +1155,726 @@ impl NodeGraphApp {
                                             close_menu = true;
                                         }
                                         
-                                        ui.add_space(8.0);
-                                        ui.separator();
+                                        ui.add_space(16.0);
+                                        
+                                        // Separador visual mejorado
+                                        let (sep_rect, _) = ui.allocate_exact_size(
+                                            egui::vec2(ui.available_width(), 1.0),
+                                            egui::Sense::hover()
+                                        );
+                                        ui.painter().rect_filled(
+                                            sep_rect,
+                                            0.0,
+                                            Color32::from_rgba_unmultiplied(
+                                                vulkan_color.r(),
+                                                vulkan_color.g(),
+                                                vulkan_color.b(),
+                                                60
+                                            )
+                                        );
+                                        
+                                        ui.add_space(12.0);
+                                        
+                                        // Header de componentes individuales
+                                        ui.horizontal(|ui| {
+                                            ui.label(egui::RichText::new("📦").size(16.0).color(Color32::from_rgb(150, 200, 255)));
+                                            ui.label(egui::RichText::new("Componentes Individuales")
+                                                .strong()
+                                                .size(13.0)
+                                                .color(Color32::from_rgb(220, 220, 230)));
+                                        });
                                         ui.add_space(8.0);
                                         
-                                        ui.label(egui::RichText::new("O añadir componentes individuales:").small().color(Color32::GRAY));
-                                        ui.add_space(4.0);
-                                        
-                                        // Mostrar templates de Vulkan
+                                        // Mostrar templates de Vulkan con organización mejorada
                                         let templates = crate::templates::all_templates();
                                         let filtered: Vec<_> = templates.iter()
                                             .filter(|t| t.category == "Vulkan")
                                             .collect();
                                         
-                                        // Agrupar por subcategoría
+                                        // Agrupar por subcategoría y ordenar lógicamente
                                         let mut subcats: Vec<&str> = filtered.iter()
                                             .map(|t| t.subcategory)
                                             .collect();
-                                        subcats.sort();
                                         subcats.dedup();
                                         
+                                        // Ordenar subcategorías para Vulkan: Base, Inicialización, Pipeline, Recursos, Ejecución, Renderizado, Build
+                                        let vulkan_order = ["Base", "Inicialización", "Pipeline", "Recursos", "Ejecución", "Renderizado", "Build"];
+                                        subcats.sort_by(|a, b| {
+                                            let a_pos = vulkan_order.iter().position(|&x| x == *a).unwrap_or(999);
+                                            let b_pos = vulkan_order.iter().position(|&x| x == *b).unwrap_or(999);
+                                            if a_pos == b_pos {
+                                                a.cmp(b)
+                                            } else {
+                                                a_pos.cmp(&b_pos)
+                                            }
+                                        });
+                                        
                                         egui::ScrollArea::vertical()
-                                            .max_height(200.0)
+                                            .max_height(400.0)
                                             .show(ui, |ui| {
-                                                for subcat in subcats {
-                                                    ui.label(egui::RichText::new(subcat).strong().color(Color32::from_rgb(150, 150, 150)));
-                                                    ui.add_space(4.0);
+                                                for (subcat_idx, subcat) in subcats.iter().enumerate() {
+                                                    // Determinar color y estilo según tipo de subcategoría para Vulkan
+                                                    let (subcat_icon, subcat_color, subcat_bg) = match *subcat {
+                                                        "Base" => ("🔰", Color32::from_rgb(100, 200, 100), Color32::from_rgba_unmultiplied(50, 100, 50, 80)),
+                                                        "Inicialización" => ("🔌", Color32::from_rgb(150, 150, 255), Color32::from_rgba_unmultiplied(50, 50, 100, 80)),
+                                                        "Pipeline" => ("🔧", Color32::from_rgb(200, 100, 255), Color32::from_rgba_unmultiplied(100, 40, 100, 80)),
+                                                        "Recursos" => ("📦", Color32::from_rgb(100, 200, 200), Color32::from_rgba_unmultiplied(40, 100, 100, 80)),
+                                                        "Ejecución" => ("💻", Color32::from_rgb(255, 170, 80), Color32::from_rgba_unmultiplied(100, 60, 30, 80)),
+                                                        "Renderizado" => ("🎨", Color32::from_rgb(80, 200, 255), Color32::from_rgba_unmultiplied(30, 80, 100, 80)),
+                                                        "Build" => ("🔧", Color32::from_rgb(100, 150, 255), Color32::from_rgba_unmultiplied(40, 60, 100, 80)),
+                                                        _ => ("📋", Color32::from_rgb(150, 150, 150), Color32::from_rgba_unmultiplied(50, 50, 50, 80)),
+                                                    };
                                                     
-                                                    for template in filtered.iter().filter(|t| t.subcategory == subcat) {
+                                                    // Header de subcategoría mejorado y destacado
+                                                    let subcat_templates: Vec<_> = filtered.iter()
+                                                        .filter(|t| t.subcategory == *subcat)
+                                                        .collect();
+                                                    
+                                                    egui::Frame::none()
+                                                        .fill(subcat_bg)
+                                                        .stroke(egui::Stroke::new(2.0, subcat_color))
+                                                        .rounding(egui::Rounding::same(6.0))
+                                                        .inner_margin(egui::Margin::symmetric(12.0, 8.0))
+                                                        .show(ui, |ui| {
+                                                            ui.horizontal(|ui| {
+                                                                ui.label(egui::RichText::new(subcat_icon).size(18.0).color(subcat_color));
+                                                                ui.add_space(8.0);
+                                                                ui.label(egui::RichText::new(*subcat)
+                                                                    .strong()
+                                                                    .size(14.0)
+                                                                    .color(Color32::WHITE));
+                                                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                                    ui.label(egui::RichText::new(format!("({})", subcat_templates.len()))
+                                                                        .size(11.0)
+                                                                        .color(Color32::from_rgb(180, 180, 200)));
+                                                                });
+                                                            });
+                                                        });
+                                                    ui.add_space(8.0);
+                                                    
+                                                    // Templates organizados con mejor diseño
+                                                    for template in subcat_templates.iter() {
                                                         let color = Color32::from_rgb(template.color.0, template.color.1, template.color.2);
-                                                        let btn_text = format!("{} {}", template.icon, template.name);
+                                                        let template_cloned = (**template).clone();
                                                         
-                                                        if ui.add(egui::Button::new(
-                                                            egui::RichText::new(&btn_text).color(color)
-                                                        ).min_size(Vec2::new(180.0, 24.0))).clicked() {
-                                                            template_to_add = Some((*template).clone());
+                                                        // Crear área interactiva
+                                                        let (rect, response) = ui.allocate_exact_size(
+                                                            egui::vec2(ui.available_width(), 36.0),
+                                                            egui::Sense::click()
+                                                        );
+                                                        
+                                                        let is_hovered = response.hovered();
+                                                        
+                                                        // Fondo y borde según estado
+                                                        let template_bg = if is_hovered {
+                                                            Color32::from_rgba_unmultiplied(
+                                                                (color.r() as u32 * 8 / 255 + 50) as u8,
+                                                                (color.g() as u32 * 8 / 255 + 50) as u8,
+                                                                (color.b() as u32 * 8 / 255 + 50) as u8,
+                                                                180
+                                                            )
+                                                        } else {
+                                                            Color32::from_rgba_unmultiplied(45, 50, 60, 150)
+                                                        };
+                                                        
+                                                        let template_border = if is_hovered {
+                                                            Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 220)
+                                                        } else {
+                                                            color
+                                                        };
+                                                        
+                                                        // Dibujar fondo y borde
+                                                        ui.painter().rect_filled(
+                                                            rect,
+                                                            6.0,
+                                                            template_bg
+                                                        );
+                                                        ui.painter().rect_stroke(
+                                                            rect,
+                                                            6.0,
+                                                            egui::Stroke::new(1.8, template_border)
+                                                        );
+                                                        
+                                                        // Indicador lateral izquierdo con color
+                                                        ui.painter().rect_filled(
+                                                            egui::Rect::from_min_size(
+                                                                rect.left_top(),
+                                                                egui::vec2(4.0, rect.height())
+                                                            ),
+                                                            0.0,
+                                                            color
+                                                        );
+                                                        
+                                                        // Dibujar contenido
+                                                        let icon_pos = rect.left_top() + egui::vec2(16.0, 18.0);
+                                                        ui.painter().text(
+                                                            icon_pos,
+                                                            egui::Align2::LEFT_CENTER,
+                                                            template.icon,
+                                                            egui::FontId::proportional(17.0),
+                                                            color
+                                                        );
+                                                        
+                                                        let text_pos = rect.left_top() + egui::vec2(48.0, 18.0);
+                                                        ui.painter().text(
+                                                            text_pos,
+                                                            egui::Align2::LEFT_CENTER,
+                                                            template.name,
+                                                            egui::FontId::proportional(12.5),
+                                                            Color32::from_rgb(235, 235, 240)
+                                                        );
+                                                        
+                                                        // Indicador de click (opcional, visual)
+                                                        if is_hovered {
+                                                            let hover_rect = rect.expand(1.0);
+                                                            ui.painter().rect_stroke(
+                                                                hover_rect,
+                                                                6.0,
+                                                                egui::Stroke::new(0.5, Color32::from_rgba_unmultiplied(255, 255, 255, 100))
+                                                            );
+                                                        }
+                                                        
+                                                        if response.clicked() {
+                                                            template_to_add = Some(template_cloned);
                                                             close_menu = true;
                                                         }
+                                                        
+                                                        ui.add_space(3.0);
                                                     }
                                                     
-                                                    ui.add_space(8.0);
+                                                    // Separador entre subcategorías (excepto la última)
+                                                    if subcat_idx < subcats.len() - 1 {
+                                                        ui.add_space(12.0);
+                                                        let (sep_rect, _) = ui.allocate_exact_size(
+                                                            egui::vec2(ui.available_width(), 1.0),
+                                                            egui::Sense::hover()
+                                                        );
+                                                        ui.painter().rect_filled(
+                                                            sep_rect,
+                                                            0.0,
+                                                            Color32::from_rgba_unmultiplied(
+                                                                vulkan_color.r(),
+                                                                vulkan_color.g(),
+                                                                vulkan_color.b(),
+                                                                40
+                                                            )
+                                                        );
+                                                        ui.add_space(12.0);
+                                                    } else {
+                                                        ui.add_space(4.0);
+                                                    }
+                                                }
+                                                
+                                                // Si no hay templates, mostrar mensaje
+                                                if filtered.is_empty() {
+                                                    ui.centered_and_justified(|ui| {
+                                                        egui::Frame::none()
+                                                            .fill(Color32::from_rgba_unmultiplied(50, 50, 50, 100))
+                                                            .rounding(egui::Rounding::same(6.0))
+                                                            .inner_margin(egui::Margin::symmetric(20.0, 15.0))
+                                                            .show(ui, |ui| {
+                                                                ui.label(egui::RichText::new("📭 No hay componentes disponibles")
+                                                                    .size(13.0)
+                                                                    .color(Color32::GRAY));
+                                                            });
+                                                    });
                                                 }
                                             });
-                                    } else if cat == "Mojo" {
-                                        // Panel especial para Mojo
-                                        ui.heading(egui::RichText::new("🔥 Mojo").color(Color32::from_rgb(0xff, 0x64, 0x64)));
-                                        ui.add_space(8.0);
+                                    } else if cat == "DirectX12" {
+                                        // Panel especial para DirectX12 (similar a Vulkan)
+                                        let dx12_color = Color32::from_rgb(0x00, 0x7a, 0xcc);
+                                        let dx12_gold = Color32::from_rgb(0xff, 0xd7, 0x00);
                                         
-                                        ui.label(egui::RichText::new("Lenguaje de alto rendimiento para IA/ML").color(Color32::GRAY));
-                                        ui.add_space(8.0);
+                                        // Header mejorado de DirectX12
+                                        egui::Frame::none()
+                                            .fill(Color32::from_rgba_unmultiplied(0, 122, 204, 30))
+                                            .stroke(egui::Stroke::new(2.0, dx12_color))
+                                            .rounding(egui::Rounding::same(8.0))
+                                            .inner_margin(egui::Margin::symmetric(14.0, 10.0))
+                                            .show(ui, |ui| {
+                                                ui.horizontal(|ui| {
+                                                    ui.label(egui::RichText::new("💎").size(24.0));
+                                                    ui.add_space(8.0);
+                                                    ui.vertical(|ui| {
+                                                        ui.label(egui::RichText::new("DirectX 12 API")
+                                                            .strong()
+                                                            .size(18.0)
+                                                            .color(dx12_color));
+                                                        ui.label(egui::RichText::new("Graphics API de Microsoft para Windows")
+                                                            .small()
+                                                            .color(Color32::from_rgb(180, 180, 190)));
+                                                    });
+                                                });
+                                            });
+                                        ui.add_space(12.0);
                                         
-                                        // Botón para crear nodo Mojo vacío
-                                        if ui.add(egui::Button::new(
-                                            egui::RichText::new("🔥 Crear Nodo Mojo")
-                                                .color(Color32::from_rgb(0xff, 0x64, 0x64))
-                                                .strong()
-                                        ).min_size(Vec2::new(200.0, 35.0))).clicked() {
-                                            let world_pos = self.viewport.screen_to_world(self.node_menu_pos, Rect::from_min_size(Pos2::ZERO, Vec2::new(10000.0, 10000.0)));
-                                            let id = self.graph.add_node(
-                                                "🔥 Nodo Mojo",
-                                                world_pos,
-                                                Color32::from_rgb(0xff, 0x64, 0x64),
-                                                &["Input"],
-                                                &["Output"],
-                                                NodeLanguage::Mojo,
+                                        // Botón principal para crear proyecto completo
+                                        let create_project_response = egui::Frame::none()
+                                            .fill(Color32::from_rgba_unmultiplied(
+                                                dx12_gold.r(),
+                                                dx12_gold.g(),
+                                                dx12_gold.b(),
+                                                40
+                                            ))
+                                            .stroke(egui::Stroke::new(2.5, dx12_gold))
+                                            .rounding(egui::Rounding::same(8.0))
+                                            .inner_margin(egui::Margin::symmetric(14.0, 12.0))
+                                            .show(ui, |ui| {
+                                                ui.horizontal(|ui| {
+                                                    ui.label(egui::RichText::new("💎").size(20.0).color(dx12_gold));
+                                                    ui.add_space(10.0);
+                                                    ui.vertical(|ui| {
+                                                        ui.label(egui::RichText::new("Crear Proyecto DirectX12 Completo")
+                                                            .strong()
+                                                            .size(14.0)
+                                                            .color(dx12_gold));
+                                                        ui.label(egui::RichText::new("Incluye todos los componentes necesarios")
+                                                            .small()
+                                                            .color(Color32::from_rgb(200, 200, 180)));
+                                                    });
+                                                });
+                                            }).response;
+                                        
+                                        if create_project_response.clicked() || create_project_response.hovered() {
+                                            let hover_bg = if create_project_response.hovered() {
+                                                Color32::from_rgba_unmultiplied(
+                                                    dx12_gold.r(),
+                                                    dx12_gold.g(),
+                                                    dx12_gold.b(),
+                                                    80
+                                                )
+                                            } else {
+                                                Color32::from_rgba_unmultiplied(
+                                                    dx12_gold.r(),
+                                                    dx12_gold.g(),
+                                                    dx12_gold.b(),
+                                                    40
+                                                )
+                                            };
+                                            ui.painter().rect_filled(
+                                                create_project_response.rect.expand(2.0),
+                                                8.0,
+                                                hover_bg
                                             );
-                                            
-                                            if let Some(node) = self.graph.nodes().iter().find(|n| n.id == id) {
-                                                let title_clone = node.title.clone();
-                                                let code_clone = node.code.clone();
-                                                use crate::expressions::ChannelValue;
-                                                self.channel_manager.set_channel(title_clone.clone(), ChannelValue::Code(code_clone.clone()));
-                                                self.channel_manager.set_channel(format!("{}/code", title_clone.clone()), ChannelValue::Code(code_clone.clone()));
-                                                self.channel_manager.set_node_channel(id, "code".to_string(), ChannelValue::Code(code_clone));
-                                            }
-                                            
-                                            if self.workspace.has_root() {
-                                                let _ = self.save_current_graph();
-                                            }
-                                            
+                                        }
+                                        
+                                        if create_project_response.clicked() {
+                                            // TODO: Crear el proyecto DirectX12 con todos los nodos
+                                            // self.graph = NodeGraph::create_directx12_project();
                                             close_menu = true;
                                         }
                                         
-                                        ui.add_space(8.0);
-                                        ui.separator();
-                                        ui.add_space(8.0);
+                                        ui.add_space(16.0);
                                         
-                                        ui.label(egui::RichText::new("Ejemplo de código Mojo:").small().color(Color32::GRAY));
-                                        ui.add_space(4.0);
-                                        let mut example_code = "fn main() -> Int:\n    return 42".to_string();
-                                        ui.add(
-                                            egui::TextEdit::multiline(&mut example_code)
-                                                .font(egui::TextStyle::Monospace)
-                                                .code_editor()
+                                        // Separador visual
+                                        let (sep_rect, _) = ui.allocate_exact_size(
+                                            egui::vec2(ui.available_width(), 1.0),
+                                            egui::Sense::hover()
+                                        );
+                                        ui.painter().rect_filled(
+                                            sep_rect,
+                                            0.0,
+                                            Color32::from_rgba_unmultiplied(
+                                                dx12_color.r(),
+                                                dx12_color.g(),
+                                                dx12_color.b(),
+                                                60
+                                            )
                                         );
                                         
-                                    } else if cat == "MojoAI" {
-                                        // Panel especial para MojoAI
-                                        ui.heading(egui::RichText::new("🤖 MojoAI").color(Color32::from_rgb(0xff, 0xa0, 0x64)));
-                                        ui.add_space(8.0);
+                                        ui.add_space(12.0);
                                         
-                                        ui.label(egui::RichText::new("Nodos especializados con capacidades de IA").color(Color32::GRAY));
-                                        ui.add_space(8.0);
-                                        
-                                        // Botón para crear nodo MojoAI vacío
-                                        if ui.add(egui::Button::new(
-                                            egui::RichText::new("🤖 Crear Nodo MojoAI")
-                                                .color(Color32::from_rgb(0xff, 0xa0, 0x64))
+                                        // Header de componentes individuales
+                                        ui.horizontal(|ui| {
+                                            ui.label(egui::RichText::new("📦").size(16.0).color(Color32::from_rgb(150, 200, 255)));
+                                            ui.label(egui::RichText::new("Componentes Individuales")
                                                 .strong()
-                                        ).min_size(Vec2::new(200.0, 35.0))).clicked() {
-                                            let world_pos = self.viewport.screen_to_world(self.node_menu_pos, Rect::from_min_size(Pos2::ZERO, Vec2::new(10000.0, 10000.0)));
-                                            let id = self.graph.add_node(
-                                                "🤖 Nodo MojoAI",
-                                                world_pos,
-                                                Color32::from_rgb(0xff, 0xa0, 0x64),
-                                                &["Prompt", "Input"],
-                                                &["Output"],
-                                                NodeLanguage::MojoAI,
-                                            );
-                                            
-                                            if let Some(node) = self.graph.nodes().iter().find(|n| n.id == id) {
-                                                let title_clone = node.title.clone();
-                                                let code_clone = node.code.clone();
-                                                use crate::expressions::ChannelValue;
-                                                self.channel_manager.set_channel(title_clone.clone(), ChannelValue::Code(code_clone.clone()));
-                                                self.channel_manager.set_channel(format!("{}/code", title_clone.clone()), ChannelValue::Code(code_clone.clone()));
-                                                self.channel_manager.set_node_channel(id, "code".to_string(), ChannelValue::Code(code_clone));
-                                            }
-                                            
-                                            if self.workspace.has_root() {
-                                                let _ = self.save_current_graph();
-                                            }
-                                            
-                                            close_menu = true;
-                                        }
-                                        
-                                        ui.add_space(8.0);
-                                        ui.separator();
+                                                .size(13.0)
+                                                .color(Color32::from_rgb(220, 220, 230)));
+                                        });
                                         ui.add_space(8.0);
                                         
-                                        ui.label(egui::RichText::new("Capacidades:").small().color(Color32::GRAY));
-                                        ui.label("• Generación de código con IA");
-                                        ui.label("• Análisis inteligente de código");
-                                        ui.label("• Optimización automática");
+                                        // Mostrar templates de DirectX12 con organización mejorada
+                                        let templates = crate::templates::all_templates();
+                                        let filtered: Vec<_> = templates.iter()
+                                            .filter(|t| t.category == "DirectX12")
+                                            .collect();
                                         
+                                        // Agrupar por subcategoría y ordenar
+                                        let mut subcats: Vec<&str> = filtered.iter()
+                                            .map(|t| t.subcategory)
+                                            .collect();
+                                        subcats.dedup();
+                                        
+                                        let dx12_order = ["Base", "Inicialización", "Comandos", "Pipeline", "Recursos", "Librerías", "Renderizado", "Build"];
+                                        subcats.sort_by(|a, b| {
+                                            let a_pos = dx12_order.iter().position(|&x| x == *a).unwrap_or(999);
+                                            let b_pos = dx12_order.iter().position(|&x| x == *b).unwrap_or(999);
+                                            if a_pos == b_pos {
+                                                a.cmp(b)
+                                            } else {
+                                                a_pos.cmp(&b_pos)
+                                            }
+                                        });
+                                        
+                                        egui::ScrollArea::vertical()
+                                            .max_height(400.0)
+                                            .show(ui, |ui| {
+                                                for (subcat_idx, subcat) in subcats.iter().enumerate() {
+                                                    let (subcat_icon, subcat_color, subcat_bg) = match *subcat {
+                                                        "Base" => ("🔰", Color32::from_rgb(100, 200, 100), Color32::from_rgba_unmultiplied(50, 100, 50, 80)),
+                                                        "Inicialización" => ("🔌", Color32::from_rgb(150, 150, 255), Color32::from_rgba_unmultiplied(50, 50, 100, 80)),
+                                                        "Comandos" => ("⚙️", Color32::from_rgb(100, 200, 255), Color32::from_rgba_unmultiplied(40, 60, 100, 80)),
+                                                        "Pipeline" => ("🔧", Color32::from_rgb(200, 100, 255), Color32::from_rgba_unmultiplied(100, 40, 100, 80)),
+                                                        "Recursos" => ("📦", Color32::from_rgb(100, 200, 200), Color32::from_rgba_unmultiplied(40, 100, 100, 80)),
+                                                        "Librerías" => ("📚", Color32::from_rgb(200, 150, 80), Color32::from_rgba_unmultiplied(100, 60, 40, 80)),
+                                                        "Renderizado" => ("🎨", Color32::from_rgb(80, 200, 255), Color32::from_rgba_unmultiplied(30, 80, 100, 80)),
+                                                        "Build" => ("🔧", Color32::from_rgb(100, 150, 255), Color32::from_rgba_unmultiplied(40, 60, 100, 80)),
+                                                        _ => ("📋", Color32::from_rgb(150, 150, 150), Color32::from_rgba_unmultiplied(50, 50, 50, 80)),
+                                                    };
+                                                    
+                                                    let subcat_templates: Vec<_> = filtered.iter()
+                                                        .filter(|t| t.subcategory == *subcat)
+                                                        .collect();
+                                                    
+                                                    egui::Frame::none()
+                                                        .fill(subcat_bg)
+                                                        .stroke(egui::Stroke::new(2.0, subcat_color))
+                                                        .rounding(egui::Rounding::same(6.0))
+                                                        .inner_margin(egui::Margin::symmetric(12.0, 8.0))
+                                                        .show(ui, |ui| {
+                                                            ui.horizontal(|ui| {
+                                                                ui.label(egui::RichText::new(subcat_icon).size(18.0).color(subcat_color));
+                                                                ui.add_space(8.0);
+                                                                ui.label(egui::RichText::new(*subcat)
+                                                                    .strong()
+                                                                    .size(14.0)
+                                                                    .color(Color32::WHITE));
+                                                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                                    ui.label(egui::RichText::new(format!("({})", subcat_templates.len()))
+                                                                        .size(11.0)
+                                                                        .color(Color32::from_rgb(180, 180, 200)));
+                                                                });
+                                                            });
+                                                        });
+                                                    ui.add_space(8.0);
+                                                    
+                                                    for template in subcat_templates.iter() {
+                                                        let color = Color32::from_rgb(template.color.0, template.color.1, template.color.2);
+                                                        let template_cloned = (**template).clone();
+                                                        
+                                                        let (rect, response) = ui.allocate_exact_size(
+                                                            egui::vec2(ui.available_width(), 36.0),
+                                                            egui::Sense::click()
+                                                        );
+                                                        
+                                                        let is_hovered = response.hovered();
+                                                        
+                                                        let template_bg = if is_hovered {
+                                                            Color32::from_rgba_unmultiplied(
+                                                                (color.r() as u32 * 8 / 255 + 50) as u8,
+                                                                (color.g() as u32 * 8 / 255 + 50) as u8,
+                                                                (color.b() as u32 * 8 / 255 + 50) as u8,
+                                                                180
+                                                            )
+                                                        } else {
+                                                            Color32::from_rgba_unmultiplied(45, 50, 60, 150)
+                                                        };
+                                                        
+                                                        let template_border = if is_hovered {
+                                                            Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 220)
+                                                        } else {
+                                                            color
+                                                        };
+                                                        
+                                                        ui.painter().rect_filled(rect, 6.0, template_bg);
+                                                        ui.painter().rect_stroke(rect, 6.0, egui::Stroke::new(1.8, template_border));
+                                                        
+                                                        ui.painter().rect_filled(
+                                                            egui::Rect::from_min_size(rect.left_top(), egui::vec2(4.0, rect.height())),
+                                                            0.0,
+                                                            color
+                                                        );
+                                                        
+                                                        let icon_pos = rect.left_top() + egui::vec2(16.0, 18.0);
+                                                        ui.painter().text(
+                                                            icon_pos,
+                                                            egui::Align2::LEFT_CENTER,
+                                                            template.icon,
+                                                            egui::FontId::proportional(17.0),
+                                                            color
+                                                        );
+                                                        
+                                                        let text_pos = rect.left_top() + egui::vec2(48.0, 18.0);
+                                                        ui.painter().text(
+                                                            text_pos,
+                                                            egui::Align2::LEFT_CENTER,
+                                                            template.name,
+                                                            egui::FontId::proportional(12.5),
+                                                            Color32::from_rgb(235, 235, 240)
+                                                        );
+                                                        
+                                                        if is_hovered {
+                                                            let hover_rect = rect.expand(1.0);
+                                                            ui.painter().rect_stroke(
+                                                                hover_rect,
+                                                                6.0,
+                                                                egui::Stroke::new(0.5, Color32::from_rgba_unmultiplied(255, 255, 255, 100))
+                                                            );
+                                                        }
+                                                        
+                                                        if response.clicked() {
+                                                            template_to_add = Some(template_cloned);
+                                                            close_menu = true;
+                                                        }
+                                                        
+                                                        ui.add_space(3.0);
+                                                    }
+                                                    
+                                                    if subcat_idx < subcats.len() - 1 {
+                                                        ui.add_space(12.0);
+                                                        let (sep_rect, _) = ui.allocate_exact_size(
+                                                            egui::vec2(ui.available_width(), 1.0),
+                                                            egui::Sense::hover()
+                                                        );
+                                                        ui.painter().rect_filled(
+                                                            sep_rect,
+                                                            0.0,
+                                                            Color32::from_rgba_unmultiplied(
+                                                                dx12_color.r(),
+                                                                dx12_color.g(),
+                                                                dx12_color.b(),
+                                                                40
+                                                            )
+                                                        );
+                                                        ui.add_space(12.0);
+                                                    } else {
+                                                        ui.add_space(4.0);
+                                                    }
+                                                }
+                                            });
                                     } else {
-                                        // Mostrar templates de la categoría seleccionada
+                                        // Mostrar templates de la categoría seleccionada con organización mejorada
                                         let templates = crate::templates::all_templates();
                                         let filtered: Vec<_> = templates.iter()
                                             .filter(|t| t.category == cat.as_str())
                                             .collect();
                                         
-                                        // Agrupar por subcategoría
+                                        // Agrupar por subcategoría y ordenar lógicamente
                                         let mut subcats: Vec<&str> = filtered.iter()
                                             .map(|t| t.subcategory)
                                             .collect();
-                                        subcats.sort();
                                         subcats.dedup();
                                         
+                                        // Ordenar subcategorías de manera lógica: Básico -> Intermedio -> Avanzado -> Librerías -> Otros
+                                        let order = ["Básico", "Intermedio", "Avanzado", "Librerías"];
+                                        subcats.sort_by(|a, b| {
+                                            let a_pos = order.iter().position(|&x| x == *a).unwrap_or(999);
+                                            let b_pos = order.iter().position(|&x| x == *b).unwrap_or(999);
+                                            if a_pos == b_pos {
+                                                a.cmp(b) // Si no están en la lista, orden alfabético
+                                            } else {
+                                                a_pos.cmp(&b_pos)
+                                            }
+                                        });
+                                        
+                                        // Header de categoría mejorado
+                                        ui.horizontal(|ui| {
+                                            ui.label(egui::RichText::new("📚").size(20.0).color(Color32::from_rgb(150, 200, 255)));
+                                            ui.label(egui::RichText::new(cat.as_str())
+                                                .strong()
+                                                .size(16.0)
+                                                .color(Color32::from_rgb(220, 230, 240)));
+                                        });
+                                        ui.add_space(8.0);
+                                        ui.separator();
+                                        ui.add_space(8.0);
+                                        
                                         egui::ScrollArea::vertical()
-                                            .max_height(300.0)
+                                            .max_height(450.0)
                                             .show(ui, |ui| {
-                                                for subcat in subcats {
-                                                    ui.label(egui::RichText::new(subcat).strong().color(Color32::from_rgb(150, 150, 150)));
-                                                    ui.add_space(4.0);
+                                                for (subcat_idx, subcat) in subcats.iter().enumerate() {
+                                                    // Determinar color y estilo según tipo de subcategoría
+                                                    let (subcat_icon, subcat_color, subcat_bg) = match *subcat {
+                                                        "Básico" => ("🔰", Color32::from_rgb(100, 200, 100), Color32::from_rgba_unmultiplied(50, 100, 50, 80)),
+                                                        "Intermedio" => ("⚡", Color32::from_rgb(200, 180, 80), Color32::from_rgba_unmultiplied(100, 80, 40, 80)),
+                                                        "Avanzado" => ("🔥", Color32::from_rgb(200, 80, 80), Color32::from_rgba_unmultiplied(100, 40, 40, 80)),
+                                                        "Librerías" => ("📦", Color32::from_rgb(100, 150, 255), Color32::from_rgba_unmultiplied(40, 60, 100, 80)),
+                                                        _ => ("📋", Color32::from_rgb(150, 150, 150), Color32::from_rgba_unmultiplied(50, 50, 50, 80)),
+                                                    };
                                                     
-                                                    for template in filtered.iter().filter(|t| t.subcategory == subcat) {
+                                                    // Header de subcategoría mejorado y destacado
+                                                    let subcat_templates: Vec<_> = filtered.iter()
+                                                        .filter(|t| t.subcategory == *subcat)
+                                                        .collect();
+                                                    
+                                                    egui::Frame::none()
+                                                        .fill(subcat_bg)
+                                                        .stroke(egui::Stroke::new(2.0, subcat_color))
+                                                        .rounding(egui::Rounding::same(6.0))
+                                                        .inner_margin(egui::Margin::symmetric(12.0, 8.0))
+                                                        .show(ui, |ui| {
+                                                            ui.horizontal(|ui| {
+                                                                ui.label(egui::RichText::new(subcat_icon).size(18.0).color(subcat_color));
+                                                                ui.add_space(8.0);
+                                                                ui.label(egui::RichText::new(*subcat)
+                                                                    .strong()
+                                                                    .size(14.0)
+                                                                    .color(Color32::WHITE));
+                                                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                                    ui.label(egui::RichText::new(format!("({})", subcat_templates.len()))
+                                                                        .size(11.0)
+                                                                        .color(Color32::from_rgb(180, 180, 200)));
+                                                                });
+                                                            });
+                                                        });
+                                                    ui.add_space(8.0);
+                                                    
+                                                    // Templates organizados en grid o lista mejorada
+                                                    for (template_idx, template) in subcat_templates.iter().enumerate() {
                                                         let color = Color32::from_rgb(template.color.0, template.color.1, template.color.2);
-                                                        let btn_text = format!("{} {}", template.icon, template.name);
+                                                        let template_cloned = (**template).clone();
                                                         
-                                                        if ui.add(egui::Button::new(
-                                                            egui::RichText::new(&btn_text).color(color)
-                                                        ).min_size(Vec2::new(180.0, 24.0))).clicked() {
-                                                            template_to_add = Some((*template).clone());
+                                                        // Crear área interactiva
+                                                        let (rect, response) = ui.allocate_exact_size(
+                                                            egui::vec2(ui.available_width(), 36.0),
+                                                            egui::Sense::click()
+                                                        );
+                                                        
+                                                        let is_hovered = response.hovered();
+                                                        
+                                                        // Fondo y borde según estado
+                                                        let template_bg = if is_hovered {
+                                                            Color32::from_rgba_unmultiplied(
+                                                                (color.r() as u32 * 8 / 255 + 50) as u8,
+                                                                (color.g() as u32 * 8 / 255 + 50) as u8,
+                                                                (color.b() as u32 * 8 / 255 + 50) as u8,
+                                                                180
+                                                            )
+                                                        } else {
+                                                            Color32::from_rgba_unmultiplied(45, 50, 60, 150)
+                                                        };
+                                                        
+                                                        let template_border = if is_hovered {
+                                                            Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 220)
+                                                        } else {
+                                                            color
+                                                        };
+                                                        
+                                                        // Dibujar fondo y borde
+                                                        ui.painter().rect_filled(
+                                                            rect,
+                                                            6.0,
+                                                            template_bg
+                                                        );
+                                                        ui.painter().rect_stroke(
+                                                            rect,
+                                                            6.0,
+                                                            egui::Stroke::new(1.8, template_border)
+                                                        );
+                                                        
+                                                        // Indicador lateral izquierdo con color
+                                                        ui.painter().rect_filled(
+                                                            egui::Rect::from_min_size(
+                                                                rect.left_top(),
+                                                                egui::vec2(4.0, rect.height())
+                                                            ),
+                                                            0.0,
+                                                            color
+                                                        );
+                                                        
+                                                        // Dibujar contenido
+                                                        let icon_pos = rect.left_top() + egui::vec2(16.0, 18.0);
+                                                        ui.painter().text(
+                                                            icon_pos,
+                                                            egui::Align2::LEFT_CENTER,
+                                                            template.icon,
+                                                            egui::FontId::proportional(17.0),
+                                                            color
+                                                        );
+                                                        
+                                                        let text_pos = rect.left_top() + egui::vec2(48.0, 18.0);
+                                                        ui.painter().text(
+                                                            text_pos,
+                                                            egui::Align2::LEFT_CENTER,
+                                                            template.name,
+                                                            egui::FontId::proportional(12.5),
+                                                            Color32::from_rgb(235, 235, 240)
+                                                        );
+                                                        
+                                                        // Indicador de click (opcional, visual)
+                                                        if is_hovered {
+                                                            let hover_rect = rect.expand(1.0);
+                                                            ui.painter().rect_stroke(
+                                                                hover_rect,
+                                                                6.0,
+                                                                egui::Stroke::new(0.5, Color32::from_rgba_unmultiplied(255, 255, 255, 100))
+                                                            );
+                                                        }
+                                                        
+                                                        if response.clicked() {
+                                                            template_to_add = Some(template_cloned);
                                                             close_menu = true;
                                                         }
+                                                        
+                                                        ui.add_space(3.0);
                                                     }
                                                     
-                                                    ui.add_space(8.0);
+                                                    // Separador entre subcategorías (excepto la última)
+                                                    if subcat_idx < subcats.len() - 1 {
+                                                        ui.add_space(12.0);
+                                                        let (sep_rect, _) = ui.allocate_exact_size(
+                                                            egui::vec2(ui.available_width(), 1.0),
+                                                            egui::Sense::hover()
+                                                        );
+                                                        ui.painter().rect_filled(
+                                                            sep_rect,
+                                                            0.0,
+                                                            Color32::from_rgba_unmultiplied(100, 150, 255, 40)
+                                                        );
+                                                        ui.add_space(12.0);
+                                                    } else {
+                                                        ui.add_space(4.0);
+                                                    }
+                                                }
+                                                
+                                                // Si no hay templates, mostrar mensaje
+                                                if filtered.is_empty() {
+                                                    ui.centered_and_justified(|ui| {
+                                                        egui::Frame::none()
+                                                            .fill(Color32::from_rgba_unmultiplied(50, 50, 50, 100))
+                                                            .rounding(egui::Rounding::same(6.0))
+                                                            .inner_margin(egui::Margin::symmetric(20.0, 15.0))
+                                                            .show(ui, |ui| {
+                                                                ui.label(egui::RichText::new("📭 No hay templates disponibles")
+                                                                    .size(13.0)
+                                                                    .color(Color32::GRAY));
+                                                            });
+                                                    });
                                                 }
                                             });
                                     }
                                 } else {
-                                    // Sin categoría seleccionada
+                                    // Sin categoría seleccionada - mostrar mensaje mejorado
                                     ui.centered_and_justified(|ui| {
-                                        ui.label(egui::RichText::new("← Selecciona una categoría").color(Color32::GRAY));
+                                        egui::Frame::none()
+                                            .fill(Color32::from_rgba_unmultiplied(50, 50, 50, 100))
+                                            .rounding(egui::Rounding::same(8.0))
+                                            .inner_margin(egui::Margin::symmetric(20.0, 15.0))
+                                            .show(ui, |ui| {
+                                                ui.vertical_centered(|ui| {
+                                                    ui.label(egui::RichText::new("👆").size(32.0));
+                                                    ui.add_space(8.0);
+                                                    ui.label(egui::RichText::new("Selecciona una categoría")
+                                                        .size(14.0)
+                                                        .strong()
+                                                        .color(Color32::from_rgb(200, 200, 210)));
+                                                    ui.add_space(4.0);
+                                                    ui.label(egui::RichText::new("para ver los templates disponibles")
+                                                        .size(12.0)
+                                                        .color(Color32::GRAY));
+                                                });
+                                            });
                                     });
                                 }
                             });
