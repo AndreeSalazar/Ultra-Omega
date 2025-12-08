@@ -22,10 +22,13 @@ pub struct TerminalManager {
     pub cpp_output: String,
     pub rust_output: String,
     pub zig_output: String,
+    pub java_output: String,
     pub active_tab: TerminalTab,
     pub visible: bool,
     pub pinned: bool,
     pub hide_timer: f32,
+    // Para Java: almacenar el nombre de la clase principal compilada
+    pub java_main_class: Option<String>,
 }
 
 #[derive(PartialEq, Eq, Default, Clone, Copy)]
@@ -36,6 +39,7 @@ pub enum TerminalTab {
     Cpp,
     Rust,
     Zig,
+    Java,
     Mojo,
 }
 
@@ -47,10 +51,12 @@ impl Default for TerminalManager {
             cpp_output: String::new(),
             rust_output: String::new(),
             zig_output: String::new(),
+            java_output: String::new(),
             active_tab: TerminalTab::default(),
             visible: false,
             pinned: false,
             hide_timer: 0.0,
+            java_main_class: None,
         }
     }
 }
@@ -62,6 +68,7 @@ pub enum Language {
     Cpp,
     Rust,
     Zig,
+    Java,
     Mojo,
 }
 
@@ -126,6 +133,7 @@ impl TerminalManager {
             Language::Cpp => (&mut self.cpp_output, TerminalTab::Cpp),
             Language::Rust => (&mut self.rust_output, TerminalTab::Rust),
             Language::Zig => (&mut self.zig_output, TerminalTab::Zig),
+            Language::Java => (&mut self.java_output, TerminalTab::Java),
             Language::Mojo => {
                 // Mojo usa el buffer de Rust por ahora (o se puede crear uno específico)
                 (&mut self.rust_output, TerminalTab::Mojo)
@@ -151,10 +159,44 @@ impl TerminalManager {
             Language::Cpp => Self::compile_cpp(code, &work_dir, exe_file_str, output_buffer),
             Language::Rust => Self::compile_rust(code, &work_dir, exe_file_str, output_buffer),
             Language::Zig => Self::compile_zig(code, &work_dir, exe_file_str, output_buffer),
+            Language::Java => {
+                if let Some(main_class) = Self::compile_java(code, &work_dir, output_buffer) {
+                    self.java_main_class = Some(main_class.clone());
+                    // Ejecutar Java
+                    output_buffer.push_str(">>> Ejecutando...\n\n");
+                    let java_path = Self::find_compiler_cmd("java", output_buffer);
+                    if let Some(java_cmd) = java_path {
+                        match Command::new(&java_cmd)
+                            .current_dir(&work_dir)
+                            .arg(&main_class)
+                            .output()
+                        {
+                            Ok(run_out) => {
+                                output_buffer.push_str("--- SALIDA DEL PROGRAMA ---\n");
+                                output_buffer.push_str(&String::from_utf8_lossy(&run_out.stdout));
+                                if !run_out.stderr.is_empty() {
+                                    output_buffer.push_str(&String::from_utf8_lossy(&run_out.stderr));
+                                }
+                                output_buffer.push_str("\n---------------------------\n");
+                                if let Some(code) = run_out.status.code() {
+                                    output_buffer.push_str(&format!("Exit code: {}\n", code));
+                                }
+                            }
+                            Err(e) => {
+                                output_buffer.push_str(&format!("Error ejecutando programa: {}\n", e));
+                            }
+                        }
+                    } else {
+                        output_buffer.push_str(">>> Error: No se encontró 'java' en PATH.\n");
+                        output_buffer.push_str(">>> Asegúrate de tener el JDK instalado.\n");
+                    }
+                }
+                return;
+            }
             Language::Mojo => Self::compile_mojo(code, &work_dir, exe_file_str, output_buffer),
         }
 
-        // Run if compiled
+        // Run if compiled (para Java se maneja por separado)
         if exe_path.exists() {
             output_buffer.push_str(">>> Ejecutando...\n\n");
             match Command::new(&exe_path)
@@ -707,6 +749,107 @@ impl TerminalManager {
                 }
             }
         }
+    }
+
+    fn compile_java(code: &str, work_dir: &Path, output: &mut String) -> Option<String> {
+        let temp_file = work_dir.join("Main.java");
+        if let Err(e) = std::fs::write(&temp_file, code) {
+            output.push_str(&format!("Error guardando archivo: {}\n", e));
+            return None;
+        }
+        
+        // Buscar javac
+        let javac_path = Self::find_compiler_cmd("javac", output);
+        if javac_path.is_none() {
+            output.push_str(">>> Error: No se encontró javac (Java Compiler).\n");
+            output.push_str(">>> Instala el JDK (Java Development Kit):\n");
+            #[cfg(target_os = "windows")]
+            {
+                output.push_str(">>>   Descarga desde: https://adoptium.net/\n");
+                output.push_str(">>>   O con chocolatey: choco install temurin\n");
+            }
+            #[cfg(target_os = "linux")]
+            {
+                output.push_str(">>>   sudo apt install openjdk-25-jdk\n");
+                output.push_str(">>>   O desde: https://adoptium.net/\n");
+            }
+            #[cfg(target_os = "macos")]
+            {
+                output.push_str(">>>   brew install --cask temurin\n");
+                output.push_str(">>>   O desde: https://adoptium.net/\n");
+            }
+            return None;
+        }
+        
+        let javac_cmd = javac_path.unwrap();
+        output.push_str(&format!(">>> Usando javac: {}\n", javac_cmd));
+        
+        // Compilar con Java 25 (usando --release 25 o --source 25 --target 25)
+        let cmd_output = Command::new(&javac_cmd)
+            .current_dir(work_dir)
+            .args(&["--source", "25", "--target", "25", "--enable-preview", temp_file.file_name().unwrap().to_str().unwrap()])
+            .output();
+        
+        match cmd_output {
+            Ok(out) => {
+                let stderr = String::from_utf8_lossy(&out.stderr);
+                let stdout = String::from_utf8_lossy(&out.stdout);
+                
+                if !stdout.is_empty() {
+                    output.push_str("javac Output:\n");
+                    output.push_str(&stdout);
+                }
+                
+                if !stderr.is_empty() {
+                    output.push_str("javac Error/Log:\n");
+                    output.push_str(&stderr);
+                }
+                
+                if out.status.success() {
+                    output.push_str(">>> Java: Compilación exitosa.\n");
+                    
+                    // Extraer el nombre de la clase principal del código
+                    let main_class = Self::extract_java_main_class(code);
+                    if let Some(class_name) = main_class {
+                        return Some(class_name);
+                    } else {
+                        // Por defecto usar "Main"
+                        output.push_str(">>> Advertencia: No se pudo determinar la clase principal, usando 'Main'\n");
+                        return Some("Main".to_string());
+                    }
+                } else {
+                    output.push_str(">>> Java: Error de compilación.\n");
+                    if let Some(code) = out.status.code() {
+                        output.push_str(&format!(">>> Exit code: {}\n", code));
+                    }
+                    return None;
+                }
+            }
+            Err(e) => {
+                output.push_str(&format!("Error ejecutando javac: {}\n", e));
+                output.push_str(">>> javac no está instalado o no está en PATH.\n");
+                return None;
+            }
+        }
+    }
+    
+    // Función helper para extraer el nombre de la clase principal de Java
+    fn extract_java_main_class(code: &str) -> Option<String> {
+        // Buscar "public class" seguido del nombre
+        for line in code.lines() {
+            let trimmed = line.trim();
+            if trimmed.starts_with("public class") {
+                // Extraer el nombre de la clase
+                let parts: Vec<&str> = trimmed.split_whitespace().collect();
+                if parts.len() >= 3 && parts[0] == "public" && parts[1] == "class" {
+                    let class_name = parts[2];
+                    // Remover llaves si están en la misma línea
+                    let class_name = class_name.trim_end_matches('{').trim();
+                    return Some(class_name.to_string());
+                }
+            }
+        }
+        None
     }
 
     fn compile_mojo(code: &str, work_dir: &Path, exe_file: &str, output: &mut String) {

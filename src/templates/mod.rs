@@ -141,6 +141,48 @@ pub mod cpp {
 // ══════════════════════════════════════════
 // RUST
 // ══════════════════════════════════════════
+// ══════════════════════════════════════════
+// JAVA 25 - Lenguaje orientado a objetos multiplataforma
+// ══════════════════════════════════════════
+pub mod java {
+    // Básicos
+    pub const HELLO: &str = include_str!("java/hello_world.java");
+    pub const VARIABLES: &str = include_str!("java/variables.java");
+    pub const CLASSES: &str = include_str!("java/classes.java");
+    pub const METHODS: &str = include_str!("java/methods.java");
+    
+    // Intermedio
+    pub const COLLECTIONS: &str = include_str!("java/collections.java");
+    pub const GENERICS: &str = include_str!("java/generics.java");
+    pub const EXCEPTIONS: &str = include_str!("java/exceptions.java");
+    pub const INTERFACES: &str = include_str!("java/interfaces.java");
+    pub const INHERITANCE: &str = include_str!("java/inheritance.java");
+    
+    // Avanzado
+    pub const STREAMS: &str = include_str!("java/streams.java");
+    pub const LAMBDAS: &str = include_str!("java/lambdas.java");
+    pub const CONCURRENCY: &str = include_str!("java/concurrency.java");
+    pub const REFLECTION: &str = include_str!("java/reflection.java");
+    pub const ANNOTATIONS: &str = include_str!("java/annotations.java");
+    pub const RECORDS: &str = include_str!("java/records.java");
+    pub const SEALED_CLASSES: &str = include_str!("java/sealed_classes.java");
+    pub const PATTERN_MATCHING: &str = include_str!("java/pattern_matching.java");
+    pub const TEXT_BLOCKS: &str = include_str!("java/text_blocks.java");
+    
+    // Java 25 - Características más recientes
+    pub const VIRTUAL_THREADS: &str = include_str!("java/virtual_threads.java");
+    pub const SWITCH_EXPRESSIONS: &str = include_str!("java/switch_expressions.java");
+    pub const RECORD_PATTERNS: &str = include_str!("java/record_patterns.java");
+    pub const FOREIGN_MEMORY: &str = include_str!("java/foreign_memory.java");
+    pub const STRUCTURED_CONCURRENCY: &str = include_str!("java/structured_concurrency.java");
+    
+    // Librerías
+    pub const LIB_UTILS: &str = include_str!("java/lib_utils.java");
+    pub const LIB_COLLECTIONS: &str = include_str!("java/lib_collections.java");
+    pub const LIB_IO: &str = include_str!("java/lib_io.java");
+    pub const LIB_ASYNC: &str = include_str!("java/lib_async.java");
+}
+
 pub mod rust {
     // ═══════════════════════════════════════
     // BÁSICO
@@ -993,6 +1035,265 @@ pub fn all_templates() -> Vec<Template> {
             color: (0xf0, 0xaa, 0x00),
             icon: "⚡",
             language: NodeLanguage::Zig,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // JAVA 25 - BÁSICO
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "Hola Mundo",
+            code: java::HELLO,
+            category: "Java",
+            subcategory: "Básico",
+            color: (0xed, 0x8b, 0x00),
+            icon: "☕",
+            language: NodeLanguage::Java,
+        },
+        Template {
+            name: "Variables y Tipos",
+            code: java::VARIABLES,
+            category: "Java",
+            subcategory: "Básico",
+            color: (0xed, 0x8b, 0x00),
+            icon: "📦",
+            language: NodeLanguage::Java,
+        },
+        Template {
+            name: "Clases y Objetos",
+            code: java::CLASSES,
+            category: "Java",
+            subcategory: "Básico",
+            color: (0xed, 0x8b, 0x00),
+            icon: "🏛️",
+            language: NodeLanguage::Java,
+        },
+        Template {
+            name: "Métodos y Funciones",
+            code: java::METHODS,
+            category: "Java",
+            subcategory: "Básico",
+            color: (0xed, 0x8b, 0x00),
+            icon: "⚡",
+            language: NodeLanguage::Java,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // JAVA 25 - INTERMEDIO
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "Colecciones",
+            code: java::COLLECTIONS,
+            category: "Java",
+            subcategory: "Intermedio",
+            color: (0xed, 0x8b, 0x00),
+            icon: "📚",
+            language: NodeLanguage::Java,
+        },
+        Template {
+            name: "Genéricos",
+            code: java::GENERICS,
+            category: "Java",
+            subcategory: "Intermedio",
+            color: (0xed, 0x8b, 0x00),
+            icon: "🔀",
+            language: NodeLanguage::Java,
+        },
+        Template {
+            name: "Excepciones",
+            code: java::EXCEPTIONS,
+            category: "Java",
+            subcategory: "Intermedio",
+            color: (0xed, 0x8b, 0x00),
+            icon: "⚠️",
+            language: NodeLanguage::Java,
+        },
+        Template {
+            name: "Interfaces",
+            code: java::INTERFACES,
+            category: "Java",
+            subcategory: "Intermedio",
+            color: (0xed, 0x8b, 0x00),
+            icon: "🔌",
+            language: NodeLanguage::Java,
+        },
+        Template {
+            name: "Herencia",
+            code: java::INHERITANCE,
+            category: "Java",
+            subcategory: "Intermedio",
+            color: (0xed, 0x8b, 0x00),
+            icon: "🔗",
+            language: NodeLanguage::Java,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // JAVA 25 - AVANZADO
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "Streams API",
+            code: java::STREAMS,
+            category: "Java",
+            subcategory: "Avanzado",
+            color: (0xed, 0x8b, 0x00),
+            icon: "🌊",
+            language: NodeLanguage::Java,
+        },
+        Template {
+            name: "Lambdas",
+            code: java::LAMBDAS,
+            category: "Java",
+            subcategory: "Avanzado",
+            color: (0xed, 0x8b, 0x00),
+            icon: "λ",
+            language: NodeLanguage::Java,
+        },
+        Template {
+            name: "Concurrencia",
+            code: java::CONCURRENCY,
+            category: "Java",
+            subcategory: "Avanzado",
+            color: (0xed, 0x8b, 0x00),
+            icon: "⚙️",
+            language: NodeLanguage::Java,
+        },
+        Template {
+            name: "Reflection",
+            code: java::REFLECTION,
+            category: "Java",
+            subcategory: "Avanzado",
+            color: (0xed, 0x8b, 0x00),
+            icon: "🔮",
+            language: NodeLanguage::Java,
+        },
+        Template {
+            name: "Anotaciones",
+            code: java::ANNOTATIONS,
+            category: "Java",
+            subcategory: "Avanzado",
+            color: (0xed, 0x8b, 0x00),
+            icon: "🏷️",
+            language: NodeLanguage::Java,
+        },
+        Template {
+            name: "Records",
+            code: java::RECORDS,
+            category: "Java",
+            subcategory: "Avanzado",
+            color: (0xed, 0x8b, 0x00),
+            icon: "📋",
+            language: NodeLanguage::Java,
+        },
+        Template {
+            name: "Sealed Classes",
+            code: java::SEALED_CLASSES,
+            category: "Java",
+            subcategory: "Avanzado",
+            color: (0xed, 0x8b, 0x00),
+            icon: "🔒",
+            language: NodeLanguage::Java,
+        },
+        Template {
+            name: "Pattern Matching",
+            code: java::PATTERN_MATCHING,
+            category: "Java",
+            subcategory: "Avanzado",
+            color: (0xed, 0x8b, 0x00),
+            icon: "🔍",
+            language: NodeLanguage::Java,
+        },
+        Template {
+            name: "Text Blocks",
+            code: java::TEXT_BLOCKS,
+            category: "Java",
+            subcategory: "Avanzado",
+            color: (0xed, 0x8b, 0x00),
+            icon: "📄",
+            language: NodeLanguage::Java,
+        },
+        Template {
+            name: "Virtual Threads",
+            code: java::VIRTUAL_THREADS,
+            category: "Java",
+            subcategory: "Avanzado",
+            color: (0xed, 0x8b, 0x00),
+            icon: "🧵",
+            language: NodeLanguage::Java,
+        },
+        Template {
+            name: "Switch Expressions",
+            code: java::SWITCH_EXPRESSIONS,
+            category: "Java",
+            subcategory: "Avanzado",
+            color: (0xed, 0x8b, 0x00),
+            icon: "🔀",
+            language: NodeLanguage::Java,
+        },
+        Template {
+            name: "Record Patterns",
+            code: java::RECORD_PATTERNS,
+            category: "Java",
+            subcategory: "Avanzado",
+            color: (0xed, 0x8b, 0x00),
+            icon: "🎯",
+            language: NodeLanguage::Java,
+        },
+        Template {
+            name: "Foreign Memory API",
+            code: java::FOREIGN_MEMORY,
+            category: "Java",
+            subcategory: "Avanzado",
+            color: (0xed, 0x8b, 0x00),
+            icon: "💾",
+            language: NodeLanguage::Java,
+        },
+        Template {
+            name: "Structured Concurrency",
+            code: java::STRUCTURED_CONCURRENCY,
+            category: "Java",
+            subcategory: "Avanzado",
+            color: (0xed, 0x8b, 0x00),
+            icon: "🔗",
+            language: NodeLanguage::Java,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // JAVA 25 - LIBRERÍAS (Funciones independientes reutilizables)
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "📚 Utils (Utilidades)",
+            code: java::LIB_UTILS,
+            category: "Java",
+            subcategory: "Librerías",
+            color: (0x80, 0x40, 0x00),
+            icon: "🛠️",
+            language: NodeLanguage::Java,
+        },
+        Template {
+            name: "📚 Collections (Colecciones)",
+            code: java::LIB_COLLECTIONS,
+            category: "Java",
+            subcategory: "Librerías",
+            color: (0x80, 0x40, 0x00),
+            icon: "📚",
+            language: NodeLanguage::Java,
+        },
+        Template {
+            name: "📚 I/O (Entrada/Salida)",
+            code: java::LIB_IO,
+            category: "Java",
+            subcategory: "Librerías",
+            color: (0x80, 0x40, 0x00),
+            icon: "📁",
+            language: NodeLanguage::Java,
+        },
+        Template {
+            name: "📚 Async (Asíncrono)",
+            code: java::LIB_ASYNC,
+            category: "Java",
+            subcategory: "Librerías",
+            color: (0x80, 0x40, 0x00),
+            icon: "⚡",
+            language: NodeLanguage::Java,
         },
         
         // ══════════════════════════════════════════════════════════════

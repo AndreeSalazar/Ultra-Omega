@@ -328,6 +328,7 @@ pub fn draw_sidebar(app: &mut NodeGraphApp, ctx: &egui::Context, _open_factor: f
                                 crate::core::node_graph::NodeLanguage::Cpp => ("⊕", Color32::from_rgb(180, 140, 255)),
                                 crate::core::node_graph::NodeLanguage::Asm => ("⚡", Color32::from_rgb(255, 220, 100)),
                                 crate::core::node_graph::NodeLanguage::Zig => ("⚡", Color32::from_rgb(240, 170, 0)),
+                                crate::core::node_graph::NodeLanguage::Java => ("☕", Color32::from_rgb(237, 139, 0)),
                                 crate::core::node_graph::NodeLanguage::Mojo => ("🔥", Color32::from_rgb(255, 100, 100)),
                                 crate::core::node_graph::NodeLanguage::MojoAI => ("🤖", Color32::from_rgb(255, 150, 100)),
                                 crate::core::node_graph::NodeLanguage::Text => ("📄", Color32::from_rgb(200, 200, 150)),

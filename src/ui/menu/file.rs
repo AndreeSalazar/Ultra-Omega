@@ -178,6 +178,55 @@ pub fn draw_file_menu(ui: &mut egui::Ui, ctx: &egui::Context, app: &mut NodeGrap
         
         ui.separator();
         
+        // ═══════════════════════════════════════════════════════════════════
+        // HDA (Houdini Digital Assets) - Exportar/Importar Assets
+        // ═══════════════════════════════════════════════════════════════════
+        ui.menu_button("📦 Assets (HDA)", |ui| {
+            if ui.button("📤 Export Selected Nodes as HDA...").clicked() {
+                if !app.interaction.selected_nodes.is_empty() {
+                    app.show_hda_export_dialog = true;
+                    // Inicializar campos con valores por defecto
+                    let selected_count = app.interaction.selected_nodes.len();
+                    if app.hda_export_name.is_empty() {
+                        app.hda_export_name = format!("asset_{}", selected_count);
+                    }
+                    if app.hda_export_label.is_empty() {
+                        app.hda_export_label = format!("Asset ({})", selected_count);
+                    }
+                }
+                ui.close_menu();
+            }
+            
+            if ui.button("📤 Export Subnetwork as HDA...").clicked() {
+                if let Some(&selected_id) = app.interaction.selected_nodes.iter().next() {
+                    if let Some(node) = app.graph.node(selected_id) {
+                        if node.subnetwork_graph.is_some() {
+                            app.show_hda_export_dialog = true;
+                            if app.hda_export_name.is_empty() {
+                                app.hda_export_name = node.title.clone().replace(" ", "_").to_lowercase();
+                            }
+                            if app.hda_export_label.is_empty() {
+                                app.hda_export_label = node.title.clone();
+                            }
+                            if app.hda_export_description.is_empty() {
+                                app.hda_export_description = format!("HDA exported from subnetwork: {}", node.title);
+                            }
+                        }
+                    }
+                }
+                ui.close_menu();
+            }
+            
+            ui.separator();
+            
+            if ui.button("📥 Import HDA...").clicked() {
+                app.show_hda_import_dialog = true;
+                ui.close_menu();
+            }
+        });
+        
+        ui.separator();
+        
         // Share and Preferences
         ui.menu_button("Share", |_ui| {
             // TODO: Submenu for share options

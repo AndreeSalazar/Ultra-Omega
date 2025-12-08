@@ -22,6 +22,8 @@ pub enum NodeLanguage {
     Rust,
     /// Zig - Lenguaje de sistemas moderno y seguro
     Zig,
+    /// Java - Lenguaje orientado a objetos multiplataforma (Java 25)
+    Java,
     /// Texto/Documentación - NO se compila, solo visualización
     Text,
     /// Mojo - Lenguaje de alto rendimiento para IA/ML

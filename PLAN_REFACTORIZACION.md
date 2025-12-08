@@ -479,11 +479,22 @@ Nodo B: "Render Loop"
   - [ ] Exportar subnetwork como asset reutilizable (HDA)
   - [ ] Parámetros expuestos al nivel padre (UI completa)
   
-- [ ] **HDAs (Houdini Digital Assets)**: Assets exportables
-  - Exportar grupo de nodos como asset
-  - Importar assets en otros proyectos
-  - Parámetros configurables expuestos
-  - Documentación integrada en el asset
+- [x] **HDAs (Houdini Digital Assets)**: Assets exportables ✅
+  - [x] Exportar grupo de nodos como asset
+  - [x] Exportar subnetwork como asset
+  - [x] Importar assets en otros proyectos
+  - [x] Assets locales y globales (compartidos entre proyectos)
+  - [x] Metadatos completos (nombre, versión, autor, categoría, tags)
+  - [x] Documentación integrada en el asset (README.md)
+  - [x] UI completa para exportar/importar HDAs
+  - [x] Parámetros configurables expuestos ✅
+    - [x] UI para agregar/editar parámetros al exportar
+    - [x] Tipos de parámetros: Float, Int, String, Bool, Enum, Vector3, Color
+    - [x] Validación con min/max para Float e Int
+    - [x] Opciones personalizadas para Enum
+    - [x] UI para configurar parámetros al importar
+    - [x] Aplicación automática de valores de parámetros al código del HDA
+    - [x] Reemplazo de variables en código: `${param_name}`, `{param_name}`, `$param_name`
 
 **Sistema de Parámetros Avanzado:**
 - [ ] **Parameter Editor**: Panel dedicado para editar parámetros
@@ -1012,7 +1023,7 @@ impl Workspace {
 
 ## 📊 Estado General del Proyecto
 
-**Última actualización**: 2025-01-07 (Fase 7: Librerías Modulares - DirectX12 completado)
+**Última actualización**: 2025-01-27 (HDAs - Parámetros Configurables Expuestos completado)
 
 ### Progreso por Fases:
 

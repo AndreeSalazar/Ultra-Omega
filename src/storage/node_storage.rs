@@ -94,6 +94,7 @@ impl NodeStorage {
             NodeLanguage::C => "c",
             NodeLanguage::Cpp => "cpp",
             NodeLanguage::Zig => "zig",
+            NodeLanguage::Java => "java",
             NodeLanguage::Mojo => "mojo",
             NodeLanguage::MojoAI => "mojo",
             NodeLanguage::Text => "txt",

@@ -36,6 +36,22 @@ pub struct NodeGraphApp {
     // ═══════════════════════════════════════════════════════════════════
     /// Pila de niveles de red (para navegación jerárquica)
     pub network_levels: Vec<NetworkLevel>,
+    // ═══════════════════════════════════════════════════════════════════
+    // 🆕 SISTEMA DE HDAs (Houdini Digital Assets)
+    // ═══════════════════════════════════════════════════════════════════
+    pub show_hda_export_dialog: bool,
+    pub show_hda_import_dialog: bool,
+    pub hda_export_name: String,
+    pub hda_export_label: String,
+    pub hda_export_description: String,
+    pub hda_export_author: String,
+    pub hda_export_category: String,
+    pub hda_export_to_global: bool,
+    // Parámetros del HDA que se está exportando
+    pub hda_export_parameters: Vec<crate::storage::HDAParameter>,
+    // Parámetros del HDA que se está importando (nombre -> valor)
+    pub hda_import_parameter_values: std::collections::HashMap<String, String>,
+    pub hda_import_selected_asset: Option<(std::path::PathBuf, crate::storage::HDAInfo)>,
 }
 
 /// Representa un nivel de red en la jerarquía de subnetworks
@@ -165,6 +181,18 @@ impl NodeGraphApp {
                 parent_subnetwork_id: None,
                 breadcrumbs: vec!["Root".to_string()],
             }],
+            // HDA system
+            show_hda_export_dialog: false,
+            show_hda_import_dialog: false,
+            hda_export_name: String::new(),
+            hda_export_label: String::new(),
+            hda_export_description: String::new(),
+            hda_export_author: String::new(),
+            hda_export_category: String::from("General"),
+            hda_export_to_global: false,
+            hda_export_parameters: Vec::new(),
+            hda_import_parameter_values: std::collections::HashMap::new(),
+            hda_import_selected_asset: None,
         };
         
         // Load workspace if configured
@@ -513,6 +541,7 @@ impl NodeGraphApp {
             NodeLanguage::Cpp => crate::compilation::terminal::Language::Cpp,
             NodeLanguage::Rust => crate::compilation::terminal::Language::Rust,
             NodeLanguage::Zig => crate::compilation::terminal::Language::Zig,
+            NodeLanguage::Java => crate::compilation::terminal::Language::Java,
             NodeLanguage::Text => crate::compilation::terminal::Language::C, // Text no se compila realmente
             NodeLanguage::Mojo => crate::compilation::terminal::Language::Mojo,
             NodeLanguage::MojoAI => crate::compilation::terminal::Language::Mojo, // MojoAI también usa Mojo
@@ -520,6 +549,8 @@ impl NodeGraphApp {
                 let lower = node_title.to_lowercase();
                 if lower.contains("asm") {
                     crate::compilation::terminal::Language::Nasm
+                } else if lower.contains("java") {
+                    crate::compilation::terminal::Language::Java
                 } else if lower.contains("zig") {
                     crate::compilation::terminal::Language::Zig
                 } else if lower.contains("cpp") || lower.contains("c++") {
@@ -695,6 +726,7 @@ impl NodeGraphApp {
                     ui.selectable_value(&mut self.terminal.active_tab, TerminalTab::Cpp, "Terminal C++");
                     ui.selectable_value(&mut self.terminal.active_tab, TerminalTab::Rust, "Terminal Rust");
                     ui.selectable_value(&mut self.terminal.active_tab, TerminalTab::Zig, "Terminal Zig");
+                    ui.selectable_value(&mut self.terminal.active_tab, TerminalTab::Java, "Terminal Java");
                     
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         // Pin button
@@ -721,6 +753,7 @@ impl NodeGraphApp {
                         TerminalTab::Cpp => &mut self.terminal.cpp_output,
                         TerminalTab::Rust => &mut self.terminal.rust_output,
                         TerminalTab::Zig => &mut self.terminal.zig_output,
+                        TerminalTab::Java => &mut self.terminal.java_output,
                         TerminalTab::Mojo => &mut self.terminal.rust_output, // Mojo usa el buffer de Rust por ahora
                     };
                     
@@ -830,8 +863,8 @@ impl NodeGraphApp {
                                 }
                                 
                                 // Categorías de templates con mejor diseño
-                                let categories = ["Assembler (Windows)", "Assembler (Linux)", "C", "C++", "Rust", "Zig", "FastOS ASM+Rust+Zig", "Vulkan", "DirectX12"];
-                                let category_icons = ["🔧", "🐧", "📘", "📗", "🦀", "⚡", "🚀", "🎮", "💎"];
+                                let categories = ["Assembler (Windows)", "Assembler (Linux)", "C", "C++", "Rust", "Zig", "Java", "FastOS ASM+Rust+Zig", "Vulkan", "DirectX12"];
+                                let category_icons = ["🔧", "🐧", "📘", "📗", "🦀", "⚡", "☕", "🚀", "🎮", "💎"];
                                 let category_colors = [
                                     Color32::from_rgb(0xff, 0x47, 0x00), // Naranja para Windows
                                     Color32::from_rgb(0x00, 0xaa, 0xff), // Cyan para Linux
@@ -839,6 +872,7 @@ impl NodeGraphApp {
                                     Color32::from_rgb(0x00, 0x44, 0x82),
                                     Color32::from_rgb(0xde, 0x39, 0x00),
                                     Color32::from_rgb(0xf0, 0xaa, 0x00), // Amarillo/naranja para Zig
+                                    Color32::from_rgb(0xed, 0x8b, 0x00), // Naranja Java (Java orange)
                                     Color32::from_rgb(0xFF, 0x44, 0x00), // Naranja/Rojo para FastOS ASM+Rust+Zig
                                     Color32::from_rgb(0xac, 0x14, 0x2c), // Rojo Vulkan
                                     Color32::from_rgb(0x00, 0x7a, 0xcc), // Azul DirectX12
@@ -2054,6 +2088,12 @@ impl NodeGraphApp {
         }
         
         // ═══════════════════════════════════════════════════════════════
+        // 🆕 DIÁLOGOS DE HDA (Houdini Digital Assets)
+        // ═══════════════════════════════════════════════════════════════
+        self.hda_export_dialog_ui(ctx);
+        self.hda_import_dialog_ui(ctx);
+        
+        // ═══════════════════════════════════════════════════════════════
         // MENÚ F3 - Búsqueda rápida estilo Blender
         // ═══════════════════════════════════════════════════════════════
         if self.show_search_menu {
@@ -3092,17 +3132,19 @@ impl NodeGraphApp {
                                                                             NodeLanguage::Cpp => ("C++", "⊕", Color32::from_rgb(50, 40, 80)),
                                                                             NodeLanguage::Rust => ("Rust", "🦀", Color32::from_rgb(80, 40, 40)),
                                                                             NodeLanguage::Zig => ("Zig", "⚡", Color32::from_rgb(240, 170, 0)),
+                                                                            NodeLanguage::Java => ("Java", "☕", Color32::from_rgb(237, 139, 0)),
                                                                             NodeLanguage::Text => ("Doc", "📄", Color32::from_rgb(60, 60, 40)),
                                                                             NodeLanguage::Mojo => ("Mojo", "🔥", Color32::from_rgb(200, 50, 50)),
                                                                             NodeLanguage::MojoAI => ("MojoAI", "🤖", Color32::from_rgb(200, 100, 50)),
                                                                             NodeLanguage::Auto => ("Auto", "⚙", Color32::from_rgb(50, 50, 50)),
                                                                         };
-                                                                        let lang_color = match language {
+                                                                        let lang_color = match *language {
                                                                             NodeLanguage::Asm => Color32::from_rgb(255, 170, 120),
                                                                             NodeLanguage::C => Color32::from_rgb(120, 200, 255),
                                                                             NodeLanguage::Cpp => Color32::from_rgb(180, 140, 255),
                                                                             NodeLanguage::Rust => Color32::from_rgb(255, 130, 100),
                                                                             NodeLanguage::Zig => Color32::from_rgb(240, 170, 0), // Amarillo/naranja para Zig
+                                                                            NodeLanguage::Java => Color32::from_rgb(237, 139, 0), // Naranja Java
                                                                             NodeLanguage::Text => Color32::from_rgb(200, 200, 150),
                                                                             NodeLanguage::Mojo => Color32::from_rgb(255, 100, 100), // Rojo para Mojo
                                                                             NodeLanguage::MojoAI => Color32::from_rgb(255, 150, 100), // Naranja para MojoAI
@@ -4840,6 +4882,653 @@ impl NodeGraphApp {
     /// Verificar si estamos en el nivel raíz
     pub fn is_at_root(&self) -> bool {
         self.network_levels.len() == 1
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════
+    // 🆕 DIÁLOGOS DE HDA (Houdini Digital Assets)
+    // ═══════════════════════════════════════════════════════════════════
+    
+    /// Diálogo para exportar HDA
+    fn hda_export_dialog_ui(&mut self, ctx: &egui::Context) {
+        if !self.show_hda_export_dialog {
+            return;
+        }
+        
+        let mut open = self.show_hda_export_dialog;
+        let mut should_close = false;
+        egui::Window::new("📦 Exportar HDA (Houdini Digital Asset)")
+            .open(&mut open)
+            .resizable(true)
+            .default_size([600.0, 500.0])
+            .collapsible(false)
+            .show(ctx, |ui| {
+                ui.vertical(|ui| {
+                    ui.heading("Exportar Asset Reutilizable");
+                    ui.separator();
+                    
+                    // Campos del formulario
+                    ui.horizontal(|ui| {
+                        ui.label("Nombre (ID único):");
+                        ui.text_edit_singleline(&mut self.hda_export_name);
+                    });
+                    
+                    ui.horizontal(|ui| {
+                        ui.label("Etiqueta:");
+                        ui.text_edit_singleline(&mut self.hda_export_label);
+                    });
+                    
+                    ui.horizontal(|ui| {
+                        ui.label("Descripción:");
+                        ui.add(egui::TextEdit::multiline(&mut self.hda_export_description).desired_rows(3));
+                    });
+                    
+                    ui.horizontal(|ui| {
+                        ui.label("Autor:");
+                        ui.text_edit_singleline(&mut self.hda_export_author);
+                    });
+                    
+                    ui.horizontal(|ui| {
+                        ui.label("Categoría:");
+                        ui.text_edit_singleline(&mut self.hda_export_category);
+                    });
+                    
+                    ui.checkbox(&mut self.hda_export_to_global, "Exportar a assets globales (compartido entre proyectos)");
+                    
+                    ui.separator();
+                    
+                    // ═══════════════════════════════════════════════════════════════════
+                    // PARÁMETROS CONFIGURABLES
+                    // ═══════════════════════════════════════════════════════════════════
+                    ui.heading("⚙️ Parámetros Configurables");
+                    ui.label(egui::RichText::new("Define parámetros que pueden ser configurados al usar este asset").small().color(egui::Color32::GRAY));
+                    
+                    egui::ScrollArea::vertical()
+                        .max_height(200.0)
+                        .show(ui, |ui| {
+                            let mut to_remove = None;
+                            for (idx, param) in self.hda_export_parameters.iter_mut().enumerate() {
+                                egui::Frame::none()
+                                    .fill(egui::Color32::from_rgba_unmultiplied(50, 55, 65, 200))
+                                    .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(100, 150, 255)))
+                                    .rounding(egui::Rounding::same(6.0))
+                                    .inner_margin(egui::Margin::symmetric(10.0, 8.0))
+                                    .show(ui, |ui| {
+                                        ui.horizontal(|ui| {
+                                            ui.vertical(|ui| {
+                                                ui.horizontal(|ui| {
+                                                    ui.label("Nombre:");
+                                                    ui.text_edit_singleline(&mut param.name);
+                                                });
+                                                ui.horizontal(|ui| {
+                                                    ui.label("Etiqueta:");
+                                                    ui.text_edit_singleline(&mut param.label);
+                                                });
+                                                ui.horizontal(|ui| {
+                                                    ui.label("Tipo:");
+                                                    let type_names: Vec<&str> = crate::storage::ParameterType::all_types().iter().map(|t| t.as_str()).collect();
+                                                    let current_type_str = param.param_type.as_str();
+                                                    let mut selected_type_idx = type_names.iter().position(|&s| s == current_type_str).unwrap_or(0);
+                                                    egui::ComboBox::from_id_source(format!("param_type_{}", idx))
+                                                        .selected_text(type_names[selected_type_idx])
+                                                        .show_ui(ui, |ui| {
+                                                            for (i, type_name) in type_names.iter().enumerate() {
+                                                                if ui.selectable_value(&mut selected_type_idx, i, *type_name).clicked() {
+                                                                    if let Some(new_type) = crate::storage::ParameterType::from_str(type_name) {
+                                                                        param.param_type = new_type;
+                                                                    }
+                                                                }
+                                                            }
+                                                        });
+                                                });
+                                                ui.horizontal(|ui| {
+                                                    ui.label("Valor por defecto:");
+                                                    ui.text_edit_singleline(&mut param.default_value);
+                                                });
+                                                ui.horizontal(|ui| {
+                                                    ui.label("Descripción:");
+                                                    ui.text_edit_singleline(&mut param.description);
+                                                });
+                                                // Min/Max solo para Float e Int
+                                                if matches!(param.param_type, crate::storage::ParameterType::Float | crate::storage::ParameterType::Int) {
+                                                    ui.horizontal(|ui| {
+                                                        ui.label("Min:");
+                                                        let mut min_str = param.min_value.map(|v| v.to_string()).unwrap_or_default();
+                                                        if ui.text_edit_singleline(&mut min_str).changed() {
+                                                            param.min_value = min_str.parse().ok();
+                                                        }
+                                                        ui.label("Max:");
+                                                        let mut max_str = param.max_value.map(|v| v.to_string()).unwrap_or_default();
+                                                        if ui.text_edit_singleline(&mut max_str).changed() {
+                                                            param.max_value = max_str.parse().ok();
+                                                        }
+                                                    });
+                                                }
+                                                // Choices solo para Enum
+                                                if matches!(param.param_type, crate::storage::ParameterType::Enum) {
+                                                    ui.horizontal(|ui| {
+                                                        ui.label("Opciones (separadas por coma):");
+                                                        let mut choices_str = param.choices.as_ref()
+                                                            .map(|v| v.join(", "))
+                                                            .unwrap_or_default();
+                                                        if ui.text_edit_singleline(&mut choices_str).changed() {
+                                                            param.choices = if choices_str.is_empty() {
+                                                                None
+                                                            } else {
+                                                                Some(choices_str.split(',').map(|s| s.trim().to_string()).collect())
+                                                            };
+                                                        }
+                                                    });
+                                                }
+                                            });
+                                            ui.with_layout(egui::Layout::right_to_left(egui::Align::TOP), |ui| {
+                                                if ui.button("❌").clicked() {
+                                                    to_remove = Some(idx);
+                                                }
+                                            });
+                                        });
+                                    });
+                                ui.add_space(4.0);
+                            }
+                            if let Some(idx) = to_remove {
+                                self.hda_export_parameters.remove(idx);
+                            }
+                        });
+                    
+                    ui.horizontal(|ui| {
+                        if ui.button("➕ Agregar Parámetro").clicked() {
+                            self.hda_export_parameters.push(crate::storage::HDAParameter {
+                                name: format!("param_{}", self.hda_export_parameters.len() + 1),
+                                label: format!("Parámetro {}", self.hda_export_parameters.len() + 1),
+                                description: String::new(),
+                                param_type: crate::storage::ParameterType::String,
+                                default_value: String::new(),
+                                min_value: None,
+                                max_value: None,
+                                choices: None,
+                            });
+                        }
+                    });
+                    
+                    ui.separator();
+                    
+                    // Información sobre qué se va a exportar
+                    let node_count = self.interaction.selected_nodes.len();
+                    let is_subnetwork = if let Some(&selected_id) = self.interaction.selected_nodes.iter().next() {
+                        self.graph.node(selected_id).map(|n| n.subnetwork_graph.is_some()).unwrap_or(false)
+                    } else {
+                        false
+                    };
+                    
+                    ui.horizontal(|ui| {
+                        let msg = if is_subnetwork {
+                            let node_count_internal = if let Some(&selected_id) = self.interaction.selected_nodes.iter().next() {
+                                self.graph.node(selected_id)
+                                    .and_then(|n| n.subnetwork_graph.as_ref())
+                                    .map(|g| g.nodes().len())
+                                    .unwrap_or(0)
+                            } else {
+                                0
+                            };
+                            format!("📁 Exportando subnetwork ({} nodos internos)", node_count_internal)
+                        } else {
+                            format!("📦 Exportando {} nodos seleccionados", node_count)
+                        };
+                        ui.label(egui::RichText::new(msg).color(egui::Color32::from_rgb(150, 200, 255)));
+                    });
+                    
+                    ui.separator();
+                    
+                    // Botones
+                    ui.horizontal(|ui| {
+                        if ui.button("❌ Cancelar").clicked() {
+                            should_close = true;
+                        }
+                        
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            let can_export = !self.hda_export_name.is_empty() && 
+                                           (!self.interaction.selected_nodes.is_empty() || is_subnetwork);
+                            
+                            if ui.add_enabled(can_export, egui::Button::new("✅ Exportar")).clicked() {
+                                if let Some(root_path) = &self.workspace.root_path {
+                                    let manager = crate::storage::HDAManager::new(root_path);
+                                    
+                                    let hda_result = if is_subnetwork {
+                                        // Exportar desde subnetwork
+                                        if let Some(&selected_id) = self.interaction.selected_nodes.iter().next() {
+                                            if let Some(node) = self.graph.node(selected_id) {
+                                                match crate::storage::create_hda_from_subnetwork(node) {
+                                                    Ok(mut hda) => {
+                                                        hda.name = self.hda_export_name.clone();
+                                                        hda.label = self.hda_export_label.clone();
+                                                        hda.description = self.hda_export_description.clone();
+                                                        hda.author = self.hda_export_author.clone();
+                                                        hda.category = self.hda_export_category.clone();
+                                                        hda.parameters = self.hda_export_parameters.clone();
+                                                        Ok(hda)
+                                                    }
+                                                    Err(e) => Err(e),
+                                                }
+                                            } else {
+                                                Err("Nodo no encontrado".to_string())
+                                            }
+                                        } else {
+                                            Err("No hay nodo seleccionado".to_string())
+                                        }
+                                    } else {
+                                        // Exportar desde nodos seleccionados
+                                        let node_ids: Vec<_> = self.interaction.selected_nodes.iter().copied().collect();
+                                        match crate::storage::create_hda_from_nodes(
+                                            &self.graph,
+                                            &node_ids,
+                                            self.hda_export_name.clone(),
+                                            self.hda_export_label.clone(),
+                                            self.hda_export_description.clone(),
+                                        ) {
+                                            Ok(mut hda) => {
+                                                hda.author = self.hda_export_author.clone();
+                                                hda.category = self.hda_export_category.clone();
+                                                hda.parameters = self.hda_export_parameters.clone();
+                                                Ok(hda)
+                                            }
+                                            Err(e) => Err(e),
+                                        }
+                                    };
+                                    
+                                    match hda_result {
+                                        Ok(hda) => {
+                                            match manager.export_hda(&hda, self.hda_export_to_global) {
+                                                Ok(asset_path) => {
+                                                    self.terminal.visible = true;
+                                                    self.terminal.rust_output = format!(
+                                                        "✅ HDA exportado exitosamente!\n\n\
+                                                        Nombre: {}\n\
+                                                        Ubicación: {}\n\
+                                                        Nodos: {}\n\
+                                                        Parámetros: {}",
+                                                        hda.name,
+                                                        asset_path.display(),
+                                                        hda.graph.nodes().len(),
+                                                        hda.parameters.len()
+                                                    );
+                                                    self.terminal.active_tab = TerminalTab::Rust;
+                                                    
+                                                    // Limpiar campos
+                                                    self.hda_export_name.clear();
+                                                    self.hda_export_label.clear();
+                                                    self.hda_export_description.clear();
+                                                    self.hda_export_author.clear();
+                                                    self.hda_export_category = "General".to_string();
+                                                    self.hda_export_parameters.clear();
+                                                    
+                                                    should_close = true;
+                                                }
+                                                Err(e) => {
+                                                    self.terminal.visible = true;
+                                                    self.terminal.rust_output = format!("❌ Error al exportar HDA: {}", e);
+                                                    self.terminal.active_tab = TerminalTab::Rust;
+                                                }
+                                            }
+                                        }
+                                        Err(e) => {
+                                            self.terminal.visible = true;
+                                            self.terminal.rust_output = format!("❌ Error al crear HDA: {}", e);
+                                            self.terminal.active_tab = TerminalTab::Rust;
+                                        }
+                                    }
+                                } else {
+                                    self.terminal.visible = true;
+                                    self.terminal.rust_output = "❌ No hay workspace abierto. Abre un workspace primero.".to_string();
+                                    self.terminal.active_tab = TerminalTab::Rust;
+                                }
+                            }
+                        });
+                    });
+                });
+            });
+        
+        self.show_hda_export_dialog = open;
+        if should_close {
+            self.show_hda_export_dialog = false;
+        }
+    }
+    
+    /// Diálogo para importar HDA
+    fn hda_import_dialog_ui(&mut self, ctx: &egui::Context) {
+        if !self.show_hda_import_dialog {
+            return;
+        }
+        
+        let mut open = self.show_hda_import_dialog;
+        let mut should_close = false;
+        egui::Window::new("📥 Importar HDA (Houdini Digital Asset)")
+            .open(&mut open)
+            .resizable(true)
+            .default_size([700.0, 600.0])
+            .collapsible(false)
+            .show(ctx, |ui| {
+                ui.vertical(|ui| {
+                    ui.heading("Importar Asset Reutilizable");
+                    ui.separator();
+                    
+                    // Listar HDAs disponibles
+                    let hdas = if let Some(root_path) = &self.workspace.root_path {
+                        let manager = crate::storage::HDAManager::new(root_path);
+                        manager.list_available_hdas()
+                    } else {
+                        Vec::new()
+                    };
+                    
+                    if hdas.is_empty() {
+                        ui.label(egui::RichText::new("📭 No hay HDAs disponibles").color(egui::Color32::GRAY));
+                        ui.label("Exporta algunos nodos como HDA primero.");
+                    } else {
+                        ui.label(format!("📦 {} HDAs disponibles:", hdas.len()));
+                        ui.separator();
+                        
+                        egui::ScrollArea::vertical()
+                            .max_height(400.0)
+                            .show(ui, |ui| {
+                                for (asset_path, info) in &hdas {
+                                    egui::Frame::none()
+                                        .fill(egui::Color32::from_rgba_unmultiplied(40, 45, 55, 150))
+                                        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(100, 150, 255)))
+                                        .rounding(egui::Rounding::same(6.0))
+                                        .inner_margin(egui::Margin::symmetric(12.0, 8.0))
+                                        .show(ui, |ui| {
+                                            ui.horizontal(|ui| {
+                                                ui.label(egui::RichText::new(&info.icon).size(24.0));
+                                                ui.add_space(10.0);
+                                                
+                                                ui.vertical(|ui| {
+                                                    ui.label(egui::RichText::new(&info.label).strong().size(14.0));
+                                                    if !info.description.is_empty() {
+                                                        ui.label(egui::RichText::new(&info.description).small().color(egui::Color32::GRAY));
+                                                    }
+                                                    ui.horizontal(|ui| {
+                                                        ui.label(egui::RichText::new(format!("v{}", info.version)).small().color(egui::Color32::from_rgb(150, 200, 255)));
+                                                        ui.label(egui::RichText::new(" • ").small().color(egui::Color32::GRAY));
+                                                        ui.label(egui::RichText::new(format!("{} nodos", info.node_count)).small().color(egui::Color32::GRAY));
+                                                        if info.is_global {
+                                                            ui.label(egui::RichText::new(" • 🌐 Global").small().color(egui::Color32::from_rgb(200, 150, 80)));
+                                                        }
+                                                    });
+                                                });
+                                                
+                                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                    if ui.button("📥 Importar").clicked() {
+                                                        let manager = crate::storage::HDAManager::new(
+                                                            self.workspace.root_path.as_ref().unwrap()
+                                                        );
+                                                        
+                                                        match manager.import_hda(asset_path) {
+                                                            Ok(hda) => {
+                                                                // Si el HDA tiene parámetros, prepararlos para configuración
+                                                                if !hda.parameters.is_empty() {
+                                                                    // Inicializar valores de parámetros con defaults
+                                                                    self.hda_import_parameter_values.clear();
+                                                                    for param in &hda.parameters {
+                                                                        self.hda_import_parameter_values.insert(
+                                                                            param.name.clone(),
+                                                                            param.default_value.clone()
+                                                                        );
+                                                                    }
+                                                                    // Guardar el HDA seleccionado para configurar parámetros
+                                                                    self.hda_import_selected_asset = Some((asset_path.clone(), info.clone()));
+                                                                    // Mostrar diálogo de configuración de parámetros
+                                                                    // (continuará en el siguiente frame)
+                                                                } else {
+                                                                    // Importar directamente si no hay parámetros
+                                                                    self.import_hda_with_parameters(hda, ctx);
+                                                                    should_close = true;
+                                                                }
+                                                            }
+                                                            Err(e) => {
+                                                                self.terminal.visible = true;
+                                                                self.terminal.rust_output = format!("❌ Error al importar HDA: {}", e);
+                                                                self.terminal.active_tab = TerminalTab::Rust;
+                                                            }
+                                                        }
+                                                    }
+                                                });
+                                            });
+                                        });
+                                    ui.add_space(8.0);
+                                }
+                            });
+                    }
+                    
+                    ui.separator();
+                    
+                    // Botón cancelar
+                    ui.horizontal(|ui| {
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if ui.button("❌ Cerrar").clicked() {
+                                should_close = true;
+                            }
+                        });
+                    });
+                });
+            });
+        
+        self.show_hda_import_dialog = open;
+        if should_close {
+            self.show_hda_import_dialog = false;
+        }
+        
+        // ═══════════════════════════════════════════════════════════════════
+        // DIÁLOGO DE CONFIGURACIÓN DE PARÁMETROS (si hay un HDA seleccionado)
+        // ═══════════════════════════════════════════════════════════════════
+        if let Some((ref asset_path, ref info)) = self.hda_import_selected_asset {
+            // Clonar datos necesarios antes del closure
+            let asset_path_clone = asset_path.clone();
+            let info_label = info.label.clone();
+            let workspace_root = self.workspace.root_path.clone();
+            let mut config_open = true;
+            
+            egui::Window::new("⚙️ Configurar Parámetros del HDA")
+                .open(&mut config_open)
+                .resizable(true)
+                .default_size([500.0, 400.0])
+                .collapsible(false)
+                .show(ctx, |ui| {
+                    ui.vertical(|ui| {
+                        ui.heading(format!("Configurar: {}", info_label));
+                        ui.separator();
+                        
+                        // Cargar HDA para mostrar parámetros
+                        if let Some(ref root_path) = workspace_root {
+                            let manager = crate::storage::HDAManager::new(root_path);
+                            if let Ok(hda) = manager.import_hda(&asset_path_clone) {
+                                ui.label(egui::RichText::new("Ajusta los parámetros antes de importar:").small().color(egui::Color32::GRAY));
+                                ui.separator();
+                                
+                                egui::ScrollArea::vertical()
+                                    .max_height(250.0)
+                                    .show(ui, |ui| {
+                                        for param in &hda.parameters {
+                                            egui::Frame::none()
+                                                .fill(egui::Color32::from_rgba_unmultiplied(50, 55, 65, 200))
+                                                .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(100, 150, 255)))
+                                                .rounding(egui::Rounding::same(6.0))
+                                                .inner_margin(egui::Margin::symmetric(10.0, 8.0))
+                                                .show(ui, |ui| {
+                                                    ui.vertical(|ui| {
+                                                        ui.label(egui::RichText::new(&param.label).strong());
+                                                        if !param.description.is_empty() {
+                                                            ui.label(egui::RichText::new(&param.description).small().color(egui::Color32::GRAY));
+                                                        }
+                                                        
+                                                        let value = self.hda_import_parameter_values
+                                                            .entry(param.name.clone())
+                                                            .or_insert_with(|| param.default_value.clone());
+                                                        
+                                                        match param.param_type {
+                                                            crate::storage::ParameterType::Bool => {
+                                                                let mut bool_val = value.parse().unwrap_or(false);
+                                                                if ui.checkbox(&mut bool_val, "").changed() {
+                                                                    *value = bool_val.to_string();
+                                                                }
+                                                            }
+                                                            crate::storage::ParameterType::Int => {
+                                                                let mut int_val = value.parse().unwrap_or(0);
+                                                                ui.horizontal(|ui| {
+                                                                    ui.label("Valor:");
+                                                                    if let (Some(min), Some(max)) = (param.min_value, param.max_value) {
+                                                                        ui.add(egui::DragValue::new(&mut int_val).clamp_range(min as i64..=max as i64));
+                                                                    } else if let Some(min) = param.min_value {
+                                                                        ui.add(egui::DragValue::new(&mut int_val).clamp_range(min as i64..=i64::MAX));
+                                                                    } else if let Some(max) = param.max_value {
+                                                                        ui.add(egui::DragValue::new(&mut int_val).clamp_range(i64::MIN..=max as i64));
+                                                                    } else {
+                                                                        ui.add(egui::DragValue::new(&mut int_val));
+                                                                    }
+                                                                    *value = int_val.to_string();
+                                                                });
+                                                            }
+                                                            crate::storage::ParameterType::Float => {
+                                                                let mut float_val = value.parse().unwrap_or(0.0);
+                                                                ui.horizontal(|ui| {
+                                                                    ui.label("Valor:");
+                                                                    if let (Some(min), Some(max)) = (param.min_value, param.max_value) {
+                                                                        ui.add(egui::DragValue::new(&mut float_val).clamp_range(min..=max));
+                                                                    } else if let Some(min) = param.min_value {
+                                                                        ui.add(egui::DragValue::new(&mut float_val).clamp_range(min..=f64::MAX));
+                                                                    } else if let Some(max) = param.max_value {
+                                                                        ui.add(egui::DragValue::new(&mut float_val).clamp_range(f64::MIN..=max));
+                                                                    } else {
+                                                                        ui.add(egui::DragValue::new(&mut float_val));
+                                                                    }
+                                                                    *value = float_val.to_string();
+                                                                });
+                                                            }
+                                                            crate::storage::ParameterType::Enum => {
+                                                                if let Some(ref choices) = param.choices {
+                                                                    let current_idx = choices.iter().position(|c| c == value).unwrap_or(0);
+                                                                    let mut selected_idx = current_idx;
+                                                                    egui::ComboBox::from_id_source(&param.name)
+                                                                        .selected_text(value.clone())
+                                                                        .show_ui(ui, |ui| {
+                                                                            for (i, choice) in choices.iter().enumerate() {
+                                                                                if ui.selectable_value(&mut selected_idx, i, choice).clicked() {
+                                                                                    *value = choice.clone();
+                                                                                }
+                                                                            }
+                                                                        });
+                                                                } else {
+                                                                    ui.text_edit_singleline(value);
+                                                                }
+                                                            }
+                                                            _ => {
+                                                                ui.text_edit_singleline(value);
+                                                            }
+                                                        }
+                                                    });
+                                                });
+                                            ui.add_space(4.0);
+                                        }
+                                    });
+                                
+                                ui.separator();
+                                
+                                ui.horizontal(|ui| {
+                                    if ui.button("❌ Cancelar").clicked() {
+                                        self.hda_import_selected_asset = None;
+                                        self.hda_import_parameter_values.clear();
+                                    }
+                                    
+                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                        if ui.button("✅ Importar con Parámetros").clicked() {
+                                            // Usar una flag para indicar que se debe importar
+                                            // (se procesará después del cierre del closure)
+                                            ctx.data_mut(|data| {
+                                                data.insert_temp(egui::Id::new("hda_import_flag"), true);
+                                            });
+                                        }
+                                    });
+                                });
+                            }
+                        }
+                    });
+                });
+            
+            if !config_open {
+                self.hda_import_selected_asset = None;
+                self.hda_import_parameter_values.clear();
+            }
+            
+            // Verificar si se debe importar (después del cierre del closure)
+            if ctx.data(|data| data.get_temp::<bool>(egui::Id::new("hda_import_flag")).unwrap_or(false)) {
+                ctx.data_mut(|data| {
+                    data.remove::<bool>(egui::Id::new("hda_import_flag"));
+                });
+                
+                // Cargar HDA e importar con parámetros
+                if let Some(ref root_path) = self.workspace.root_path {
+                    let manager = crate::storage::HDAManager::new(root_path);
+                    if let Ok(hda) = manager.import_hda(&asset_path_clone) {
+                        self.import_hda_with_parameters(hda, ctx);
+                        self.hda_import_selected_asset = None;
+                        self.hda_import_parameter_values.clear();
+                        self.show_hda_import_dialog = false;
+                    }
+                }
+            }
+        }
+    }
+    
+    /// Importar HDA aplicando valores de parámetros
+    fn import_hda_with_parameters(&mut self, mut hda: crate::storage::HDA, ctx: &egui::Context) {
+        // Aplicar valores de parámetros al código del HDA
+        // Buscar en el código del HDA referencias a parámetros y reemplazarlas
+        for node in hda.graph.nodes_mut() {
+            // Reemplazar referencias de parámetros en el código
+            for (param_name, param_value) in &self.hda_import_parameter_values {
+                // Reemplazar ${param_name} o {param_name} con el valor
+                node.code = node.code.replace(&format!("${{{}}}", param_name), param_value);
+                node.code = node.code.replace(&format!("{{{}}}", param_name), param_value);
+                node.code = node.code.replace(&format!("${}", param_name), param_value);
+            }
+        }
+        
+        // Agregar nodos del HDA al grafo actual
+        let world_pos = self.viewport.screen_to_world(
+            ctx.pointer_hover_pos().unwrap_or(pos2(400.0, 300.0)),
+            ctx.screen_rect()
+        );
+        
+        // Crear un nodo contenedor para el HDA (como un subnetwork)
+        let input_slices: Vec<&str> = hda.exposed_inputs.iter().map(|s| s.as_str()).collect();
+        let output_slices: Vec<&str> = hda.exposed_outputs.iter().map(|s| s.as_str()).collect();
+        let container_id = self.graph.add_node(
+            &hda.label,
+            world_pos,
+            egui::Color32::from_rgb(150, 100, 200),
+            &input_slices,
+            &output_slices,
+            NodeLanguage::Auto,
+        );
+        
+        if let Some(node) = self.graph.node_mut(container_id) {
+            node.subnetwork_graph = Some(hda.graph.clone());
+        }
+        
+        self.sync_current_level_to_graph();
+        
+        self.terminal.visible = true;
+        self.terminal.rust_output = format!(
+            "✅ HDA importado exitosamente!\n\n\
+            Nombre: {}\n\
+            Nodos: {}\n\
+            Parámetros configurados: {}",
+            hda.label,
+            hda.graph.nodes().len(),
+            self.hda_import_parameter_values.len()
+        );
+        self.terminal.active_tab = TerminalTab::Rust;
+        
+        if self.workspace.has_root() {
+            let _ = self.save_current_graph();
+        }
     }
 }
 
