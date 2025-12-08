@@ -433,9 +433,19 @@ Nodo B: "Render Loop"
 - [ ] Documentar mejor el sistema de herencia en templates
 - [ ] Crear ejemplos de proyectos usando librerías modulares
 
-**Estado**: 🆕 **EN PROGRESO** - DirectX12 completado, aplicar a otros módulos
+**Estado**: ✅ **EN PROGRESO** - DirectX12, Vulkan y Rust completados (60%)
 
-**Esfuerzo estimado restante**: 2-3 horas (aplicar patrón a otros templates)
+#### ✅ **COMPLETADO:**
+- [x] DirectX12 librerías modulares ✅
+  - [x] helpers.cpp, resource_manager.cpp, window_manager.cpp, sync_manager.cpp ✅
+- [x] Vulkan librerías modulares ✅
+  - [x] helpers.cpp, resource_manager.cpp, window_manager.cpp, sync_manager.cpp ✅
+- [x] Rust librerías modulares ✅
+  - [x] lib_utils.rs, lib_math.rs, lib_io.rs, lib_error.rs ✅
+- [x] Actualizar registros en mod.rs ✅
+- [x] Actualizar UI para mostrar subcategoría "Librerías" ✅
+
+**Esfuerzo estimado restante**: 1-2 horas (aplicar patrón a C/C++/Zig si es necesario)
 
 ---
 

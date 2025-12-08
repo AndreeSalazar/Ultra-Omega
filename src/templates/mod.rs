@@ -171,6 +171,14 @@ pub mod rust {
     pub const MACROS: &str = include_str!("rust/macros.rs");
     pub const UNSAFE: &str = include_str!("rust/unsafe.rs");
     pub const CONCURRENCY: &str = include_str!("rust/concurrency.rs");
+    
+    // ═══════════════════════════════════════
+    // LIBRERÍAS (Funciones independientes reutilizables)
+    // ═══════════════════════════════════════
+    pub const LIB_UTILS: &str = include_str!("rust/lib_utils.rs");
+    pub const LIB_MATH: &str = include_str!("rust/lib_math.rs");
+    pub const LIB_IO: &str = include_str!("rust/lib_io.rs");
+    pub const LIB_ERROR: &str = include_str!("rust/lib_error.rs");
 }
 
 // ══════════════════════════════════════════
@@ -266,6 +274,12 @@ pub mod vulkan {
     // Renderizado
     pub const RENDER_LOOP: &str = include_str!("vulkan/render_loop.cpp");
     pub const MAIN: &str = include_str!("vulkan/main.cpp");
+    
+    // Librerías (helpers y utilidades reutilizables)
+    pub const HELPERS: &str = include_str!("vulkan/helpers.cpp");
+    pub const RESOURCE_MANAGER: &str = include_str!("vulkan/resource_manager.cpp");
+    pub const WINDOW_MANAGER: &str = include_str!("vulkan/window_manager.cpp");
+    pub const SYNC_MANAGER: &str = include_str!("vulkan/sync_manager.cpp");
     
     // Build
     pub const CMAKE: &str = include_str!("vulkan/CMakeLists.txt");
@@ -911,6 +925,46 @@ pub fn all_templates() -> Vec<Template> {
         },
         
         // ══════════════════════════════════════════════════════════════
+        // RUST - LIBRERÍAS (Funciones independientes reutilizables)
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "📚 Utils (Utilidades)",
+            code: rust::LIB_UTILS,
+            category: "Rust",
+            subcategory: "Librerías",
+            color: (0x80, 0x40, 0x00),
+            icon: "🛠️",
+            language: NodeLanguage::Rust,
+        },
+        Template {
+            name: "📚 Math (Matemáticas)",
+            code: rust::LIB_MATH,
+            category: "Rust",
+            subcategory: "Librerías",
+            color: (0x80, 0x40, 0x00),
+            icon: "🔢",
+            language: NodeLanguage::Rust,
+        },
+        Template {
+            name: "📚 IO (Entrada/Salida)",
+            code: rust::LIB_IO,
+            category: "Rust",
+            subcategory: "Librerías",
+            color: (0x80, 0x40, 0x00),
+            icon: "📂",
+            language: NodeLanguage::Rust,
+        },
+        Template {
+            name: "📚 Error (Manejo de Errores)",
+            code: rust::LIB_ERROR,
+            category: "Rust",
+            subcategory: "Librerías",
+            color: (0x80, 0x40, 0x00),
+            icon: "⚠️",
+            language: NodeLanguage::Rust,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
         // ZIG - BÁSICO
         // ══════════════════════════════════════════════════════════════
         Template {
@@ -1056,6 +1110,46 @@ pub fn all_templates() -> Vec<Template> {
             category: "Vulkan",
             subcategory: "Ejecución",
             color: (0xff, 0x8c, 0x00),
+            icon: "⏱️",
+            language: NodeLanguage::Cpp,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // VULKAN - LIBRERÍAS (Funciones independientes reutilizables)
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "📚 Helpers (Utilidades)",
+            code: vulkan::HELPERS,
+            category: "Vulkan",
+            subcategory: "Librerías",
+            color: (0x80, 0x40, 0x00),
+            icon: "🛠️",
+            language: NodeLanguage::Cpp,
+        },
+        Template {
+            name: "📚 Resource Manager",
+            code: vulkan::RESOURCE_MANAGER,
+            category: "Vulkan",
+            subcategory: "Librerías",
+            color: (0x80, 0x40, 0x00),
+            icon: "📦",
+            language: NodeLanguage::Cpp,
+        },
+        Template {
+            name: "📚 Window Manager",
+            code: vulkan::WINDOW_MANAGER,
+            category: "Vulkan",
+            subcategory: "Librerías",
+            color: (0x80, 0x40, 0x00),
+            icon: "🪟",
+            language: NodeLanguage::Cpp,
+        },
+        Template {
+            name: "📚 Sync Manager",
+            code: vulkan::SYNC_MANAGER,
+            category: "Vulkan",
+            subcategory: "Librerías",
+            color: (0x80, 0x40, 0x00),
             icon: "⏱️",
             language: NodeLanguage::Cpp,
         },

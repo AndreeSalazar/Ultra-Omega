@@ -1175,15 +1175,23 @@ impl NodeGraphApp {
                                         
                                         ui.add_space(12.0);
                                         
-                                        // Header de componentes individuales
-                                        ui.horizontal(|ui| {
-                                            ui.label(egui::RichText::new("📦").size(16.0).color(Color32::from_rgb(150, 200, 255)));
-                                            ui.label(egui::RichText::new("Componentes Individuales")
-                                                .strong()
-                                                .size(13.0)
-                                                .color(Color32::from_rgb(220, 220, 230)));
-                                        });
-                                        ui.add_space(8.0);
+                                        // Header de componentes individuales mejorado
+                                        egui::Frame::none()
+                                            .fill(Color32::from_rgba_unmultiplied(172, 20, 44, 25))
+                                            .stroke(egui::Stroke::new(1.5, vulkan_color))
+                                            .rounding(egui::Rounding::same(6.0))
+                                            .inner_margin(egui::Margin::symmetric(12.0, 8.0))
+                                            .show(ui, |ui| {
+                                                ui.horizontal(|ui| {
+                                                    ui.label(egui::RichText::new("📦").size(18.0).color(Color32::from_rgb(200, 150, 255)));
+                                                    ui.add_space(10.0);
+                                                    ui.label(egui::RichText::new("Componentes Individuales")
+                                                        .strong()
+                                                        .size(14.5)
+                                                        .color(Color32::from_rgb(230, 230, 240)));
+                                                });
+                                            });
+                                        ui.add_space(10.0);
                                         
                                         // Mostrar templates de Vulkan con organización mejorada
                                         let templates = crate::templates::all_templates();
@@ -1197,8 +1205,8 @@ impl NodeGraphApp {
                                             .collect();
                                         subcats.dedup();
                                         
-                                        // Ordenar subcategorías para Vulkan: Base, Inicialización, Pipeline, Recursos, Ejecución, Renderizado, Build
-                                        let vulkan_order = ["Base", "Inicialización", "Pipeline", "Recursos", "Ejecución", "Renderizado", "Build"];
+                                        // Ordenar subcategorías para Vulkan: Base, Inicialización, Pipeline, Recursos, Ejecución, Librerías, Renderizado, Build
+                                        let vulkan_order = ["Base", "Inicialización", "Pipeline", "Recursos", "Ejecución", "Librerías", "Renderizado", "Build"];
                                         subcats.sort_by(|a, b| {
                                             let a_pos = vulkan_order.iter().position(|&x| x == *a).unwrap_or(999);
                                             let b_pos = vulkan_order.iter().position(|&x| x == *b).unwrap_or(999);
@@ -1220,6 +1228,7 @@ impl NodeGraphApp {
                                                         "Pipeline" => ("🔧", Color32::from_rgb(200, 100, 255), Color32::from_rgba_unmultiplied(100, 40, 100, 80)),
                                                         "Recursos" => ("📦", Color32::from_rgb(100, 200, 200), Color32::from_rgba_unmultiplied(40, 100, 100, 80)),
                                                         "Ejecución" => ("💻", Color32::from_rgb(255, 170, 80), Color32::from_rgba_unmultiplied(100, 60, 30, 80)),
+                                                        "Librerías" => ("📚", Color32::from_rgb(200, 150, 80), Color32::from_rgba_unmultiplied(100, 60, 40, 80)),
                                                         "Renderizado" => ("🎨", Color32::from_rgb(80, 200, 255), Color32::from_rgba_unmultiplied(30, 80, 100, 80)),
                                                         "Build" => ("🔧", Color32::from_rgb(100, 150, 255), Color32::from_rgba_unmultiplied(40, 60, 100, 80)),
                                                         _ => ("📋", Color32::from_rgb(150, 150, 150), Color32::from_rgba_unmultiplied(50, 50, 50, 80)),
@@ -1230,107 +1239,139 @@ impl NodeGraphApp {
                                                         .filter(|t| t.subcategory == *subcat)
                                                         .collect();
                                                     
+                                                    // Header de subcategoría con diseño más profesional
                                                     egui::Frame::none()
                                                         .fill(subcat_bg)
-                                                        .stroke(egui::Stroke::new(2.0, subcat_color))
-                                                        .rounding(egui::Rounding::same(6.0))
-                                                        .inner_margin(egui::Margin::symmetric(12.0, 8.0))
+                                                        .stroke(egui::Stroke::new(2.5, subcat_color))
+                                                        .rounding(egui::Rounding::same(8.0))
+                                                        .inner_margin(egui::Margin::symmetric(14.0, 10.0))
                                                         .show(ui, |ui| {
                                                             ui.horizontal(|ui| {
-                                                                ui.label(egui::RichText::new(subcat_icon).size(18.0).color(subcat_color));
-                                                                ui.add_space(8.0);
+                                                                ui.label(egui::RichText::new(subcat_icon).size(20.0).color(subcat_color));
+                                                                ui.add_space(10.0);
                                                                 ui.label(egui::RichText::new(*subcat)
                                                                     .strong()
-                                                                    .size(14.0)
-                                                                    .color(Color32::WHITE));
+                                                                    .size(15.0)
+                                                                    .color(Color32::from_rgb(255, 255, 255)));
                                                                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                                                                     ui.label(egui::RichText::new(format!("({})", subcat_templates.len()))
-                                                                        .size(11.0)
-                                                                        .color(Color32::from_rgb(180, 180, 200)));
+                                                                        .size(12.0)
+                                                                        .color(Color32::from_rgb(200, 200, 220)));
                                                                 });
                                                             });
                                                         });
-                                                    ui.add_space(8.0);
+                                                    ui.add_space(10.0);
                                                     
-                                                    // Templates organizados con mejor diseño
+                                                    // Templates organizados con diseño profesional mejorado (Vulkan)
                                                     for template in subcat_templates.iter() {
                                                         let color = Color32::from_rgb(template.color.0, template.color.1, template.color.2);
                                                         let template_cloned = (**template).clone();
                                                         
-                                                        // Crear área interactiva
+                                                        // Crear área interactiva más grande y profesional
                                                         let (rect, response) = ui.allocate_exact_size(
-                                                            egui::vec2(ui.available_width(), 36.0),
+                                                            egui::vec2(ui.available_width(), 44.0),
                                                             egui::Sense::click()
                                                         );
                                                         
                                                         let is_hovered = response.hovered();
                                                         
-                                                        // Fondo y borde según estado
+                                                        // Colores mejorados con gradientes sutiles
                                                         let template_bg = if is_hovered {
                                                             Color32::from_rgba_unmultiplied(
-                                                                (color.r() as u32 * 8 / 255 + 50) as u8,
-                                                                (color.g() as u32 * 8 / 255 + 50) as u8,
-                                                                (color.b() as u32 * 8 / 255 + 50) as u8,
-                                                                180
+                                                                (color.r() as u32 * 12 / 255 + 60).min(255) as u8,
+                                                                (color.g() as u32 * 12 / 255 + 60).min(255) as u8,
+                                                                (color.b() as u32 * 12 / 255 + 60).min(255) as u8,
+                                                                200
                                                             )
                                                         } else {
-                                                            Color32::from_rgba_unmultiplied(45, 50, 60, 150)
+                                                            Color32::from_rgba_unmultiplied(38, 42, 52, 180)
                                                         };
                                                         
                                                         let template_border = if is_hovered {
-                                                            Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 220)
+                                                            Color32::from_rgba_unmultiplied(
+                                                                (color.r() as u32 * 13 / 10).min(255) as u8,
+                                                                (color.g() as u32 * 13 / 10).min(255) as u8,
+                                                                (color.b() as u32 * 13 / 10).min(255) as u8,
+                                                                255
+                                                            )
                                                         } else {
-                                                            color
+                                                            Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 180)
                                                         };
                                                         
-                                                        // Dibujar fondo y borde
-                                                        ui.painter().rect_filled(
-                                                            rect,
-                                                            6.0,
-                                                            template_bg
-                                                        );
+                                                        // Sombra profesional cuando está hover
+                                                        if is_hovered {
+                                                            ui.painter().rect_filled(
+                                                                rect.translate(egui::vec2(0.0, 2.0)),
+                                                                8.0,
+                                                                Color32::from_black_alpha(60)
+                                                            );
+                                                        }
+                                                        
+                                                        ui.painter().rect_filled(rect, 8.0, template_bg);
                                                         ui.painter().rect_stroke(
                                                             rect,
-                                                            6.0,
-                                                            egui::Stroke::new(1.8, template_border)
+                                                            8.0,
+                                                            egui::Stroke::new(if is_hovered { 2.5 } else { 1.5 }, template_border)
                                                         );
                                                         
-                                                        // Indicador lateral izquierdo con color
+                                                        let indicator_width = if is_hovered { 5.0 } else { 4.0 };
                                                         ui.painter().rect_filled(
                                                             egui::Rect::from_min_size(
                                                                 rect.left_top(),
-                                                                egui::vec2(4.0, rect.height())
+                                                                egui::vec2(indicator_width, rect.height())
                                                             ),
-                                                            0.0,
+                                                            if is_hovered { 8.0 } else { 0.0 },
                                                             color
                                                         );
                                                         
-                                                        // Dibujar contenido
-                                                        let icon_pos = rect.left_top() + egui::vec2(16.0, 18.0);
+                                                        if is_hovered {
+                                                            ui.painter().rect_filled(
+                                                                egui::Rect::from_min_size(
+                                                                    rect.left_top(),
+                                                                    egui::vec2(indicator_width, rect.height() * 0.5)
+                                                                ),
+                                                                0.0,
+                                                                Color32::from_rgba_unmultiplied(255, 255, 255, 40)
+                                                            );
+                                                        }
+                                                        
+                                                        let icon_size = if is_hovered { 20.0 } else { 18.0 };
+                                                        let icon_pos = rect.left_top() + egui::vec2(20.0, rect.height() / 2.0);
                                                         ui.painter().text(
                                                             icon_pos,
                                                             egui::Align2::LEFT_CENTER,
                                                             template.icon,
-                                                            egui::FontId::proportional(17.0),
+                                                            egui::FontId::proportional(icon_size),
                                                             color
                                                         );
                                                         
-                                                        let text_pos = rect.left_top() + egui::vec2(48.0, 18.0);
+                                                        let text_pos = rect.left_top() + egui::vec2(54.0, rect.height() / 2.0);
                                                         ui.painter().text(
                                                             text_pos,
                                                             egui::Align2::LEFT_CENTER,
                                                             template.name,
-                                                            egui::FontId::proportional(12.5),
-                                                            Color32::from_rgb(235, 235, 240)
+                                                            egui::FontId::proportional(if is_hovered { 13.5 } else { 13.0 }),
+                                                            Color32::from_rgb(245, 245, 250)
                                                         );
                                                         
-                                                        // Indicador de click (opcional, visual)
                                                         if is_hovered {
-                                                            let hover_rect = rect.expand(1.0);
-                                                            ui.painter().rect_stroke(
-                                                                hover_rect,
-                                                                6.0,
-                                                                egui::Stroke::new(0.5, Color32::from_rgba_unmultiplied(255, 255, 255, 100))
+                                                            let glow_rect = egui::Rect::from_min_size(
+                                                                rect.right_top() - egui::vec2(40.0, 0.0),
+                                                                egui::vec2(40.0, 20.0)
+                                                            );
+                                                            ui.painter().rect_filled(
+                                                                glow_rect,
+                                                                4.0,
+                                                                Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 30)
+                                                            );
+                                                            
+                                                            let click_hint_pos = rect.right_top() - egui::vec2(8.0, rect.height() / 2.0);
+                                                            ui.painter().text(
+                                                                click_hint_pos,
+                                                                egui::Align2::RIGHT_CENTER,
+                                                                "→",
+                                                                egui::FontId::proportional(16.0),
+                                                                Color32::from_rgba_unmultiplied(200, 200, 200, 180)
                                                             );
                                                         }
                                                         
@@ -1339,7 +1380,7 @@ impl NodeGraphApp {
                                                             close_menu = true;
                                                         }
                                                         
-                                                        ui.add_space(3.0);
+                                                        ui.add_space(6.0);
                                                     }
                                                     
                                                     // Separador entre subcategorías (excepto la última)
@@ -1484,15 +1525,23 @@ impl NodeGraphApp {
                                         
                                         ui.add_space(12.0);
                                         
-                                        // Header de componentes individuales
-                                        ui.horizontal(|ui| {
-                                            ui.label(egui::RichText::new("📦").size(16.0).color(Color32::from_rgb(150, 200, 255)));
-                                            ui.label(egui::RichText::new("Componentes Individuales")
-                                                .strong()
-                                                .size(13.0)
-                                                .color(Color32::from_rgb(220, 220, 230)));
-                                        });
-                                        ui.add_space(8.0);
+                                        // Header de componentes individuales mejorado
+                                        egui::Frame::none()
+                                            .fill(Color32::from_rgba_unmultiplied(0, 122, 204, 25))
+                                            .stroke(egui::Stroke::new(1.5, Color32::from_rgb(0, 122, 204)))
+                                            .rounding(egui::Rounding::same(6.0))
+                                            .inner_margin(egui::Margin::symmetric(12.0, 8.0))
+                                            .show(ui, |ui| {
+                                                ui.horizontal(|ui| {
+                                                    ui.label(egui::RichText::new("📦").size(18.0).color(Color32::from_rgb(150, 200, 255)));
+                                                    ui.add_space(10.0);
+                                                    ui.label(egui::RichText::new("Componentes Individuales")
+                                                        .strong()
+                                                        .size(14.5)
+                                                        .color(Color32::from_rgb(230, 230, 240)));
+                                                });
+                                            });
+                                        ui.add_space(10.0);
                                         
                                         // Mostrar templates de DirectX12 con organización mejorada
                                         let templates = crate::templates::all_templates();
@@ -1537,34 +1586,36 @@ impl NodeGraphApp {
                                                         .filter(|t| t.subcategory == *subcat)
                                                         .collect();
                                                     
+                                                    // Header de subcategoría con diseño más profesional
                                                     egui::Frame::none()
                                                         .fill(subcat_bg)
-                                                        .stroke(egui::Stroke::new(2.0, subcat_color))
-                                                        .rounding(egui::Rounding::same(6.0))
-                                                        .inner_margin(egui::Margin::symmetric(12.0, 8.0))
+                                                        .stroke(egui::Stroke::new(2.5, subcat_color))
+                                                        .rounding(egui::Rounding::same(8.0))
+                                                        .inner_margin(egui::Margin::symmetric(14.0, 10.0))
                                                         .show(ui, |ui| {
                                                             ui.horizontal(|ui| {
-                                                                ui.label(egui::RichText::new(subcat_icon).size(18.0).color(subcat_color));
-                                                                ui.add_space(8.0);
+                                                                ui.label(egui::RichText::new(subcat_icon).size(20.0).color(subcat_color));
+                                                                ui.add_space(10.0);
                                                                 ui.label(egui::RichText::new(*subcat)
                                                                     .strong()
-                                                                    .size(14.0)
-                                                                    .color(Color32::WHITE));
+                                                                    .size(15.0)
+                                                                    .color(Color32::from_rgb(255, 255, 255)));
                                                                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                                                                     ui.label(egui::RichText::new(format!("({})", subcat_templates.len()))
-                                                                        .size(11.0)
-                                                                        .color(Color32::from_rgb(180, 180, 200)));
+                                                                        .size(12.0)
+                                                                        .color(Color32::from_rgb(200, 200, 220)));
                                                                 });
                                                             });
                                                         });
-                                                    ui.add_space(8.0);
+                                                    ui.add_space(10.0);
                                                     
+                                                    // Templates organizados con diseño profesional mejorado (DirectX12)
                                                     for template in subcat_templates.iter() {
                                                         let color = Color32::from_rgb(template.color.0, template.color.1, template.color.2);
                                                         let template_cloned = (**template).clone();
                                                         
                                                         let (rect, response) = ui.allocate_exact_size(
-                                                            egui::vec2(ui.available_width(), 36.0),
+                                                            egui::vec2(ui.available_width(), 44.0),
                                                             egui::Sense::click()
                                                         );
                                                         
@@ -1572,54 +1623,96 @@ impl NodeGraphApp {
                                                         
                                                         let template_bg = if is_hovered {
                                                             Color32::from_rgba_unmultiplied(
-                                                                (color.r() as u32 * 8 / 255 + 50) as u8,
-                                                                (color.g() as u32 * 8 / 255 + 50) as u8,
-                                                                (color.b() as u32 * 8 / 255 + 50) as u8,
-                                                                180
+                                                                (color.r() as u32 * 12 / 255 + 60).min(255) as u8,
+                                                                (color.g() as u32 * 12 / 255 + 60).min(255) as u8,
+                                                                (color.b() as u32 * 12 / 255 + 60).min(255) as u8,
+                                                                200
                                                             )
                                                         } else {
-                                                            Color32::from_rgba_unmultiplied(45, 50, 60, 150)
+                                                            Color32::from_rgba_unmultiplied(38, 42, 52, 180)
                                                         };
                                                         
                                                         let template_border = if is_hovered {
-                                                            Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 220)
+                                                            Color32::from_rgba_unmultiplied(
+                                                                (color.r() as u32 * 13 / 10).min(255) as u8,
+                                                                (color.g() as u32 * 13 / 10).min(255) as u8,
+                                                                (color.b() as u32 * 13 / 10).min(255) as u8,
+                                                                255
+                                                            )
                                                         } else {
-                                                            color
+                                                            Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 180)
                                                         };
                                                         
-                                                        ui.painter().rect_filled(rect, 6.0, template_bg);
-                                                        ui.painter().rect_stroke(rect, 6.0, egui::Stroke::new(1.8, template_border));
+                                                        if is_hovered {
+                                                            ui.painter().rect_filled(
+                                                                rect.translate(egui::vec2(0.0, 2.0)),
+                                                                8.0,
+                                                                Color32::from_black_alpha(60)
+                                                            );
+                                                        }
                                                         
+                                                        ui.painter().rect_filled(rect, 8.0, template_bg);
+                                                        ui.painter().rect_stroke(
+                                                            rect,
+                                                            8.0,
+                                                            egui::Stroke::new(if is_hovered { 2.5 } else { 1.5 }, template_border)
+                                                        );
+                                                        
+                                                        let indicator_width = if is_hovered { 5.0 } else { 4.0 };
                                                         ui.painter().rect_filled(
-                                                            egui::Rect::from_min_size(rect.left_top(), egui::vec2(4.0, rect.height())),
-                                                            0.0,
+                                                            egui::Rect::from_min_size(rect.left_top(), egui::vec2(indicator_width, rect.height())),
+                                                            if is_hovered { 8.0 } else { 0.0 },
                                                             color
                                                         );
                                                         
-                                                        let icon_pos = rect.left_top() + egui::vec2(16.0, 18.0);
+                                                        if is_hovered {
+                                                            ui.painter().rect_filled(
+                                                                egui::Rect::from_min_size(
+                                                                    rect.left_top(),
+                                                                    egui::vec2(indicator_width, rect.height() * 0.5)
+                                                                ),
+                                                                0.0,
+                                                                Color32::from_rgba_unmultiplied(255, 255, 255, 40)
+                                                            );
+                                                        }
+                                                        
+                                                        let icon_size = if is_hovered { 20.0 } else { 18.0 };
+                                                        let icon_pos = rect.left_top() + egui::vec2(20.0, rect.height() / 2.0);
                                                         ui.painter().text(
                                                             icon_pos,
                                                             egui::Align2::LEFT_CENTER,
                                                             template.icon,
-                                                            egui::FontId::proportional(17.0),
+                                                            egui::FontId::proportional(icon_size),
                                                             color
                                                         );
                                                         
-                                                        let text_pos = rect.left_top() + egui::vec2(48.0, 18.0);
+                                                        let text_pos = rect.left_top() + egui::vec2(54.0, rect.height() / 2.0);
                                                         ui.painter().text(
                                                             text_pos,
                                                             egui::Align2::LEFT_CENTER,
                                                             template.name,
-                                                            egui::FontId::proportional(12.5),
-                                                            Color32::from_rgb(235, 235, 240)
+                                                            egui::FontId::proportional(if is_hovered { 13.5 } else { 13.0 }),
+                                                            Color32::from_rgb(245, 245, 250)
                                                         );
                                                         
                                                         if is_hovered {
-                                                            let hover_rect = rect.expand(1.0);
-                                                            ui.painter().rect_stroke(
-                                                                hover_rect,
-                                                                6.0,
-                                                                egui::Stroke::new(0.5, Color32::from_rgba_unmultiplied(255, 255, 255, 100))
+                                                            let glow_rect = egui::Rect::from_min_size(
+                                                                rect.right_top() - egui::vec2(40.0, 0.0),
+                                                                egui::vec2(40.0, 20.0)
+                                                            );
+                                                            ui.painter().rect_filled(
+                                                                glow_rect,
+                                                                4.0,
+                                                                Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 30)
+                                                            );
+                                                            
+                                                            let click_hint_pos = rect.right_top() - egui::vec2(8.0, rect.height() / 2.0);
+                                                            ui.painter().text(
+                                                                click_hint_pos,
+                                                                egui::Align2::RIGHT_CENTER,
+                                                                "→",
+                                                                egui::FontId::proportional(16.0),
+                                                                Color32::from_rgba_unmultiplied(200, 200, 200, 180)
                                                             );
                                                         }
                                                         
@@ -1628,7 +1721,7 @@ impl NodeGraphApp {
                                                             close_menu = true;
                                                         }
                                                         
-                                                        ui.add_space(3.0);
+                                                        ui.add_space(6.0);
                                                     }
                                                     
                                                     if subcat_idx < subcats.len() - 1 {
@@ -1678,17 +1771,23 @@ impl NodeGraphApp {
                                             }
                                         });
                                         
-                                        // Header de categoría mejorado
-                                        ui.horizontal(|ui| {
-                                            ui.label(egui::RichText::new("📚").size(20.0).color(Color32::from_rgb(150, 200, 255)));
-                                            ui.label(egui::RichText::new(cat.as_str())
-                                                .strong()
-                                                .size(16.0)
-                                                .color(Color32::from_rgb(220, 230, 240)));
-                                        });
-                                        ui.add_space(8.0);
-                                        ui.separator();
-                                        ui.add_space(8.0);
+                                        // Header de categoría mejorado y profesional
+                                        egui::Frame::none()
+                                            .fill(Color32::from_rgba_unmultiplied(40, 45, 55, 220))
+                                            .stroke(egui::Stroke::new(2.0, Color32::from_rgb(100, 150, 255)))
+                                            .rounding(egui::Rounding::same(8.0))
+                                            .inner_margin(egui::Margin::symmetric(16.0, 12.0))
+                                            .show(ui, |ui| {
+                                                ui.horizontal(|ui| {
+                                                    ui.label(egui::RichText::new("📚").size(24.0).color(Color32::from_rgb(150, 200, 255)));
+                                                    ui.add_space(12.0);
+                                                    ui.label(egui::RichText::new(cat.as_str())
+                                                        .strong()
+                                                        .size(18.0)
+                                                        .color(Color32::from_rgb(240, 240, 245)));
+                                                });
+                                            });
+                                        ui.add_space(12.0);
                                         
                                         egui::ScrollArea::vertical()
                                             .max_height(450.0)
@@ -1708,107 +1807,162 @@ impl NodeGraphApp {
                                                         .filter(|t| t.subcategory == *subcat)
                                                         .collect();
                                                     
+                                                    // Header de subcategoría con diseño más profesional
                                                     egui::Frame::none()
                                                         .fill(subcat_bg)
-                                                        .stroke(egui::Stroke::new(2.0, subcat_color))
-                                                        .rounding(egui::Rounding::same(6.0))
-                                                        .inner_margin(egui::Margin::symmetric(12.0, 8.0))
+                                                        .stroke(egui::Stroke::new(2.5, subcat_color))
+                                                        .rounding(egui::Rounding::same(8.0))
+                                                        .inner_margin(egui::Margin::symmetric(14.0, 10.0))
                                                         .show(ui, |ui| {
                                                             ui.horizontal(|ui| {
-                                                                ui.label(egui::RichText::new(subcat_icon).size(18.0).color(subcat_color));
-                                                                ui.add_space(8.0);
+                                                                ui.label(egui::RichText::new(subcat_icon).size(20.0).color(subcat_color));
+                                                                ui.add_space(10.0);
                                                                 ui.label(egui::RichText::new(*subcat)
                                                                     .strong()
-                                                                    .size(14.0)
-                                                                    .color(Color32::WHITE));
+                                                                    .size(15.0)
+                                                                    .color(Color32::from_rgb(255, 255, 255)));
                                                                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                                                                     ui.label(egui::RichText::new(format!("({})", subcat_templates.len()))
-                                                                        .size(11.0)
-                                                                        .color(Color32::from_rgb(180, 180, 200)));
+                                                                        .size(12.0)
+                                                                        .color(Color32::from_rgb(200, 200, 220)));
                                                                 });
                                                             });
                                                         });
-                                                    ui.add_space(8.0);
+                                                    ui.add_space(10.0);
                                                     
-                                                    // Templates organizados en grid o lista mejorada
+                                                    // Templates organizados con diseño profesional mejorado
                                                     for (template_idx, template) in subcat_templates.iter().enumerate() {
                                                         let color = Color32::from_rgb(template.color.0, template.color.1, template.color.2);
                                                         let template_cloned = (**template).clone();
                                                         
-                                                        // Crear área interactiva
+                                                        // Crear área interactiva más grande y profesional
                                                         let (rect, response) = ui.allocate_exact_size(
-                                                            egui::vec2(ui.available_width(), 36.0),
+                                                            egui::vec2(ui.available_width(), 44.0),
                                                             egui::Sense::click()
                                                         );
                                                         
                                                         let is_hovered = response.hovered();
                                                         
-                                                        // Fondo y borde según estado
+                                                        // Colores mejorados con gradientes sutiles
                                                         let template_bg = if is_hovered {
+                                                            // Hover: más brillante y translúcido
                                                             Color32::from_rgba_unmultiplied(
-                                                                (color.r() as u32 * 8 / 255 + 50) as u8,
-                                                                (color.g() as u32 * 8 / 255 + 50) as u8,
-                                                                (color.b() as u32 * 8 / 255 + 50) as u8,
-                                                                180
+                                                                (color.r() as u32 * 12 / 255 + 60).min(255) as u8,
+                                                                (color.g() as u32 * 12 / 255 + 60).min(255) as u8,
+                                                                (color.b() as u32 * 12 / 255 + 60).min(255) as u8,
+                                                                200
                                                             )
                                                         } else {
-                                                            Color32::from_rgba_unmultiplied(45, 50, 60, 150)
+                                                            // Normal: fondo oscuro elegante
+                                                            Color32::from_rgba_unmultiplied(38, 42, 52, 180)
                                                         };
                                                         
                                                         let template_border = if is_hovered {
-                                                            Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 220)
+                                                            // Hover: borde más brillante y más grueso
+                                                            Color32::from_rgba_unmultiplied(
+                                                                (color.r() as u32 * 13 / 10).min(255) as u8,
+                                                                (color.g() as u32 * 13 / 10).min(255) as u8,
+                                                                (color.b() as u32 * 13 / 10).min(255) as u8,
+                                                                255
+                                                            )
                                                         } else {
-                                                            color
+                                                            // Normal: borde con color del template pero más sutil
+                                                            Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 180)
                                                         };
                                                         
-                                                        // Dibujar fondo y borde
+                                                        // Sombra profesional cuando está hover
+                                                        if is_hovered {
+                                                            ui.painter().rect_filled(
+                                                                rect.translate(egui::vec2(0.0, 2.0)),
+                                                                8.0,
+                                                                Color32::from_black_alpha(60)
+                                                            );
+                                                        }
+                                                        
+                                                        // Dibujar fondo principal con bordes redondeados
                                                         ui.painter().rect_filled(
                                                             rect,
-                                                            6.0,
+                                                            8.0,
                                                             template_bg
                                                         );
+                                                        
+                                                        // Borde profesional más grueso en hover
                                                         ui.painter().rect_stroke(
                                                             rect,
-                                                            6.0,
-                                                            egui::Stroke::new(1.8, template_border)
+                                                            8.0,
+                                                            egui::Stroke::new(if is_hovered { 2.5 } else { 1.5 }, template_border)
                                                         );
                                                         
-                                                        // Indicador lateral izquierdo con color
+                                                        // Indicador lateral izquierdo más grueso y elegante
+                                                        let indicator_width = if is_hovered { 5.0 } else { 4.0 };
                                                         ui.painter().rect_filled(
                                                             egui::Rect::from_min_size(
                                                                 rect.left_top(),
-                                                                egui::vec2(4.0, rect.height())
+                                                                egui::vec2(indicator_width, rect.height())
                                                             ),
-                                                            0.0,
+                                                            if is_hovered { 8.0 } else { 0.0 },
                                                             color
                                                         );
                                                         
-                                                        // Dibujar contenido
-                                                        let icon_pos = rect.left_top() + egui::vec2(16.0, 18.0);
+                                                        // Efecto de brillo sutil en el indicador cuando hover
+                                                        if is_hovered {
+                                                            ui.painter().rect_filled(
+                                                                egui::Rect::from_min_size(
+                                                                    rect.left_top(),
+                                                                    egui::vec2(indicator_width, rect.height() * 0.5)
+                                                                ),
+                                                                0.0,
+                                                                Color32::from_rgba_unmultiplied(255, 255, 255, 40)
+                                                            );
+                                                        }
+                                                        
+                                                        // Dibujar contenido con mejor tipografía
+                                                        let icon_size = if is_hovered { 20.0 } else { 18.0 };
+                                                        let icon_pos = rect.left_top() + egui::vec2(20.0, rect.height() / 2.0);
                                                         ui.painter().text(
                                                             icon_pos,
                                                             egui::Align2::LEFT_CENTER,
                                                             template.icon,
-                                                            egui::FontId::proportional(17.0),
+                                                            egui::FontId::proportional(icon_size),
                                                             color
                                                         );
                                                         
-                                                        let text_pos = rect.left_top() + egui::vec2(48.0, 18.0);
+                                                        // Texto del template con mejor tipografía y spacing
+                                                        let text_pos = rect.left_top() + egui::vec2(54.0, rect.height() / 2.0);
                                                         ui.painter().text(
                                                             text_pos,
                                                             egui::Align2::LEFT_CENTER,
                                                             template.name,
-                                                            egui::FontId::proportional(12.5),
-                                                            Color32::from_rgb(235, 235, 240)
+                                                            egui::FontId::proportional(if is_hovered { 13.5 } else { 13.0 }),
+                                                            Color32::from_rgb(245, 245, 250)
                                                         );
                                                         
-                                                        // Indicador de click (opcional, visual)
+                                                        // Indicador de hover adicional (brillo en la esquina)
                                                         if is_hovered {
-                                                            let hover_rect = rect.expand(1.0);
-                                                            ui.painter().rect_stroke(
-                                                                hover_rect,
-                                                                6.0,
-                                                                egui::Stroke::new(0.5, Color32::from_rgba_unmultiplied(255, 255, 255, 100))
+                                                            // Brillo sutil en la esquina superior derecha
+                                                            let glow_rect = egui::Rect::from_min_size(
+                                                                rect.right_top() - egui::vec2(40.0, 0.0),
+                                                                egui::vec2(40.0, 20.0)
+                                                            );
+                                                            ui.painter().rect_filled(
+                                                                glow_rect,
+                                                                4.0,
+                                                                Color32::from_rgba_unmultiplied(
+                                                                    color.r(),
+                                                                    color.g(),
+                                                                    color.b(),
+                                                                    30
+                                                                )
+                                                            );
+                                                            
+                                                            // Indicador "clic para agregar" sutil
+                                                            let click_hint_pos = rect.right_top() - egui::vec2(8.0, rect.height() / 2.0);
+                                                            ui.painter().text(
+                                                                click_hint_pos,
+                                                                egui::Align2::RIGHT_CENTER,
+                                                                "→",
+                                                                egui::FontId::proportional(16.0),
+                                                                Color32::from_rgba_unmultiplied(200, 200, 200, 180)
                                                             );
                                                         }
                                                         
@@ -1817,7 +1971,7 @@ impl NodeGraphApp {
                                                             close_menu = true;
                                                         }
                                                         
-                                                        ui.add_space(3.0);
+                                                        ui.add_space(6.0);
                                                     }
                                                     
                                                     // Separador entre subcategorías (excepto la última)
@@ -4688,4 +4842,5 @@ impl NodeGraphApp {
         self.network_levels.len() == 1
     }
 }
+
 
