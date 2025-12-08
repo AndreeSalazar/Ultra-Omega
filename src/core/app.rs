@@ -253,6 +253,124 @@ impl NodeGraphApp {
             eprintln!("Error saving config: {}", e);
         }
     }
+    
+    /// Renderizar una línea del terminal con colores según el contenido
+    fn render_terminal_line(ui: &mut egui::Ui, line: &str, font_id: &egui::FontId) {
+        use egui::RichText;
+        
+        // Colores para diferentes tipos de mensajes
+        let color_success = Color32::from_rgb(86, 200, 86);      // Verde para éxito
+        let color_error = Color32::from_rgb(244, 135, 113);      // Rojo para errores
+        let color_warning = Color32::from_rgb(204, 204, 0);      // Amarillo para advertencias
+        let color_info = Color32::from_rgb(100, 150, 255);       // Azul para información
+        let color_command = Color32::from_rgb(78, 148, 206);     // Cyan para comandos
+        let color_path = Color32::from_rgb(200, 150, 255);       // Púrpura para rutas
+        let color_default = Color32::from_rgb(212, 212, 212);    // Blanco/gris por defecto
+        let color_separator = Color32::from_rgb(100, 100, 120);  // Gris para separadores
+        
+        let trimmed = line.trim();
+        
+        // Detectar tipo de línea y aplicar colores
+        if trimmed.is_empty() {
+            ui.add_space(2.0);
+            return;
+        }
+        
+        // Líneas con separadores (═══, ───, ===)
+        if trimmed.starts_with("═══") || trimmed.starts_with("───") || trimmed.starts_with("===") {
+            ui.label(
+                RichText::new(line)
+                    .font(font_id.clone())
+                    .color(color_separator)
+            );
+            return;
+        }
+        
+        // Mensajes de éxito (✅, exitosa, exitosamente, Success)
+        if trimmed.contains("✅") || 
+           trimmed.contains("exitosa") || 
+           trimmed.contains("exitosamente") || 
+           trimmed.contains("Success") ||
+           trimmed.contains("COMPLETADO") {
+            ui.label(
+                RichText::new(line)
+                    .font(font_id.clone())
+                    .color(color_success)
+            );
+            return;
+        }
+        
+        // Mensajes de error (❌, Error, Error de, Falló, Failed)
+        if trimmed.contains("❌") || 
+           trimmed.starts_with("Error") || 
+           trimmed.contains("Error de") ||
+           trimmed.contains("Falló") ||
+           trimmed.contains("Failed") ||
+           trimmed.contains("error:") ||
+           trimmed.contains("ERROR") {
+            ui.label(
+                RichText::new(line)
+                    .font(font_id.clone())
+                    .color(color_error)
+            );
+            return;
+        }
+        
+        // Advertencias (⚠️, Warning, Advertencia)
+        if trimmed.contains("⚠️") || 
+           trimmed.contains("Warning") || 
+           trimmed.contains("Advertencia") ||
+           trimmed.contains("ADVERTENCIA") {
+            ui.label(
+                RichText::new(line)
+                    .font(font_id.clone())
+                    .color(color_warning)
+            );
+            return;
+        }
+        
+        // Comandos (>>>) - azul para el comando
+        if trimmed.starts_with(">>>") {
+            ui.label(
+                RichText::new(line)
+                    .font(font_id.clone())
+                    .color(color_command)
+                    .strong()
+            );
+            return;
+        }
+        
+        // Líneas con rutas (púrpura)
+        if line.contains(":\\") || line.contains("/home/") || line.contains("/usr/") || 
+           line.contains(".exe") || line.contains(".dll") || line.contains(".java") || 
+           line.contains(".class") || line.contains("javac") {
+            ui.label(
+                RichText::new(line)
+                    .font(font_id.clone())
+                    .color(color_path)
+            );
+            return;
+        }
+        
+        // Información (Iniciando, Compilación, Ejecutando)
+        if trimmed.starts_with("Iniciando") || trimmed.starts_with("Compilación") || 
+           trimmed.starts_with("Ejecutando") || trimmed.starts_with("Usando") {
+            ui.label(
+                RichText::new(line)
+                    .font(font_id.clone())
+                    .color(color_info)
+            );
+            return;
+        }
+        
+        // Renderizar línea normal
+        ui.label(
+            RichText::new(line)
+                .font(font_id.clone())
+                .color(color_default)
+        );
+    }
+    
 }
 
 impl eframe::App for NodeGraphApp {
@@ -746,24 +864,35 @@ impl NodeGraphApp {
                 });
                 ui.separator();
 
-                egui::ScrollArea::vertical().show(ui, |ui| {
-                    let text = match self.terminal.active_tab {
-                        TerminalTab::Nasm => &mut self.terminal.asm_output,
-                        TerminalTab::C => &mut self.terminal.c_output,
-                        TerminalTab::Cpp => &mut self.terminal.cpp_output,
-                        TerminalTab::Rust => &mut self.terminal.rust_output,
-                        TerminalTab::Zig => &mut self.terminal.zig_output,
-                        TerminalTab::Java => &mut self.terminal.java_output,
-                        TerminalTab::Mojo => &mut self.terminal.rust_output, // Mojo usa el buffer de Rust por ahora
-                    };
-                    
-                    ui.add(
-                        egui::TextEdit::multiline(text)
-                            .font(egui::TextStyle::Monospace)
-                            .desired_width(f32::INFINITY)
-                            .desired_rows(8),
-                    );
-                });
+                egui::ScrollArea::vertical()
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| {
+                        let text = match self.terminal.active_tab {
+                            TerminalTab::Nasm => &self.terminal.asm_output,
+                            TerminalTab::C => &self.terminal.c_output,
+                            TerminalTab::Cpp => &self.terminal.cpp_output,
+                            TerminalTab::Rust => &self.terminal.rust_output,
+                            TerminalTab::Zig => &self.terminal.zig_output,
+                            TerminalTab::Java => &self.terminal.java_output,
+                            TerminalTab::Mojo => &self.terminal.rust_output, // Mojo usa el buffer de Rust por ahora
+                        };
+                        
+                        // Crear fuente monoespaciada más grande y legible
+                        let font_id = egui::FontId {
+                            size: 14.5,
+                            family: egui::FontFamily::Monospace,
+                        };
+                        
+                        // Configurar espaciado mejorado
+                        ui.style_mut().spacing.item_spacing.y = 2.0;
+                        
+                        // Renderizar texto con colores según el contenido
+                        ui.vertical(|ui| {
+                            for line in text.lines() {
+                                Self::render_terminal_line(ui, line, &font_id);
+                            }
+                        });
+                    });
             });
     }
 

@@ -162,28 +162,69 @@ impl TerminalManager {
             Language::Java => {
                 if let Some(main_class) = Self::compile_java(code, &work_dir, output_buffer) {
                     self.java_main_class = Some(main_class.clone());
-                    // Ejecutar Java
-                    output_buffer.push_str(">>> Ejecutando...\n\n");
+                    // Ejecutar Java con codificación UTF-8
+                    output_buffer.push_str(">>> Ejecutando programa...\n");
                     let java_path = Self::find_compiler_cmd("java", output_buffer);
                     if let Some(java_cmd) = java_path {
-                        match Command::new(&java_cmd)
-                            .current_dir(&work_dir)
-                            .arg(&main_class)
-                            .output()
+                        // Configurar variables de entorno para UTF-8
+                        let mut cmd = Command::new(&java_cmd);
+                        cmd.current_dir(&work_dir);
+                        cmd.arg(&main_class);
+                        
+                        // En Windows, configurar codificación UTF-8
+                        #[cfg(target_os = "windows")]
                         {
+                            cmd.env("JAVA_TOOL_OPTIONS", "-Dfile.encoding=UTF-8");
+                            cmd.env("PYTHONIOENCODING", "utf-8");
+                        }
+                        
+                        match cmd.output() {
                             Ok(run_out) => {
-                                output_buffer.push_str("--- SALIDA DEL PROGRAMA ---\n");
-                                output_buffer.push_str(&String::from_utf8_lossy(&run_out.stdout));
-                                if !run_out.stderr.is_empty() {
-                                    output_buffer.push_str(&String::from_utf8_lossy(&run_out.stderr));
+                                // Decodificar correctamente como UTF-8
+                                let stdout_str = String::from_utf8_lossy(&run_out.stdout);
+                                let stderr_str = String::from_utf8_lossy(&run_out.stderr);
+                                
+                                // Reorganizar: primero info de compilación, luego resultados
+                                output_buffer.push_str("\n");
+                                output_buffer.push_str("═══════════════════════════════════════════════════════════════\n");
+                                output_buffer.push_str("                    📊 RESULTADOS DEL PROGRAMA\n");
+                                output_buffer.push_str("═══════════════════════════════════════════════════════════════\n\n");
+                                
+                                if !stdout_str.is_empty() {
+                                    output_buffer.push_str("📤 Salida estándar:\n");
+                                    output_buffer.push_str("───────────────────────────────────────────────────────────\n");
+                                    output_buffer.push_str(&stdout_str);
+                                    if !stdout_str.ends_with('\n') {
+                                        output_buffer.push_str("\n");
+                                    }
+                                    output_buffer.push_str("───────────────────────────────────────────────────────────\n\n");
                                 }
-                                output_buffer.push_str("\n---------------------------\n");
-                                if let Some(code) = run_out.status.code() {
-                                    output_buffer.push_str(&format!("Exit code: {}\n", code));
+                                
+                                if !stderr_str.is_empty() {
+                                    output_buffer.push_str("⚠️  Salida de errores:\n");
+                                    output_buffer.push_str("───────────────────────────────────────────────────────────\n");
+                                    output_buffer.push_str(&stderr_str);
+                                    if !stderr_str.ends_with('\n') {
+                                        output_buffer.push_str("\n");
+                                    }
+                                    output_buffer.push_str("───────────────────────────────────────────────────────────\n\n");
                                 }
+                                
+                                // Estado final
+                                if let Some(exit_code) = run_out.status.code() {
+                                    if exit_code == 0 {
+                                        output_buffer.push_str("✅ Programa ejecutado exitosamente\n");
+                                    } else {
+                                        output_buffer.push_str(&format!("❌ Programa terminó con código de salida: {}\n", exit_code));
+                                    }
+                                } else {
+                                    output_buffer.push_str("⚠️  El programa fue terminado por una señal del sistema\n");
+                                }
+                                
+                                output_buffer.push_str("═══════════════════════════════════════════════════════════════\n");
                             }
                             Err(e) => {
-                                output_buffer.push_str(&format!("Error ejecutando programa: {}\n", e));
+                                output_buffer.push_str(&format!("❌ Error ejecutando programa: {}\n", e));
                             }
                         }
                     } else {
@@ -198,24 +239,55 @@ impl TerminalManager {
 
         // Run if compiled (para Java se maneja por separado)
         if exe_path.exists() {
-            output_buffer.push_str(">>> Ejecutando...\n\n");
-            match Command::new(&exe_path)
-                .current_dir(&work_dir)
-                .output()
+            output_buffer.push_str(">>> Ejecutando programa...\n");
+            let mut cmd = Command::new(&exe_path);
+            cmd.current_dir(&work_dir);
+            
+            // En Windows, configurar codificación UTF-8
+            #[cfg(target_os = "windows")]
             {
+                cmd.env("PYTHONIOENCODING", "utf-8");
+            }
+            
+            match cmd.output() {
                 Ok(run_out) => {
-                    output_buffer.push_str("--- SALIDA DEL PROGRAMA ---\n");
-                    output_buffer.push_str(&String::from_utf8_lossy(&run_out.stdout));
-                    output_buffer.push_str(&String::from_utf8_lossy(&run_out.stderr));
-                    output_buffer.push_str("\n---------------------------\n");
+                    // Decodificar correctamente como UTF-8
+                    let stdout_str = String::from_utf8_lossy(&run_out.stdout);
+                    let stderr_str = String::from_utf8_lossy(&run_out.stderr);
+                    
+                    // Reorganizar: primero info de compilación, luego resultados
+                    output_buffer.push_str("\n");
+                    output_buffer.push_str("═══════════════════════════════════════════════════════════════\n");
+                    output_buffer.push_str("                    📊 RESULTADOS DEL PROGRAMA\n");
+                    output_buffer.push_str("═══════════════════════════════════════════════════════════════\n\n");
+                    
+                    if !stdout_str.is_empty() {
+                        output_buffer.push_str("📤 Salida estándar:\n");
+                        output_buffer.push_str("───────────────────────────────────────────────────────────\n");
+                        output_buffer.push_str(&stdout_str);
+                        if !stdout_str.ends_with('\n') {
+                            output_buffer.push_str("\n");
+                        }
+                        output_buffer.push_str("───────────────────────────────────────────────────────────\n\n");
+                    }
+                    
+                    if !stderr_str.is_empty() {
+                        output_buffer.push_str("⚠️  Salida de errores:\n");
+                        output_buffer.push_str("───────────────────────────────────────────────────────────\n");
+                        output_buffer.push_str(&stderr_str);
+                        if !stderr_str.ends_with('\n') {
+                            output_buffer.push_str("\n");
+                        }
+                        output_buffer.push_str("───────────────────────────────────────────────────────────\n\n");
+                    }
                     
                     // Analizar el código de salida
                     let exit_code = run_out.status.code();
                     if let Some(code) = exit_code {
                         if code == 139 || code == -11 {
                             // SIGSEGV (segmentation fault)
-                            output_buffer.push_str(&format!("Exit code: signal: 11 (SIGSEGV) (core dumped)\n"));
-                            output_buffer.push_str("\n⚠️  SEGMENTATION FAULT detectado!\n");
+                            output_buffer.push_str("❌ SEGMENTATION FAULT detectado!\n");
+                            output_buffer.push_str("═══════════════════════════════════════════════════════════════\n");
                             output_buffer.push_str("   Posibles causas:\n");
                             #[cfg(not(target_os = "windows"))]
                             {
@@ -235,21 +307,22 @@ impl TerminalManager {
                                 output_buffer.push_str("   2. Pila mal alineada\n");
                                 output_buffer.push_str("   3. Argumentos incorrectos en llamadas a funciones\n");
                             }
+                            output_buffer.push_str("═══════════════════════════════════════════════════════════════\n");
                         } else if code != 0 {
-                            output_buffer.push_str(&format!("Exit code: {}\n", code));
+                            output_buffer.push_str(&format!("❌ Programa terminó con código de salida: {}\n", code));
+                            output_buffer.push_str("═══════════════════════════════════════════════════════════════\n");
                         } else {
-                            output_buffer.push_str(&format!("Exit code: {}\n", run_out.status));
+                            output_buffer.push_str("✅ Programa ejecutado exitosamente\n");
+                            output_buffer.push_str("═══════════════════════════════════════════════════════════════\n");
                         }
                     } else {
                         // Proceso terminado por señal
-                        output_buffer.push_str(&format!("Exit code: {}\n", run_out.status));
-                        if run_out.status.to_string().contains("signal") {
-                            output_buffer.push_str("\n⚠️  El programa fue terminado por una señal del sistema.\n");
-                        }
+                        output_buffer.push_str("⚠️  El programa fue terminado por una señal del sistema.\n");
+                        output_buffer.push_str("═══════════════════════════════════════════════════════════════\n");
                     }
                 }
                 Err(e) => {
-                    output_buffer.push_str(&format!("Error ejecutando programa: {}\n", e));
+                    output_buffer.push_str(&format!("❌ Error ejecutando programa: {}\n", e));
                 }
             }
         }
@@ -375,27 +448,34 @@ impl TerminalManager {
     fn handle_compile_output(result: std::io::Result<std::process::Output>, name: &str, exe_file: &Path, output: &mut String) {
         match result {
             Ok(out) => {
+                // Decodificar correctamente como UTF-8 para soportar caracteres especiales
                 let stderr = String::from_utf8_lossy(&out.stderr);
                 let stdout = String::from_utf8_lossy(&out.stdout);
                 
                 // Mostrar stdout si hay contenido
                 if !stdout.is_empty() {
-                    output.push_str(&format!("{} Output:\n", name));
+                    output.push_str(&format!("{} Salida:\n", name));
                     output.push_str(&stdout);
+                    if !stdout.ends_with('\n') {
+                        output.push_str("\n");
+                    }
                 }
                 
                 // Mostrar stderr si hay contenido
                 if !stderr.is_empty() {
-                    output.push_str(&format!("{} Error/Log:\n", name));
+                    output.push_str(&format!("{} Errores/Advertencias:\n", name));
                     output.push_str(&stderr);
+                    if !stderr.ends_with('\n') {
+                        output.push_str("\n");
+                    }
                 }
                 
                 if out.status.success() {
-                    output.push_str(&format!(">>> {}: Compilación exitosa.\n", name));
+                    output.push_str(&format!("✅ {}: Compilación exitosa.\n", name));
                 } else {
-                    output.push_str(&format!(">>> {}: Error de compilación.\n", name));
+                    output.push_str(&format!("❌ {}: Error de compilación.\n", name));
                     if let Some(code) = out.status.code() {
-                        output.push_str(&format!(">>> Exit code: {}\n", code));
+                        output.push_str(&format!(">>> Código de salida: {}\n", code));
                     }
                     
                     // Si no hay stderr pero falló, mostrar más información
@@ -792,21 +872,28 @@ impl TerminalManager {
         
         match cmd_output {
             Ok(out) => {
+                // Decodificar correctamente como UTF-8 para soportar caracteres especiales
                 let stderr = String::from_utf8_lossy(&out.stderr);
                 let stdout = String::from_utf8_lossy(&out.stdout);
                 
                 if !stdout.is_empty() {
-                    output.push_str("javac Output:\n");
+                    output.push_str("javac Salida:\n");
                     output.push_str(&stdout);
+                    if !stdout.ends_with('\n') {
+                        output.push_str("\n");
+                    }
                 }
                 
                 if !stderr.is_empty() {
-                    output.push_str("javac Error/Log:\n");
+                    output.push_str("javac Errores/Advertencias:\n");
                     output.push_str(&stderr);
+                    if !stderr.ends_with('\n') {
+                        output.push_str("\n");
+                    }
                 }
                 
                 if out.status.success() {
-                    output.push_str(">>> Java: Compilación exitosa.\n");
+                    output.push_str("✅ Java: Compilación exitosa.\n");
                     
                     // Extraer el nombre de la clase principal del código
                     let main_class = Self::extract_java_main_class(code);
@@ -814,19 +901,19 @@ impl TerminalManager {
                         return Some(class_name);
                     } else {
                         // Por defecto usar "Main"
-                        output.push_str(">>> Advertencia: No se pudo determinar la clase principal, usando 'Main'\n");
+                        output.push_str("⚠️  Advertencia: No se pudo determinar la clase principal, usando 'Main'\n");
                         return Some("Main".to_string());
                     }
                 } else {
-                    output.push_str(">>> Java: Error de compilación.\n");
+                    output.push_str("❌ Java: Error de compilación.\n");
                     if let Some(code) = out.status.code() {
-                        output.push_str(&format!(">>> Exit code: {}\n", code));
+                        output.push_str(&format!(">>> Código de salida: {}\n", code));
                     }
                     return None;
                 }
             }
             Err(e) => {
-                output.push_str(&format!("Error ejecutando javac: {}\n", e));
+                output.push_str(&format!("❌ Error ejecutando javac: {}\n", e));
                 output.push_str(">>> javac no está instalado o no está en PATH.\n");
                 return None;
             }

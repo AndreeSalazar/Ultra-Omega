@@ -104,6 +104,12 @@ fn apply_vscode_theme(ctx: &egui::Context) {
         egui::TextStyle::Small,
         egui::FontId::new(11.0, egui::FontFamily::Proportional),
     );
+    // Configurar fuente monoespaciada mejorada para terminal y código
+    // Tamaño más grande para mejor legibilidad y diferenciación de caracteres
+    style.text_styles.insert(
+        egui::TextStyle::Monospace,
+        egui::FontId::new(14.5, egui::FontFamily::Monospace), // Tamaño aumentado para mejor legibilidad
+    );
     ctx.set_style(style);
 }
 
