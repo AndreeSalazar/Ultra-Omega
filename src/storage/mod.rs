@@ -11,4 +11,5 @@ pub mod migration;
 pub use workspace::Workspace;
 pub use node_storage::NodeStorage;
 pub use project::{ProjectMetadata, ProjectConfig};
+pub use migration::{MigrationResult, needs_migration, migrate_project, create_backup};
 

@@ -2,9 +2,11 @@
 
 ## 🎯 Objetivos
 
-1. **Separar código del mapa de nodos** (Propuesta 1)
-2. **Reorganizar estructura de `src/`** para mejor gestión
-3. **Preparar para repositorios en la nube** (GitHub/GitLab)
+1. **Separar código del mapa de nodos** (Propuesta 1) ✅
+2. **Reorganizar estructura de `src/`** para mejor gestión ✅
+3. **Preparar para repositorios en la nube** (GitHub/GitLab) ⏳
+4. **Inspiración Houdini**: Sistema avanzado de nodos jerárquicos, subnetworks, y workflows profesionales 🆕
+5. **Inspiración VS Code**: Explorador de archivos en tiempo real, búsqueda avanzada, organización visual 🆕
 
 ---
 
@@ -74,9 +76,11 @@ src/
 
 ---
 
-## 🚀 Plan de Implementación
+## ✅ FASES COMPLETADAS
 
-### Fase 1: Crear Sistema de Storage Separado (Prioridad Alta) ✅ COMPLETADO
+### Fase 1: Crear Sistema de Storage Separado ✅ COMPLETADO
+
+#### ✅ **COMPLETADO:**
 
 **Archivos creados:**
 - ✅ `src/storage/mod.rs` - Módulo principal de storage
@@ -85,224 +89,112 @@ src/
 - ✅ `src/storage/migration.rs` - Migración de proyectos antiguos
 
 **Modificaciones realizadas:**
-- ✅ `src/node_graph.rs` - Agregado campo `code_path: Option<String>`, implementado `Clone`
+- ✅ `src/core/node_graph.rs` - Agregado campo `code_path: Option<String>`, implementado `Clone`
 - ✅ `src/storage/workspace.rs` (movido desde `src/workspace.rs`) - Actualizado para usar nuevo sistema
-- ✅ `src/app.rs` - Actualizado para usar nuevo sistema de storage
+- ✅ `src/core/app.rs` - Actualizado para usar nuevo sistema de storage
 - ✅ `src/main.rs` - Actualizados imports para usar `storage::`
 - ✅ `Cargo.toml` - Agregada dependencia `chrono`
 
-**Estado**: ✅ **COMPLETADO** - Sistema funcional, compila correctamente
+**Resultado:**
+- ✅ Sistema funcional, compila correctamente
+- ✅ Código de nodos separado en archivos individuales
+- ✅ Compatibilidad con formato antiguo mantenida
 
 **Esfuerzo real**: ~3 horas
 
 ---
 
-### Fase 2: Reorganizar Estructura de `src/` (Prioridad Media) ✅ COMPLETADO
+### Fase 2: Reorganizar Estructura de `src/` ✅ COMPLETADO
 
-**Objetivo**: Mejorar la organización del código moviendo archivos a módulos lógicos para facilitar mantenimiento, navegación y extensibilidad.
+#### ✅ **COMPLETADO:**
 
-**Estado**: ✅ **COMPLETADO** - Todos los archivos reorganizados, compilación exitosa
+**Estructura creada:**
+- ✅ Directorios `core/`, `compilation/`, `utils/` creados
+- ✅ Archivos `mod.rs` creados para cada módulo
+
+**Archivos movidos:**
+- ✅ `app.rs` → `core/app.rs`
+- ✅ `node_graph.rs` → `core/node_graph.rs`
+- ✅ `terminal.rs` → `compilation/terminal.rs`
+- ✅ `auto_linker.rs` → `compilation/auto_linker.rs`
+- ✅ `compiler_detector.rs` → `compilation/compiler_detector.rs`
+- ✅ `editor_history.rs` → `utils/editor_history.rs`
+
+**Imports actualizados:**
+- ✅ `src/main.rs` - Usa nuevos módulos
+- ✅ `src/core/app.rs` - Imports actualizados
+- ✅ Todos los archivos en `ui/` - Actualizados a `crate::core::`
+- ✅ Todos los archivos en `storage/` - Actualizados a `crate::core::node_graph`
+- ✅ Todos los archivos en `expressions/` - Actualizados
+- ✅ `templates/mod.rs` - Actualizado
+- ✅ Archivos de compilación - Actualizados internamente
+
+**Verificación:**
+- ✅ Compilación exitosa verificada con `cargo check`
+- ✅ Sin errores de compilación
+- ✅ Estructura modular y organizada
 
 **Esfuerzo real**: ~2 horas
 
 ---
 
-#### **Pasos Detallados de Implementación:**
+## ⏳ FASES PENDIENTES / EN PROGRESO
 
-**Paso 1: Crear Estructura de Directorios** ✅
-```bash
-src/
-├── core/           # Núcleo del sistema (app, node_graph)
-├── compilation/    # Sistema de compilación (terminal, auto_linker, compiler_detector)
-└── utils/          # Utilidades compartidas (editor_history)
-```
+### Fase 3: Migración de Proyectos Existentes 🔄 PARCIAL
 
-**Paso 2: Mover Archivos Core** ✅
-- ✅ `app.rs` → `core/app.rs`
-- ✅ `node_graph.rs` → `core/node_graph.rs`
-- ✅ Crear `core/mod.rs` con exports públicos
-
-**Paso 3: Mover Archivos de Compilación** ✅
-- ✅ `terminal.rs` → `compilation/terminal.rs`
-- ✅ `auto_linker.rs` → `compilation/auto_linker.rs`
-- ✅ `compiler_detector.rs` → `compilation/compiler_detector.rs`
-- ✅ Crear `compilation/mod.rs` con exports públicos
-
-**Paso 4: Mover Utilidades** ✅
-- ✅ `editor_history.rs` → `utils/editor_history.rs`
-- ✅ Crear `utils/mod.rs` con exports públicos
-
-**Paso 5: Actualizar Imports en `main.rs`** ✅
-```rust
-// Antes:
-mod app;
-mod node_graph;
-mod terminal;
-mod auto_linker;
-mod compiler_detector;
-mod editor_history;
-mod storage;  // Ya existe
-
-// Después:
-mod core;
-mod compilation;
-mod utils;
-mod storage;
-mod ui;
-mod expressions;
-mod templates;
-mod config;
-```
-
-**Paso 6: Actualizar Imports en Todos los Archivos** ✅
-- ✅ Buscar y reemplazar `use crate::app` → `use crate::core::app`
-- ✅ Buscar y reemplazar `use crate::node_graph` → `use crate::core::node_graph`
-- ✅ Buscar y reemplazar `use crate::terminal` → `use crate::compilation::terminal`
-- ✅ Buscar y reemplazar `use crate::auto_linker` → `use crate::compilation::auto_linker`
-- ✅ Buscar y reemplazar `use crate::compiler_detector` → `use crate::compilation::compiler_detector`
-- ✅ Buscar y reemplazar `use crate::editor_history` → `use crate::utils::editor_history`
-
-**Paso 7: Crear Archivos `mod.rs` para Cada Módulo** ✅
-- ✅ `core/mod.rs` - Exporta `app`, `node_graph` y tipos públicos
-- ✅ `compilation/mod.rs` - Exporta `terminal`, `auto_linker`, `compiler_detector`
-- ✅ `utils/mod.rs` - Exporta `editor_history`
-
-**Paso 8: Verificar Compilación** ✅
-- ✅ Ejecutar `cargo check` para encontrar errores
-- ✅ Corregir todos los imports faltantes
-- ✅ Verificar que no haya referencias rotas
-- ✅ Compilación exitosa verificada
-
----
-
-#### **Archivos a Mover (Estado Detallado):**
-
-| Archivo Actual | Nuevo Destino | Estado | Dependencias a Actualizar |
-|---------------|---------------|--------|---------------------------|
-| `src/app.rs` | `src/core/app.rs` | ✅ **Completado** | Todos los imports actualizados |
-| `src/node_graph.rs` | `src/core/node_graph.rs` | ✅ **Completado** | Todos los imports actualizados |
-| `src/workspace.rs` | `src/storage/workspace.rs` | ✅ **Completado** | Ya actualizado (Fase 1) |
-| `src/terminal.rs` | `src/compilation/terminal.rs` | ✅ **Completado** | Todos los imports actualizados |
-| `src/auto_linker.rs` | `src/compilation/auto_linker.rs` | ✅ **Completado** | Todos los imports actualizados |
-| `src/compiler_detector.rs` | `src/compilation/compiler_detector.rs` | ✅ **Completado** | Todos los imports actualizados |
-| `src/editor_history.rs` | `src/utils/editor_history.rs` | ✅ **Completado** | Todos los imports actualizados |
-
----
-
-#### **Archivos `mod.rs` a Crear:**
-
-**`src/core/mod.rs`:**
-```rust
-pub mod app;
-pub mod node_graph;
-
-pub use app::NodeGraphApp;
-pub use node_graph::{NodeGraph, Node, NodeId, NodeLanguage, PinId, Link};
-```
-
-**`src/compilation/mod.rs`:**
-```rust
-pub mod terminal;
-pub mod auto_linker;
-pub mod compiler_detector;
-
-pub use terminal::{TerminalManager, TerminalTab, Language};
-pub use auto_linker::auto_link;
-pub use compiler_detector::{CompilerStatus, detect_all_compilers};
-```
-
-**`src/utils/mod.rs`:**
-```rust
-pub mod editor_history;
-
-pub use editor_history::EditorHistory;
-```
-
----
-
-#### **Estrategia de Migración Recomendada:**
-
-**Opción A: Migración Incremental (Recomendada)**
-1. Crear estructura de directorios primero
-2. Mover un módulo a la vez
-3. Actualizar imports inmediatamente después de cada movimiento
-4. Verificar compilación después de cada paso
-5. **Ventaja**: Errores más fáciles de rastrear y corregir
-
-**Opción B: Migración Completa**
-1. Mover todos los archivos de una vez
-2. Actualizar todos los imports en un paso masivo
-3. Corregir errores de compilación
-4. **Ventaja**: Más rápido, pero más difícil de debuggear
-
-**Recomendación**: Usar **Opción A** para mayor seguridad.
-
----
-
-#### **Consideraciones Importantes:**
-
-- ⚠️ **Mantener compatibilidad**: Algunos archivos externos pueden depender de la estructura actual
-- ⚠️ **Tests**: Si hay tests, también necesitarán actualización de imports
-- ⚠️ **Documentación**: Actualizar cualquier referencia en comentarios o docs
-- ⚠️ **IDE**: Reiniciar el IDE/Rust Analyzer después de los cambios para que reconozca la nueva estructura
-
----
-
-**Archivos actualizados:**
-- ✅ `src/main.rs` - Imports actualizados a nuevos módulos
-- ✅ `src/core/app.rs` - Imports actualizados, usa `super::node_graph`
-- ✅ Todos los archivos en `ui/` - Actualizados a `crate::core::`
-- ✅ Todos los archivos en `storage/` - Actualizados a `crate::core::node_graph`
-- ✅ Todos los archivos en `expressions/` - Actualizados a `crate::core::node_graph`
-- ✅ `templates/mod.rs` - Actualizado
-- ✅ Archivos de compilación - Actualizados internamente
-
-**Resultado:**
-- ✅ Compilación exitosa verificada con `cargo check`
-- ✅ Sin errores de compilación
-- ✅ Estructura modular y organizada
-- ✅ Mejor mantenibilidad y extensibilidad
-
-**Esfuerzo real**: ~2 horas (menos del estimado gracias a migración incremental exitosa)
-
-**Prioridad**: Media - ✅ **COMPLETADO** - Mejora la organización del código significativamente
-
----
-
-### Fase 3: Migración de Proyectos Existentes (Prioridad Media) 🔄 PARCIAL
-
-**Implementado:**
+#### ✅ **COMPLETADO:**
 - ✅ `needs_migration()` - Detecta si un proyecto usa formato antiguo
 - ✅ `migrate_project()` - Migra automáticamente a formato nuevo
 - ✅ `create_backup()` - Crea backup del proyecto antes de migrar
+- ✅ `copy_directory()` - Helper para backup
 - ✅ Funciones de migración en `src/storage/migration.rs`
 
-**Pendiente:**
-- ⏳ Integrar migración automática en `app.rs` al cargar proyectos
-- ⏳ UI para mostrar progreso de migración al usuario
+#### ⏳ **PENDIENTE:**
 - ⏳ Validación post-migración
-- ⏳ Testing con proyectos reales
+- ⏳ Testing con proyectos reales:
+  - ⏳ Proyecto con código embebido
+  - ⏳ Proyecto con muchos nodos
+  - ⏳ Validar que backup se crea correctamente
 
-**Estado**: 🔄 **PARCIAL** - Lógica implementada, falta integración y UI
+**Estado**: 🔄 **PARCIAL** - Integración y UI completadas, falta testing
 
-**Esfuerzo restante**: 1-2 horas
+**Esfuerzo restante**: 30 min - 1 hora (testing manual)
 
 ---
 
-### Fase 4: Preparar para GitHub (Prioridad Baja) ⏳ PENDIENTE
+### Fase 4: Preparar para GitHub ⏳ PENDIENTE
 
-**Tareas:**
-- ⏳ Verificar `.gitignore` está completo (incluir `.ultra-omega/`, `nodes/`, builds)
-- ⏳ Crear `.github/workflows/` con CI básico
+#### ✅ **COMPLETADO:**
+- ✅ `LICENSE` - Ya existe el archivo LICENSE
+
+#### ⏳ **PENDIENTE:**
+
+**`.gitignore`:**
+- ⏳ Verificar y actualizar `.gitignore`:
+  - ⏳ Excluir `nodes/` (código de nodos - puede incluirse o excluirse según preferencia)
+  - ⏳ Excluir `.ultra-omega/` (configuración local)
+  - ⏳ Excluir `target/`, `Cargo.lock` (build artifacts)
+  - ⏳ Excluir `*.exe`, `*.obj`, `*.o` (binarios compilados)
+
+**CI/CD:**
+- ⏳ Crear `.github/workflows/ci.yml` básico:
   - ⏳ Build y test en Windows/Linux
   - ⏳ Verificación de compilación
+  - ⏳ Linting básico (opcional)
+
+**Documentación:**
 - ⏳ Actualizar `README.md` con:
   - ⏳ Nueva estructura de proyectos
   - ⏳ Instrucciones de uso
   - ⏳ Información sobre formato de código separado
+  - ⏳ Ejemplos de uso
+  - ⏳ Información sobre migración de proyectos antiguos
 - ⏳ Crear `CHANGELOG.md` con versión 0.2.0 (nuevo formato)
-- ⏳ Agregar `LICENSE` (si no existe)
 - ⏳ Documentar estructura de directorios
+
+**Opcional:**
+- ⏳ Crear `.github/ISSUE_TEMPLATE/` (opcional pero recomendado)
+- ⏳ Crear `.github/PULL_REQUEST_TEMPLATE.md` (opcional)
 
 **Estado**: ⏳ **PENDIENTE**
 
@@ -312,14 +204,14 @@ pub use editor_history::EditorHistory;
 
 ## 📋 Checklist de Tareas
 
-### Fase 1: Storage Separado ✅ COMPLETADO
+### ✅ Fase 1: Storage Separado - COMPLETADO
+
 - [x] Crear `src/storage/mod.rs` ✅
 - [x] Crear `src/storage/node_storage.rs` con funciones:
   - [x] `get_node_code_path()` - Obtiene ruta del código
   - [x] `save_node_code()` - Guarda código en archivo separado
   - [x] `load_node_code()` - Carga código desde archivo
   - [x] `ensure_nodes_directory()` - Asegura directorio nodes/ existe
-  - [x] `delete_node_code()` - Elimina archivo de código
   - [x] `code_file_exists()` - Verifica si archivo existe
 - [x] Crear `src/storage/project.rs` con:
   - [x] `ProjectMetadata` struct ✅
@@ -331,90 +223,186 @@ pub use editor_history::EditorHistory;
 - [x] Actualizar `app.rs` para cargar código desde archivos ✅
 - [x] Agregar `Clone` a `NodeGraph` para soporte de serialización ✅
 
-### Fase 2: Reorganización ✅ COMPLETADO
+---
 
-#### Preparación:
-- [x] Crear directorio `storage/` ✅ (ya creado en Fase 1)
+### ✅ Fase 2: Reorganización - COMPLETADO
+
 - [x] Crear directorios `core/`, `compilation/`, `utils/` ✅
 - [x] Crear archivos `mod.rs` para cada módulo nuevo ✅
-
-#### Movimiento de Archivos Core:
 - [x] Mover `app.rs` → `core/app.rs` ✅
 - [x] Mover `node_graph.rs` → `core/node_graph.rs` ✅
-- [x] Crear `core/mod.rs` con exports apropiados ✅
-- [x] Actualizar imports en `main.rs` para `core::` ✅
-- [x] Buscar y actualizar imports de `app` en:
-  - [x] `main.rs` ✅
-  - [x] Archivos en `ui/` ✅
-  - [x] Cualquier otro archivo que use `NodeGraphApp` ✅
-- [x] Buscar y actualizar imports de `node_graph` en:
-  - [x] `app.rs` (ahora `core/app.rs`) ✅
-  - [x] `storage/*` ✅
-  - [x] `ui/*` ✅
-  - [x] `expressions/*` ✅
-
-#### Movimiento de Archivos de Compilación:
 - [x] Mover `terminal.rs` → `compilation/terminal.rs` ✅
 - [x] Mover `auto_linker.rs` → `compilation/auto_linker.rs` ✅
 - [x] Mover `compiler_detector.rs` → `compilation/compiler_detector.rs` ✅
-- [x] Crear `compilation/mod.rs` con exports apropiados ✅
-- [x] Actualizar imports en `main.rs` para `compilation::` ✅
-- [x] Buscar y actualizar imports de `terminal` en:
-  - [x] `app.rs` (ahora `core/app.rs`) ✅
-  - [x] `ui/menu/terminal.rs` ✅
-- [x] Buscar y actualizar imports de `auto_linker` en:
-  - [x] `terminal.rs` (ahora `compilation/terminal.rs`) ✅
-- [x] Buscar y actualizar imports de `compiler_detector` en:
-  - [x] `app.rs` (ahora `core/app.rs`) ✅
-  - [x] `terminal.rs` (ahora `compilation/terminal.rs`) ✅
-
-#### Movimiento de Utilidades:
 - [x] Mover `editor_history.rs` → `utils/editor_history.rs` ✅
-- [x] Crear `utils/mod.rs` con exports apropiados ✅
-- [x] Actualizar imports en `main.rs` para `utils::` ✅
-- [x] Buscar y actualizar imports de `editor_history` en:
-  - [x] `app.rs` (ahora `core/app.rs`) ✅
+- [x] Actualizar todos los imports en todos los archivos ✅
+- [x] Verificar compilación exitosa ✅
 
-#### Verificación y Limpieza:
-- [x] Ejecutar `cargo check` y corregir todos los errores ✅
-- [x] Verificar que no haya warnings sobre imports no usados ✅
-- [x] Buscar referencias rotas con `grep` o herramienta de búsqueda ✅
-- [x] Verificar que la aplicación compile completamente ✅
-- [ ] Probar funcionalidad básica (abrir, crear, guardar proyecto) - Pendiente testing manual
-- [x] Actualizar comentarios/docs que mencionen estructura antigua ✅
+#### ⏳ Pendiente (Testing Manual):
+- [ ] Probar funcionalidad básica (abrir, crear, guardar proyecto)
 
-#### Nota sobre `workspace.rs`:
-- [x] `workspace.rs` → `storage/workspace.rs` ✅ **YA COMPLETADO** (Fase 1)
+---
 
-### Fase 3: Migración 🔄 PARCIAL
+### 🔄 Fase 3: Migración - PARCIAL
+
+#### ✅ Completado:
 - [x] Crear `src/storage/migration.rs` ✅
 - [x] Implementar `needs_migration()` - Detecta formato antiguo ✅
 - [x] Implementar `migrate_project()` - Migra a formato nuevo ✅
 - [x] Implementar `create_backup()` - Crea backup antes de migrar ✅
 - [x] Implementar `copy_directory()` - Helper para backup ✅
-- [ ] Integrar migración en `app.rs` al cargar proyecto:
-  - [ ] Llamar `needs_migration()` al abrir proyecto
-  - [ ] Mostrar diálogo al usuario preguntando si migrar
-  - [ ] Ejecutar `migrate_project()` si usuario acepta
-  - [ ] Mostrar resultado de migración
-- [ ] Agregar UI para mostrar progreso de migración
+
+#### ✅ Completado Recientemente:
+- [x] Integrar migración en `app.rs` al cargar proyecto ✅
+  - [x] Llamar `needs_migration()` al abrir proyecto ✅
+  - [x] Mostrar diálogo al usuario preguntando si migrar ✅
+  - [x] Ejecutar `migrate_project()` si usuario acepta ✅
+  - [x] Mostrar resultado de migración ✅
+- [x] Agregar UI para mostrar progreso de migración ✅
+- [x] Crear backup automático antes de migrar ✅
+
+#### ⏳ Pendiente:
 - [ ] Testing con proyectos existentes:
   - [ ] Proyecto con código embebido
   - [ ] Proyecto con muchos nodos
   - [ ] Validar que backup se crea correctamente
+- [ ] Validación post-migración
 
-### Fase 4: GitHub Ready ⏳ PENDIENTE
+---
+
+### 🆕 Fase 5: Inspiración Houdini - Sistema Avanzado de Nodos 🆕
+
+#### 🎨 Ideas de Houdini para implementar:
+
+**Sistema de Subgrafos/Subnetworks:**
+- [ ] **Subnetwork Nodes**: Nodos que contienen un grafo completo dentro
+  - Abrir subnetwork en nueva pestaña/ventana
+  - Exportar subnetwork como asset reutilizable
+  - Parámetros expuestos al nivel padre
+  - Jerarquía visual clara (breadcrumbs)
+  
+- [ ] **HDAs (Houdini Digital Assets)**: Assets exportables
+  - Exportar grupo de nodos como asset
+  - Importar assets en otros proyectos
+  - Parámetros configurables expuestos
+  - Documentación integrada en el asset
+
+**Sistema de Parámetros Avanzado:**
+- [ ] **Parameter Editor**: Panel dedicado para editar parámetros
+  - Parámetros dinámicos según tipo de nodo
+  - Expresiones en parámetros (como HScript/Python)
+  - Referencias a otros nodos (channels)
+  - Validación de tipos en tiempo real
+  
+- [ ] **Channel References**: Sistema mejorado de referencias
+  - `ch("../node_name/parameter")` - Referencias relativas
+  - `ch("/absolute/path/to/node/param")` - Referencias absolutas
+  - Autocompletado de rutas
+  - Validación de referencias
+
+**Vistas y Workflows:**
+- [ ] **Network View Tabs**: Múltiples pestañas de grafos
+  - Abrir subnetworks en nuevas pestañas
+  - Navegación rápida entre niveles
+  - Breadcrumbs para jerarquía
+  
+- [ ] **Minimap/Navigator**: Vista general del grafo
+  - Mini mapa en esquina
+  - Navegación rápida
+  - Indicador de vista actual
+
+- [ ] **Copy/Paste Mejorado**:
+  - Copiar grupo de nodos con todas sus conexiones
+  - Pegar preservando IDs únicos o generando nuevos
+  - Copiar desde un subnetwork al nivel padre
+
+**Hot Reload y Live Editing:**
+- [ ] **File Watcher**: Detectar cambios en archivos externos
+  - Recargar código automáticamente cuando cambia en editor externo
+  - Notificar cambios no guardados
+  - Merge inteligente de cambios
+
+---
+
+### 🆕 Fase 6: Inspiración VS Code - Organización y Exploración 🆕
+
+#### 📁 Ideas de VS Code para implementar:
+
+**Explorador de Archivos Avanzado:**
+- [ ] **File Explorer Mejorado**: Sidebar con estructura completa
+  - Mostrar estructura completa de `nodes/`
+  - Agrupar por tipo de archivo (Rust, ASM, C++, etc.)
+  - Iconos diferenciados por lenguaje
+  - Indicador de nodos modificados/no guardados
+  
+- [ ] **Quick File Search**: Búsqueda rápida de archivos
+  - Atajo `Ctrl+P` para buscar archivos por nombre
+  - Filtrar por tipo de archivo
+  - Abrir directamente desde búsqueda
+
+- [ ] **Outline View**: Vista de estructura del código
+  - Mostrar funciones/clases en archivos
+  - Navegación rápida dentro del archivo
+  - Resaltar definiciones
+
+**Editor Avanzado:**
+- [ ] **Multi-Editor Tabs**: Abrir múltiples archivos simultáneamente
+  - Tabs para cada archivo abierto
+  - Split view (horizontal/vertical)
+  - Grupos de editores
+  
+- [ ] **Preview Mode**: Vista previa sin abrir editor completo
+  - Click derecho → "Preview" para vista rápida
+  - Auto-cierre al abrir otro preview
+  - Hover preview con información
+
+**Workspace y Organización:**
+- [ ] **Workspace Files**: Archivos de configuración de workspace
+  - Guardar configuración de ventanas/tabs abiertos
+  - Restaurar estado al abrir proyecto
+  - Multi-root workspaces
+  
+- [ ] **Folder Organization**: Organización visual mejorada
+  - Crear carpetas virtuales (como VS Code)
+  - Agrupar nodos por categoría/carpeta
+  - Folders en el grafo visual
+
+**Búsqueda y Navegación:**
+- [ ] **Global Search**: Buscar en todos los archivos
+  - `Ctrl+Shift+F` para búsqueda global
+  - Buscar texto, nombres de nodos, etc.
+  - Reemplazar en múltiples archivos
+  
+- [ ] **Go to Definition**: Navegación inteligente
+  - `F12` para ir a definición
+  - `Alt+F12` para peek definition
+  - Navegar entre referencias
+
+---
+
+### ⏳ Fase 4: GitHub Ready - PENDIENTE
+
+#### ✅ Completado:
+- [x] `LICENSE` - Ya existe el archivo LICENSE ✅
+
+#### ⏳ Pendiente:
+
+**`.gitignore`:**
 - [ ] Verificar y actualizar `.gitignore`:
   - [ ] Excluir `nodes/` (código de nodos - puede incluirse o excluirse según preferencia)
   - [ ] Excluir `.ultra-omega/` (configuración local)
   - [ ] Excluir `target/`, `Cargo.lock` (build artifacts)
   - [ ] Excluir `*.exe`, `*.obj`, `*.o` (binarios compilados)
+
+**CI/CD:**
 - [ ] Crear `.github/workflows/ci.yml` básico:
   - [ ] Build en Windows
   - [ ] Build en Linux (opcional)
   - [ ] Verificación de compilación
   - [ ] Linting básico (opcional)
-- [ ] Actualizar `README.md`:
+
+**Documentación:**
+- [ ] Actualizar `README.md` con:
   - [ ] Descripción del nuevo formato de proyectos
   - [ ] Estructura de directorios explicada
   - [ ] Instrucciones de instalación
@@ -424,9 +412,165 @@ pub use editor_history::EditorHistory;
   - [ ] Versión 0.2.0: Nuevo formato de código separado
   - [ ] Notas de migración
   - [ ] Breaking changes documentados
-- [ ] Verificar `LICENSE` existe y está actualizado
+- [ ] Documentar estructura de directorios
+
+**Opcional:**
 - [ ] Crear `.github/ISSUE_TEMPLATE/` (opcional pero recomendado)
 - [ ] Crear `.github/PULL_REQUEST_TEMPLATE.md` (opcional)
+
+---
+
+## 🆕 Nuevas Ideas Detalladas
+
+### 🎯 Sistema de Subnetworks (Inspiración Houdini)
+
+**Concepto**: Nodos especiales que contienen un grafo completo dentro.
+
+**Implementación propuesta:**
+```rust
+// src/core/node_graph.rs
+pub struct SubnetworkNode {
+    pub id: NodeId,
+    pub title: String,
+    pub inner_graph: NodeGraph, // Grafo interno
+    pub exposed_inputs: Vec<ExposedPin>, // Pines expuestos al nivel padre
+    pub exposed_outputs: Vec<ExposedPin>,
+}
+
+// Navegación entre niveles
+pub struct NetworkLevel {
+    pub graph: NodeGraph,
+    pub parent_node_id: Option<NodeId>, // None = nivel raíz
+    pub breadcrumbs: Vec<String>, // Para mostrar ruta
+}
+```
+
+**UI Propuesta:**
+- Botón en nodo subnetwork para "entrar" al nivel interno
+- Nueva pestaña/ventana para el grafo interno
+- Breadcrumbs en la parte superior: `Root > Subnetwork1 > Subnetwork2`
+- Botón "Subir" para volver al nivel padre
+
+**Beneficios:**
+- Organización de grafos complejos
+- Reutilización de lógica encapsulada
+- Mejor navegación en proyectos grandes
+
+---
+
+### 📁 File Explorer Mejorado (Inspiración VS Code)
+
+**Estructura propuesta:**
+```
+Explorador
+├── 📁 nodes/
+│   ├── 🔴 node_000001.rs (Rust)
+│   ├── 🟠 node_000002.asm (ASM)
+│   ├── 🔵 node_000003.cpp (C++)
+│   └── ⚡ node_000004.zig (Zig)
+├── 📄 node_map.json
+└── 📁 .ultra-omega/
+    └── 📄 project.json
+```
+
+**Features:**
+- Click para abrir en editor
+- Click derecho para menú contextual (Preview, Delete, Rename)
+- Indicadores visuales:
+  - 🔴 Modificado (no guardado)
+  - ✓ Guardado
+  - 📁 Carpeta expandida/colapsada
+
+**Quick Search (`Ctrl+P`):**
+- Buscar archivos por nombre
+- Filtrar por extensión: `@rs` solo Rust, `@asm` solo ASM
+- Abrir directamente desde resultados
+
+---
+
+### ⚡ Hot Reload / File Watcher
+
+**Implementación:**
+```rust
+// src/storage/file_watcher.rs
+pub struct FileWatcher {
+    watcher: notify::RecommendedWatcher,
+    callbacks: HashMap<PathBuf, Vec<Box<dyn Fn()>>>,
+}
+
+impl FileWatcher {
+    pub fn watch_node_code(&mut self, path: PathBuf, callback: Box<dyn Fn()>) {
+        // Registrar callback para recargar código cuando cambie
+    }
+}
+```
+
+**Comportamiento:**
+- Detectar cambios en archivos de `nodes/`
+- Notificar al usuario: "Archivo modificado externamente, ¿Recargar?"
+- Auto-recargar opcional (configurable)
+- Merge inteligente si hay cambios no guardados
+
+---
+
+### 📝 Parameter Editor (Inspiración Houdini)
+
+**Panel dedicado para parámetros de nodos:**
+```
+Parameter Editor
+├── Nodo: Kernel Entry (ASM)
+├── ────────────────────────
+├── 📌 Entrada
+│   └── source: ../Bootloader/code
+├── ⚙️ Configuración
+│   ├── stack_size: 4096
+│   └── heap_size: 8192
+└── 🔗 Referencias
+    └── kernel_path: ch("../Kernel/code")
+```
+
+**Features:**
+- Edición directa de parámetros
+- Autocompletado de referencias `ch()`
+- Validación de tipos en tiempo real
+- Referencias relativas/absolutas
+- Preview de valores resueltos
+
+---
+
+### 🗂️ Multi-Editor Tabs (Inspiración VS Code)
+
+**Sistema de tabs:**
+- Cada archivo abierto tiene un tab
+- Click en tab para cambiar de archivo
+- `Ctrl+Tab` para cambiar entre tabs
+- Split view: dividir editor horizontal/verticalmente
+- Cerrar tab: `Ctrl+W` o click en X
+
+**Grupos de editores:**
+- Editor principal + editor secundario (split)
+- Útil para comparar archivos o copiar código
+
+---
+
+### 🔍 Global Search (`Ctrl+Shift+F`)
+
+**Buscar en todo el proyecto:**
+```
+Buscar: "printf"
+├── node_000001.rs (2 matches)
+│   └── línea 45, 67
+├── node_000002.c (1 match)
+│   └── línea 12
+└── node_000003.cpp (3 matches)
+    └── líneas 23, 44, 89
+```
+
+**Features:**
+- Búsqueda de texto en todos los archivos
+- Buscar por nombre de nodo
+- Reemplazar en múltiples archivos
+- Filtros: por tipo de archivo, por carpeta
 
 ---
 
@@ -545,25 +689,28 @@ pub struct Node {
 ```rust
 // src/storage/workspace.rs
 impl Workspace {
-    pub fn save_graph(&self, graph: &NodeGraph, storage: &NodeStorage) -> Result<()> {
+    pub fn save_graph(&self, graph: &mut NodeGraph, storage: &NodeStorage) -> Result<()> {
         // 1. Guardar código de cada nodo en archivos separados
-        for node in graph.nodes() {
+        for node in graph.nodes_mut() {
             if let Some(path) = &node.code_path {
                 // Ya está separado, solo guardar si cambió
                 storage.save_node_code(node.id, &node.code, node.language)?;
             } else if !node.code.is_empty() {
                 // Formato antiguo, migrar
-                let code_path = format!("nodes/node_{:06}.{}", 
-                    node.id.0, 
-                    get_extension(node.language));
-                storage.save_node_code(node.id, &node.code, node.language)?;
-                // Actualizar node.code_path
+                let code_path = storage.save_node_code(node.id, &node.code, node.language)?;
+                node.code_path = Some(code_path);
             }
         }
         
-        // 2. Guardar node_map.json (sin código)
+        // 2. Guardar node_map.json (sin código embebido para nodos con code_path)
         let map_path = self.get_node_map_path()?;
-        let json = serde_json::to_string_pretty(graph)?;
+        let mut graph_for_serialization = graph.clone();
+        for node in graph_for_serialization.nodes_mut() {
+            if node.code_path.is_some() {
+                node.code = String::new(); // Limpiar código embebido
+            }
+        }
+        let json = serde_json::to_string_pretty(&graph_for_serialization)?;
         std::fs::write(map_path, json)?;
         
         Ok(())
@@ -596,12 +743,35 @@ impl Workspace {
 
 ## ✅ Beneficios Esperados
 
+### Beneficios Actuales (Ya Implementados):
 1. **Archivos editables externamente**: Podrás editar código con tu editor favorito
 2. **Versionado Git-friendly**: Cambios de código se ven claramente en Git
 3. **Node map más rápido**: JSON mucho más pequeño
 4. **Backup incremental**: Solo respaldar archivos modificados
 5. **Reutilización**: Compartir código entre proyectos
 6. **Mejor estructura**: Código más organizado y mantenible
+7. **Migración automática**: Proyectos antiguos se actualizan automáticamente
+
+### Beneficios Futuros (Houdini + VS Code):
+
+**Organización y Navegación:**
+- **Subnetworks**: Encapsular lógica compleja en nodos jerárquicos
+- **Assets reutilizables (HDAs)**: Compartir subgrafos entre proyectos
+- **File Explorer avanzado**: Ver y organizar todos los archivos del proyecto
+- **Quick Search**: Encontrar archivos instantáneamente (`Ctrl+P`)
+- **Minimap**: Navegación rápida en grafos grandes
+
+**Productividad:**
+- **Multi-Editor Tabs**: Editar múltiples archivos simultáneamente
+- **Hot Reload**: Sincronización automática con editores externos
+- **Parameter Editor**: Editar parámetros de nodos de forma profesional
+- **Global Search**: Buscar y reemplazar en todo el proyecto (`Ctrl+Shift+F`)
+
+**Workflow Profesional:**
+- **Breadcrumbs**: Navegación clara entre niveles de subnetwork
+- **Workspace State**: Restaurar configuración al reabrir proyecto
+- **Preview Mode**: Vista rápida de archivos sin abrir editor completo
+- **Go to Definition**: Navegación inteligente entre referencias
 
 ---
 
@@ -642,11 +812,9 @@ impl Workspace {
 
 ---
 
----
-
 ## 📊 Estado General del Proyecto
 
-**Última actualización**: 2025-01-07 (Fase 2 completada)
+**Última actualización**: 2025-01-07 (Fase 2 completada, nuevas fases agregadas)
 
 ### Progreso por Fases:
 
@@ -654,20 +822,49 @@ impl Workspace {
 |------|--------|----------|-----------|
 | **Fase 1: Storage Separado** | ✅ COMPLETADO | 100% | Alta |
 | **Fase 2: Reorganización** | ✅ COMPLETADO | 100% | Media |
-| **Fase 3: Migración** | 🔄 PARCIAL | 60% | Media |
-| **Fase 4: GitHub Ready** | ⏳ PENDIENTE | 0% | Baja |
+| **Fase 3: Migración** | 🔄 PARCIAL | 85% | Media |
+| **Fase 4: GitHub Ready** | ⏳ PENDIENTE | 10% | Baja |
+| **Fase 5: Inspiración Houdini** | 🆕 PLANIFICADO | 0% | Media-Alta |
+| **Fase 6: Inspiración VS Code** | 🆕 PLANIFICADO | 0% | Media |
 
 ### Resumen:
 - ✅ **Sistema de código separado funcionando** - Los nodos ahora guardan código en archivos separados
-- ✅ **Compatibilidad con formato antiguo** - Proyectos antiguos se pueden cargar
+- ✅ **Compatibilidad con formato antiguo** - Proyectos antiguos se pueden cargar y migrar automáticamente
 - ✅ **Estructura reorganizada** - Código organizado en módulos lógicos (`core/`, `compilation/`, `utils/`, `storage/`)
-- ⏳ **Falta integrar migración automática** - UI y lógica de migración pendiente
+- ✅ **Migración automática implementada** - Con UI completa y diálogo de usuario
+- ✅ **Tema visual mejorado** - Fondo negro con líneas blancas para mejor visibilidad
+- 🆕 **Nuevas fases planificadas** - Inspiración Houdini (subnetworks, HDA) y VS Code (explorador, búsqueda, tabs)
+- ⏳ **Testing pendiente** - Validar migración con proyectos reales
 - ⏳ **Preparación para GitHub pendiente** - Documentación y CI/CD
 
 ### Próximos Pasos Recomendados:
-1. **Inmediato**: Integrar migración automática en `app.rs` (Fase 3)
-2. **Corto plazo**: Testing manual de funcionalidad básica después de reorganización
-3. **Medio plazo**: Preparar para GitHub con documentación completa (Fase 4)
+1. **Inmediato**: Completar testing de migración automática (Fase 3)
+2. **Corto plazo**: Implementar File Explorer mejorado y Quick Search (Fase 6)
+3. **Medio plazo**: Sistema de Subnetworks/HDA básico (Fase 5)
+4. **Largo plazo**: Preparar para GitHub con documentación completa (Fase 4)
+
+### 🎨 Roadmap Inspirado en Houdini + VS Code:
+
+**Prioridad Alta (Inspiración Houdini):**
+1. Sistema de Subnetworks - Nodos que contienen grafos
+2. Parameter Editor avanzado con expresiones
+3. File Watcher para hot reload de archivos externos
+
+**Prioridad Media (Inspiración VS Code):**
+1. File Explorer completo con estructura de `nodes/`
+2. Quick File Search (`Ctrl+P`)
+3. Multi-Editor Tabs para múltiples archivos
+
+**Prioridad Media (Ambos):**
+1. Copy/Paste mejorado de grupos de nodos
+2. Minimap/Navigator para grafos grandes
+3. Workspace state persistence
+
+**Organización en Tiempo Real (VS Code Style):**
+- File watcher para detectar cambios externos automáticamente
+- Sincronización bidireccional entre editor interno y externo
+- Indicadores visuales de archivos modificados
+- Auto-refresh del explorador cuando se crean/eliminan archivos
 
 ---
 
@@ -676,10 +873,41 @@ impl Workspace {
 ✅ Sistema de storage modular y extensible  
 ✅ Separación completa de código del mapa de nodos  
 ✅ Soporte para múltiples lenguajes (extensión automática)  
-✅ Migración automática implementada (falta integración UI)  
+✅ Migración automática implementada con UI completa  
 ✅ Compatibilidad hacia atrás mantenida  
 ✅ Compilación exitosa verificada  
 ✅ Estructura de código reorganizada y modularizada  
 ✅ Separación clara de responsabilidades (core, compilation, storage, utils, ui)  
 ✅ Mejor mantenibilidad y extensibilidad del código  
+✅ Tema visual negro profesional con líneas blancas (mejora UX)
 
+---
+
+## 🚀 Visiones Futuras (Houdini + VS Code)
+
+### 🎨 Houdini-Style Features:
+
+**Workflow Profesional:**
+- Sistema de subnetworks para encapsular lógica compleja
+- Assets exportables y reutilizables (HDAs)
+- Parámetros dinámicos con expresiones poderosas
+- Navegación jerárquica fluida entre niveles de red
+
+**Live Editing:**
+- Hot reload automático al editar archivos externamente
+- File watchers para sincronización en tiempo real
+- Merge inteligente de cambios concurrentes
+
+### 📁 VS Code-Style Features:
+
+**Organización Visual:**
+- Explorador de archivos completo con iconos y agrupación
+- Búsqueda rápida de archivos y contenido
+- Tabs múltiples para editar varios archivos
+- Outline view para navegación dentro de archivos
+
+**Productividad:**
+- Atajos de teclado familiares (`Ctrl+P`, `Ctrl+Shift+F`)
+- Workspace state persistence
+- Preview mode para vistas rápidas
+- Go to definition y referencias

@@ -504,7 +504,7 @@ pub fn draw_semantic_connector(
     painter: &Painter,
     from: Pos2,
     to: Pos2,
-    color: Color32,
+    _color: Color32, // Ignorar color personalizado, usar blanco siempre
     zoom: f32,
     is_highlighted: bool,
 ) {
@@ -517,35 +517,42 @@ pub fn draw_semantic_connector(
     let ctrl1 = Pos2::new(from.x, from.y + control_offset);
     let ctrl2 = Pos2::new(to.x, to.y - control_offset);
     
+    // Color blanco para todas las conexiones sobre fondo negro
+    let wire_color = Color32::from_rgb(255, 255, 255); // Blanco puro
+    let glow_color_soft = Color32::from_rgba_unmultiplied(255, 255, 255, 40);  // Glow suave
+    let glow_color_medium = Color32::from_rgba_unmultiplied(255, 255, 255, 80); // Glow medio
+    let glow_color_bright = Color32::from_rgba_unmultiplied(255, 255, 255, 120); // Glow brillante
+    
     // ═══════════════════════════════════════════════════════════════════
-    // GLOW DEL CONECTOR (Efecto neón suave)
+    // GLOW DEL CONECTOR (Efecto neón blanco sobre fondo negro)
     // ═══════════════════════════════════════════════════════════════════
     
     if is_highlighted {
-        // Glow exterior grande
-        let glow_color_1 = Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 20);
-        draw_bezier_curve(painter, from, ctrl1, ctrl2, to, glow_color_1, thickness * 4.0);
+        // Glow exterior grande (más visible cuando está resaltado)
+        draw_bezier_curve(painter, from, ctrl1, ctrl2, to, glow_color_soft, thickness * 5.0);
         
         // Glow medio
-        let glow_color_2 = Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 40);
-        draw_bezier_curve(painter, from, ctrl1, ctrl2, to, glow_color_2, thickness * 2.5);
+        draw_bezier_curve(painter, from, ctrl1, ctrl2, to, glow_color_medium, thickness * 3.0);
+        
+        // Glow brillante
+        draw_bezier_curve(painter, from, ctrl1, ctrl2, to, glow_color_bright, thickness * 2.0);
     } else {
         // Glow sutil para conexiones normales
-        let glow_color = Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), 25);
-        draw_bezier_curve(painter, from, ctrl1, ctrl2, to, glow_color, thickness * 2.0);
+        draw_bezier_curve(painter, from, ctrl1, ctrl2, to, glow_color_soft, thickness * 3.0);
+        draw_bezier_curve(painter, from, ctrl1, ctrl2, to, glow_color_medium, thickness * 2.0);
     }
     
     // ═══════════════════════════════════════════════════════════════════
-    // LÍNEA PRINCIPAL
+    // LÍNEA PRINCIPAL (Blanco)
     // ═══════════════════════════════════════════════════════════════════
     
-    draw_bezier_curve(painter, from, ctrl1, ctrl2, to, color, thickness);
+    draw_bezier_curve(painter, from, ctrl1, ctrl2, to, wire_color, thickness);
     
     // ═══════════════════════════════════════════════════════════════════
-    // HIGHLIGHT (Brillo lateral para efecto 3D)
+    // HIGHLIGHT (Brillo lateral para efecto 3D - Blanco)
     // ═══════════════════════════════════════════════════════════════════
     
-    let highlight_color = Color32::from_rgba_unmultiplied(255, 255, 255, 40);
+    let highlight_color = Color32::from_rgb(255, 255, 255); // Blanco puro
     let offset = Vec2::new(-0.8 * zoom, 0.0);
     draw_bezier_curve(
         painter, 
@@ -554,7 +561,7 @@ pub fn draw_semantic_connector(
         ctrl2 + offset, 
         to + offset, 
         highlight_color, 
-        1.0 * zoom
+        1.5 * zoom
     );
 }
 

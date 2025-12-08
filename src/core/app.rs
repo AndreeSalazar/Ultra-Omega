@@ -4,7 +4,7 @@ use super::node_graph::{self, Link, Node, NodeGraph, NodeId, NodeLanguage, PinId
 use crate::compilation::terminal::{TerminalManager, TerminalTab};
 use crate::ui::viewport::Viewport2D;
 use crate::ui::layout::LayoutConfig;
-use crate::storage::Workspace;
+use crate::storage::{Workspace, migration::{needs_migration, migrate_project, create_backup, MigrationResult}};
 use crate::config::AppConfig;
 use crate::compilation::compiler_detector::{CompilerStatus, detect_all_compilers};
 
@@ -29,6 +29,17 @@ pub struct NodeGraphApp {
     // Detector de compiladores
     pub compiler_status: Option<CompilerStatus>,
     pub show_compiler_status: bool,
+    // Sistema de migración
+    pub migration_dialog: Option<MigrationDialogState>,
+}
+
+#[derive(Debug, Clone)]
+pub struct MigrationDialogState {
+    pub show: bool,
+    pub needs_migration: bool,
+    pub backup_path: Option<std::path::PathBuf>,
+    pub result: Option<MigrationResult>,
+    pub error: Option<String>,
 }
 
 #[derive(Default)]
@@ -111,6 +122,7 @@ impl NodeGraphApp {
             layout_config: LayoutConfig::default(),
             compiler_status: None,
             show_compiler_status: false,
+            migration_dialog: None,
         };
         
         // Load workspace if configured
@@ -292,12 +304,13 @@ impl eframe::App for NodeGraphApp {
         // 4. Central Canvas (Remaining space)
         self.canvas_ui(ctx);
 
-        // 5. Overlays
-        self.editor_ui(ctx);
-        self.node_menu_ui(ctx);
-        self.inheritance_view_ui(ctx);
-        self.draw_compiler_status(ctx);
-    }
+            // 5. Overlays
+            self.editor_ui(ctx);
+            self.node_menu_ui(ctx);
+            self.inheritance_view_ui(ctx);
+            self.draw_compiler_status(ctx);
+            self.draw_migration_dialog(ctx);
+        }
 }
 
 impl NodeGraphApp {
@@ -2438,24 +2451,25 @@ impl NodeGraphApp {
 
     // --- Painting Helpers (Moved from old main) ---
 
-    fn paint_grid(&self, painter: &egui::Painter, rect: Rect, visuals: &Visuals) {
+    fn paint_grid(&self, painter: &egui::Painter, rect: Rect, _visuals: &Visuals) {
         const GRID_SPACING: f32 = 32.0;
         let spacing = (GRID_SPACING * self.viewport.zoom).clamp(12.0, 256.0);
 
         let offset_x = self.viewport.pan.x.rem_euclid(spacing);
         let offset_y = self.viewport.pan.y.rem_euclid(spacing);
 
-        painter.rect_filled(rect, 0.0, visuals.extreme_bg_color);
+        // Fondo completamente negro
+        painter.rect_filled(rect, 0.0, Color32::from_rgb(0, 0, 0));
+
+        // Líneas de grilla en gris muy oscuro para visibilidad sutil
+        let grid_color_minor = Color32::from_rgb(15, 15, 15); // Líneas menores muy sutiles
+        let grid_color_major = Color32::from_rgb(25, 25, 25); // Líneas mayores ligeramente más visibles
 
         let mut count_x = 0;
         let mut x = rect.min.x + offset_x;
         while x < rect.max.x {
             let major = count_x % 4 == 0;
-            let color = if major {
-                visuals.extreme_bg_color.gamma_multiply(1.4)
-            } else {
-                visuals.extreme_bg_color.gamma_multiply(1.15)
-            };
+            let color = if major { grid_color_major } else { grid_color_minor };
             painter.line_segment(
                 [pos2(x, rect.min.y), pos2(x, rect.max.y)],
                 Stroke::new(1.0, color),
@@ -2468,11 +2482,7 @@ impl NodeGraphApp {
         let mut y = rect.min.y + offset_y;
         while y < rect.max.y {
             let major = count_y % 4 == 0;
-            let color = if major {
-                visuals.extreme_bg_color.gamma_multiply(1.4)
-            } else {
-                visuals.extreme_bg_color.gamma_multiply(1.15)
-            };
+            let color = if major { grid_color_major } else { grid_color_minor };
             painter.line_segment(
                 [pos2(rect.min.x, y), pos2(rect.max.x, y)],
                 Stroke::new(1.0, color),
@@ -2495,11 +2505,12 @@ impl NodeGraphApp {
             match self.layout_config.style {
                 crate::ui::layout::LayoutStyle::SemanticMap => {
                     // Conectores verticales para mapa semántico
+                    // Usar blanco para todas las conexiones (ignorar link.color)
                     crate::ui::nodes_semantic::draw_semantic_connector(
                         painter,
                         start,
                         end,
-                        link.color,
+                        Color32::WHITE, // Siempre blanco sobre fondo negro
                         self.viewport.zoom,
                         false, // is_highlighted
                     );
@@ -2736,11 +2747,12 @@ impl NodeGraphApp {
                     (pointer, Color32::from_rgb(100, 200, 255))
                 };
                 
+                // Usar blanco para todas las conexiones (ignorar snap_color)
                 crate::ui::connectors::draw_connection(
                     painter,
                     start_pos,
                     end_pos,
-                    snap_color,
+                    Color32::WHITE, // Siempre blanco sobre fondo negro
                     self.viewport.zoom,
                     time,
                 );
@@ -3113,8 +3125,25 @@ impl NodeGraphApp {
     }
 
     pub fn load_graph_from_workspace(&mut self) -> Result<(), String> {
-        let graph = self.workspace.load_graph()?;
-        self.graph = graph;
+        // Detectar si necesita migración ANTES de cargar
+        if needs_migration(&self.workspace) {
+            // Preparar estado del diálogo de migración
+            self.migration_dialog = Some(MigrationDialogState {
+                show: true,
+                needs_migration: true,
+                backup_path: None,
+                result: None,
+                error: None,
+            });
+            // Cargar el grafo de todas formas (en formato antiguo) para poder migrarlo
+            let graph = self.workspace.load_graph()?;
+            self.graph = graph;
+        } else {
+            // Cargar normalmente si no necesita migración
+            let graph = self.workspace.load_graph()?;
+            self.graph = graph;
+        }
+        
         self.graph.recalculate_ids();
         self.interaction.selected_nodes.clear();
         self.last_save_hash = self.graph_hash();
@@ -3404,6 +3433,152 @@ impl NodeGraphApp {
             
         if update_requested {
             self.compiler_status = Some(detect_all_compilers());
+        }
+    }
+
+    fn draw_migration_dialog(&mut self, ctx: &egui::Context) {
+        if self.migration_dialog.is_none() {
+            return;
+        }
+
+        let mut close_dialog = false;
+        let mut should_migrate = false;
+        
+        // Clonar datos necesarios para mostrar el diálogo
+        let backup_path_clone = self.migration_dialog.as_ref().and_then(|d| d.backup_path.clone());
+        let result_clone = self.migration_dialog.as_ref().and_then(|d| d.result.clone());
+        let error_clone = self.migration_dialog.as_ref().and_then(|d| d.error.clone());
+
+        egui::Window::new("🔄 Migración de Proyecto")
+            .collapsible(false)
+            .resizable(false)
+            .default_size([500.0, 350.0])
+            .show(ctx, |ui| {
+                ui.vertical(|ui| {
+                    ui.heading("Migración Requerida");
+                    ui.separator();
+                    ui.add_space(10.0);
+
+                    ui.label(egui::RichText::new("Este proyecto usa el formato antiguo (código embebido en JSON).").color(Color32::from_rgb(255, 193, 7)));
+                    ui.add_space(8.0);
+
+                    ui.label("El nuevo formato separa el código en archivos individuales para:");
+                    ui.label("  • Mejor compatibilidad con Git");
+                    ui.label("  • Edición externa del código");
+                    ui.label("  • Mejor rendimiento");
+                    ui.add_space(8.0);
+
+                    ui.separator();
+                    ui.add_space(8.0);
+
+                    ui.label(egui::RichText::new("⚠️ IMPORTANTE:").strong().color(Color32::from_rgb(244, 67, 54)));
+                    ui.label("Se creará un backup automático antes de migrar.");
+                    ui.add_space(8.0);
+
+                    if let Some(ref backup_path) = backup_path_clone {
+                        ui.label(egui::RichText::new(format!("📁 Backup: {}", backup_path.display())).small().color(Color32::from_rgb(76, 175, 80)));
+                        ui.add_space(8.0);
+                    }
+
+                    if let Some(ref result) = result_clone {
+                        ui.separator();
+                        if result.migrated {
+                            ui.colored_label(Color32::from_rgb(76, 175, 80), 
+                                format!("✅ Migración exitosa: {} nodos migrados", result.nodes_migrated));
+                            if !result.errors.is_empty() {
+                                ui.label(egui::RichText::new(format!("⚠️ {} errores durante la migración", result.errors.len())).color(Color32::from_rgb(255, 152, 0)));
+                            }
+                            ui.add_space(8.0);
+                            if ui.button("✅ Cerrar").clicked() {
+                                close_dialog = true;
+                            }
+                        } else {
+                            ui.colored_label(Color32::from_rgb(244, 67, 54), 
+                                "❌ La migración falló");
+                            if ui.button("❌ Cerrar").clicked() {
+                                close_dialog = true;
+                            }
+                        }
+                    } else if let Some(ref error) = error_clone {
+                        ui.separator();
+                        ui.colored_label(Color32::from_rgb(244, 67, 54), 
+                            format!("❌ Error: {}", error));
+                        ui.add_space(8.0);
+                        if ui.button("❌ Cerrar").clicked() {
+                            close_dialog = true;
+                        }
+                    } else {
+                        ui.horizontal(|ui| {
+                            ui.add_space(50.0);
+                            if ui.add(egui::Button::new(egui::RichText::new("✅ Migrar").size(16.0))
+                                .min_size(egui::Vec2::new(150.0, 40.0))).clicked() {
+                                should_migrate = true;
+                            }
+                            ui.add_space(20.0);
+                            if ui.add(egui::Button::new(egui::RichText::new("❌ Cancelar").size(16.0))
+                                .min_size(egui::Vec2::new(150.0, 40.0))).clicked() {
+                                close_dialog = true;
+                            }
+                        });
+                    }
+                });
+            });
+
+        // Procesar acciones DESPUÉS del bloque de UI
+        if should_migrate {
+            // Crear backup primero
+            match create_backup(&self.workspace) {
+                Ok(backup_path) => {
+                    if let Some(ref mut dialog) = self.migration_dialog {
+                        dialog.backup_path = Some(backup_path);
+                    }
+                    
+                    // Ejecutar migración
+                    match migrate_project(&self.workspace, &mut self.graph) {
+                        Ok(result) => {
+                            if let Some(ref mut dialog) = self.migration_dialog {
+                                dialog.result = Some(result.clone());
+                            }
+                            
+                            // Guardar el grafo migrado
+                            if result.migrated {
+                                if let Err(e) = self.save_current_graph() {
+                                    if let Some(ref mut dialog) = self.migration_dialog {
+                                        dialog.error = Some(format!("Error guardando proyecto migrado: {}", e));
+                                    }
+                                } else {
+                                    // Recargar para asegurar que todo está sincronizado
+                                    if let Err(e) = self.load_graph_from_workspace() {
+                                        if let Some(ref mut dialog) = self.migration_dialog {
+                                            dialog.error = Some(format!("Error recargando proyecto: {}", e));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            if let Some(ref mut dialog) = self.migration_dialog {
+                                dialog.error = Some(format!("Error durante la migración: {}", e));
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    if let Some(ref mut dialog) = self.migration_dialog {
+                        dialog.error = Some(format!("Error creando backup: {}", e));
+                    }
+                }
+            }
+        }
+
+        if close_dialog {
+            if let Some(ref mut dialog) = self.migration_dialog {
+                dialog.show = false;
+                if dialog.result.is_some() || dialog.error.is_some() {
+                    // Cerrar completamente el diálogo después de mostrar resultado
+                    self.migration_dialog = None;
+                }
+            }
         }
     }
 }

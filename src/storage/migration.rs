@@ -22,8 +22,50 @@ pub fn needs_migration(workspace: &Workspace) -> bool {
         if map_path.exists() {
             // Intentar cargar y verificar si hay código embebido
             if let Ok(json) = std::fs::read_to_string(&map_path) {
-                // Buscar si hay nodos con campo "code" no vacío
-                return json.contains("\"code\":") && json.contains("\"code\":\"");
+                // Verificar si tiene "code_path" (formato nuevo)
+                let has_code_path = json.contains("\"code_path\":");
+                
+                // Si tiene code_path, no necesita migración
+                if has_code_path {
+                    return false;
+                }
+                
+                // Si no tiene code_path pero tiene "code": (formato antiguo), necesita migración
+                // Verificamos si hay nodos con código embebido
+                if json.contains("\"code\":") {
+                    // Verificar que no sea solo código vacío
+                    // Buscar si hay "code":" seguido de algo que no sea solo comillas
+                    // Patrón simple: "code":"... donde ... tiene al menos un carácter
+                    let code_pattern_pos = json.find("\"code\":\"");
+                    if let Some(pos) = code_pattern_pos {
+                        // Verificar que después de "code":" hay algo más que solo comillas
+                        let after_code = &json[pos + 8..]; // 8 = len("\"code\":\"")
+                        // Si hay algo antes del siguiente " o }, entonces hay código
+                        if let Some(next_quote) = after_code.find('"') {
+                            if next_quote > 0 {
+                                // Hay contenido entre las comillas
+                                return true;
+                            }
+                        }
+                    } else if json.contains("\"code\":") {
+                        // Tiene "code": pero sin comillas (puede ser null o vacío)
+                        // Por seguridad, verificamos mejor intentando parsear
+                        if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&json) {
+                            if let Some(nodes) = parsed.get("nodes").and_then(|n| n.as_array()) {
+                                for node in nodes {
+                                    if node.get("code_path").is_none() {
+                                        // Si tiene "code" con contenido, necesita migración
+                                        if let Some(code) = node.get("code").and_then(|c| c.as_str()) {
+                                            if !code.is_empty() {
+                                                return true;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }

@@ -8,7 +8,7 @@ pub fn draw_sidebar(app: &mut NodeGraphApp, ctx: &egui::Context, _open_factor: f
         .min_width(220.0)
         .max_width(450.0)
         .frame(egui::Frame::side_top_panel(&ctx.style())
-            .fill(egui::Color32::from_rgb(37, 37, 38))
+            .fill(egui::Color32::from_rgb(20, 20, 20)) // Fondo negro oscuro
             .inner_margin(egui::Margin::same(8.0)))
         .show(ctx, |ui| {
             ui.add_space(8.0);

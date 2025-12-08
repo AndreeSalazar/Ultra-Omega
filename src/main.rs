@@ -51,11 +51,11 @@ fn apply_vscode_theme(ctx: &egui::Context) {
     
     let mut visuals = Visuals::dark();
     
-    // VS Code Dark+ color scheme
+    // VS Code Dark+ color scheme - Tema Negro Mejorado
     visuals.dark_mode = true;
     visuals.override_text_color = Some(Color32::from_rgb(212, 212, 212));
-    visuals.extreme_bg_color = Color32::from_rgb(30, 30, 30); // Background
-    visuals.panel_fill = Color32::from_rgb(45, 45, 45); // Sidebar background
+    visuals.extreme_bg_color = Color32::from_rgb(0, 0, 0); // Fondo completamente negro
+    visuals.panel_fill = Color32::from_rgb(20, 20, 20); // Sidebar background (negro con poco contraste)
     visuals.window_fill = Color32::from_rgb(37, 37, 38);
     visuals.window_stroke = Stroke::new(1.0, Color32::from_rgb(60, 60, 60));
     visuals.faint_bg_color = Color32::from_rgb(45, 45, 45);

@@ -5,7 +5,7 @@ pub fn draw_connection(
     painter: &Painter,
     start: Pos2,
     end: Pos2,
-    color: Color32,
+    _color: Color32, // Ignorar color personalizado, usar blanco siempre
     zoom: f32,
     time: f64,
 ) {
@@ -20,15 +20,19 @@ pub fn draw_connection(
         end,
     ];
 
-    // Efecto neón mejorado: múltiples capas para glow
+    // Color blanco para todas las conexiones sobre fondo negro
+    let wire_color = Color32::from_rgb(255, 255, 255); // Blanco puro
+    let glow_color_soft = Color32::from_rgba_unmultiplied(255, 255, 255, 40);  // Glow suave
+    let glow_color_medium = Color32::from_rgba_unmultiplied(255, 255, 255, 80); // Glow medio
+    let glow_color_bright = Color32::from_rgba_unmultiplied(255, 255, 255, 120); // Glow brillante
+
+    // Efecto neón blanco mejorado: múltiples capas para glow visible sobre fondo negro
     // Capa 1: Glow exterior (muy suave, grande)
     painter.add(Shape::CubicBezier(CubicBezierShape {
         points,
         closed: false,
         fill: Color32::TRANSPARENT,
-        stroke: Stroke::new(8.0 * zoom, Color32::from_rgba_unmultiplied(
-            color.r(), color.g(), color.b(), 30
-        )),
+        stroke: Stroke::new(10.0 * zoom, glow_color_soft),
     }));
 
     // Capa 2: Glow medio (suave)
@@ -36,9 +40,7 @@ pub fn draw_connection(
         points,
         closed: false,
         fill: Color32::TRANSPARENT,
-        stroke: Stroke::new(6.0 * zoom, Color32::from_rgba_unmultiplied(
-            color.r(), color.g(), color.b(), 60
-        )),
+        stroke: Stroke::new(7.0 * zoom, glow_color_medium),
     }));
 
     // Capa 3: Glow interno (más visible)
@@ -46,41 +48,35 @@ pub fn draw_connection(
         points,
         closed: false,
         fill: Color32::TRANSPARENT,
-        stroke: Stroke::new(4.5 * zoom, Color32::from_rgba_unmultiplied(
-            color.r(), color.g(), color.b(), 100
-        )),
+        stroke: Stroke::new(5.0 * zoom, glow_color_bright),
     }));
 
-    // Capa 4: Base wire (outline para definición)
+    // Capa 4: Base wire (outline para definición - más grueso para visibilidad)
     painter.add(Shape::CubicBezier(CubicBezierShape {
         points,
         closed: false,
         fill: Color32::TRANSPARENT,
-        stroke: Stroke::new(4.0 * zoom, Color32::BLACK.gamma_multiply(0.4)),
+        stroke: Stroke::new(4.5 * zoom, wire_color),
     }));
 
-    // Capa 5: Main colored wire (brillante)
+    // Capa 5: Main wire (línea principal brillante)
     painter.add(Shape::CubicBezier(CubicBezierShape {
         points,
         closed: false,
         fill: Color32::TRANSPARENT,
-        stroke: Stroke::new(3.5 * zoom, color),
+        stroke: Stroke::new(3.5 * zoom, wire_color),
     }));
 
-    // Capa 6: Highlight central (brillante)
-    let highlight_color = Color32::from_rgb(
-        (color.r() as f32 * 0.7 + 255.0 * 0.3) as u8,
-        (color.g() as f32 * 0.7 + 255.0 * 0.3) as u8,
-        (color.b() as f32 * 0.7 + 255.0 * 0.3) as u8,
-    );
+    // Capa 6: Highlight central (brillante para efecto 3D)
+    let highlight_color = Color32::from_rgb(255, 255, 255); // Blanco puro
     painter.add(Shape::CubicBezier(CubicBezierShape {
         points,
         closed: false,
         fill: Color32::TRANSPARENT,
-        stroke: Stroke::new(1.5 * zoom, highlight_color),
+        stroke: Stroke::new(2.0 * zoom, highlight_color),
     }));
 
-    // Animated Pulse mejorado (Unreal Style)
+    // Animated Pulse mejorado (pulso blanco visible sobre fondo negro)
     if dist > 10.0 {
         let pulse_speed = 0.6; // Loops per second
         let t = (time * pulse_speed).rem_euclid(1.0) as f32;
@@ -89,21 +85,21 @@ pub fn draw_connection(
         let pulse_pos = sample_cubic_bezier(points, t);
         let pulse_radius = 5.0 * zoom;
         
-        // Pulso con glow
+        // Pulso con glow blanco
+        painter.circle_filled(
+            pulse_pos,
+            pulse_radius * 2.0,
+            Color32::from_rgba_unmultiplied(255, 255, 255, 60),
+        );
         painter.circle_filled(
             pulse_pos,
             pulse_radius * 1.5,
-            Color32::from_rgba_unmultiplied(255, 255, 255, 80),
+            Color32::from_rgba_unmultiplied(255, 255, 255, 120),
         );
         painter.circle_filled(
             pulse_pos,
             pulse_radius,
-            Color32::WHITE.gamma_multiply(0.95),
-        );
-        painter.circle_filled(
-            pulse_pos,
-            pulse_radius * 0.5,
-            highlight_color,
+            Color32::WHITE,
         );
         
         // Trail effect mejorado
@@ -115,7 +111,7 @@ pub fn draw_connection(
                 painter.circle_filled(
                     trail_pos,
                     pulse_radius * (0.8 - i as f32 * 0.15),
-                    Color32::from_rgba_unmultiplied(255, 255, 255, (100.0 * trail_alpha) as u8),
+                    Color32::from_rgba_unmultiplied(255, 255, 255, (150.0 * trail_alpha) as u8),
                 );
             }
         }
