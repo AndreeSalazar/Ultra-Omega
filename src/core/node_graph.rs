@@ -67,6 +67,35 @@ pub struct Node {
     
     #[serde(default)]
     pub language: NodeLanguage,
+
+    // Propiedades específicas para herencia
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_node: Option<NodeId>,
+
+    // ═══════════════════════════════════════════════════════════════════
+    // 🆕 SISTEMA DE SUBNETWORKS (Inspiración Houdini)
+    // ═══════════════════════════════════════════════════════════════════
+    
+    /// Si este nodo es un subnetwork, contiene un grafo completo dentro
+    /// Cuando está presente, el nodo actúa como contenedor de otros nodos
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub subnetwork_graph: Option<NodeGraph>,
+    
+    /// Pines expuestos al nivel padre (para subnetworks)
+    /// Estos son los inputs/outputs que se pueden conectar desde el nivel padre
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub exposed_inputs: Vec<ExposedPin>,
+    
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub exposed_outputs: Vec<ExposedPin>,
+}
+
+/// Pin expuesto de un subnetwork al nivel padre
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ExposedPin {
+    pub name: String,
+    pub inner_pin_id: PinId, // Pin dentro del subnetwork que está expuesto
+    pub exposed_pin_id: PinId, // Pin en el nivel padre
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -118,7 +147,7 @@ mod color32_serde {
     }
 }
 
-#[derive(Default, Clone, Serialize, Deserialize)]
+#[derive(Default, Clone, Serialize, Deserialize, Debug)]
 pub struct NodeGraph {
     nodes: Vec<Node>,
     links: Vec<Link>,
@@ -272,6 +301,10 @@ impl NodeGraph {
             code: String::new(),
             code_path: None, // Se asignará al guardar
             language,
+            parent_node: None, // Inicializar campo de herencia
+            subnetwork_graph: None, // No es subnetwork por defecto
+            exposed_inputs: Vec::new(),
+            exposed_outputs: Vec::new(),
         });
 
         id

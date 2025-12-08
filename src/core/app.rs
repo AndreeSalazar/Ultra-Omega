@@ -31,6 +31,22 @@ pub struct NodeGraphApp {
     pub show_compiler_status: bool,
     // Sistema de migración
     pub migration_dialog: Option<MigrationDialogState>,
+    // ═══════════════════════════════════════════════════════════════════
+    // 🆕 SISTEMA DE SUBNETWORKS (Inspiración Houdini)
+    // ═══════════════════════════════════════════════════════════════════
+    /// Pila de niveles de red (para navegación jerárquica)
+    pub network_levels: Vec<NetworkLevel>,
+}
+
+/// Representa un nivel de red en la jerarquía de subnetworks
+#[derive(Clone, Debug)]
+pub struct NetworkLevel {
+    /// El grafo en este nivel
+    pub graph: NodeGraph,
+    /// ID del nodo subnetwork que contiene este nivel (None = nivel raíz)
+    pub parent_subnetwork_id: Option<NodeId>,
+    /// Breadcrumbs para mostrar la ruta de navegación
+    pub breadcrumbs: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -57,6 +73,10 @@ pub struct InteractionState {
     pub multi_param_mode: bool, // Modo de múltiples parámetros (Ctrl+Shift+P)
     pub r_menu_selection: Option<(usize, usize, String)>, // Selección guardada para menú Ctrl+R (start, end, text)
     pub r_menu_pos: Option<egui::Pos2>, // Posición del menú Ctrl+R
+    // ═══════════════════════════════════════════════════════════════════
+    // 🆕 DOBLE CLIC PARA SUBNETWORKS
+    // ═══════════════════════════════════════════════════════════════════
+    pub last_click_node: Option<(NodeId, std::time::Instant)>, // Último nodo clickeado y tiempo
 }
 
 #[derive(Clone, Copy)]
@@ -104,8 +124,24 @@ impl NodeGraphApp {
         let mut workspace = Workspace::new();
         workspace.auto_save = config.auto_save;
         
+        let initial_graph = if let Some(workspace_path) = config.workspace_path.as_ref() {
+            let path = std::path::PathBuf::from(workspace_path);
+            if path.exists() {
+                let mut workspace = Workspace::new();
+                workspace.set_root(path.clone());
+                workspace.load_graph().unwrap_or_else(|_| {
+                    eprintln!("Error loading workspace, using demo");
+                    NodeGraph::demo()
+                })
+            } else {
+                NodeGraph::demo()
+            }
+        } else {
+            NodeGraph::demo()
+        };
+        
         let mut app = Self {
-            graph: NodeGraph::default(),
+            graph: initial_graph.clone(),
             viewport: Viewport2D::default(),
             interaction: InteractionState::default(),
             terminal: TerminalManager::default(),
@@ -123,6 +159,12 @@ impl NodeGraphApp {
             compiler_status: None,
             show_compiler_status: false,
             migration_dialog: None,
+            // Inicializar con nivel raíz (el grafo principal es el nivel 0)
+            network_levels: vec![NetworkLevel {
+                graph: initial_graph,
+                parent_subnetwork_id: None,
+                breadcrumbs: vec!["Root".to_string()],
+            }],
         };
         
         // Load workspace if configured
@@ -135,14 +177,29 @@ impl NodeGraphApp {
                     // Fallback to demo if load fails
                     app.graph = NodeGraph::demo();
                     app.graph.recalculate_ids();
+                    // Actualizar nivel raíz también
+                    if let Some(level) = app.network_levels.get_mut(0) {
+                        level.graph = app.graph.clone();
+                    }
+                } else {
+                    // Actualizar nivel raíz con el grafo cargado
+                    if let Some(level) = app.network_levels.get_mut(0) {
+                        level.graph = app.graph.clone();
+                    }
                 }
             } else {
                 app.graph = NodeGraph::demo();
                 app.graph.recalculate_ids();
+                if let Some(level) = app.network_levels.get_mut(0) {
+                    level.graph = app.graph.clone();
+                }
             }
         } else {
             app.graph = NodeGraph::demo();
             app.graph.recalculate_ids();
+            if let Some(level) = app.network_levels.get_mut(0) {
+                level.graph = app.graph.clone();
+            }
         }
         
         // Registrar todos los nodos existentes en el sistema de canales
@@ -244,7 +301,8 @@ impl eframe::App for NodeGraphApp {
         }
 
         // Handle Delete key to remove selected nodes
-        if ctx.input(|i| i.key_pressed(egui::Key::Delete) || i.key_pressed(egui::Key::Backspace)) {
+        // Backspace también se usa para salir de subnetworks, así que verificar primero
+        if ctx.input(|i| i.key_pressed(egui::Key::Delete)) {
             if !self.interaction.selected_nodes.is_empty() {
                 // Don't delete if editing a node
                 if self.interaction.editing_node.is_none() {
@@ -259,8 +317,39 @@ impl eframe::App for NodeGraphApp {
                     }
                     self.graph.remove_nodes(&self.interaction.selected_nodes);
                     self.interaction.selected_nodes.clear();
+                    // Sincronizar cambios al nivel actual
+                    self.sync_current_level_to_graph();
                     // Auto-save after deletion
                     self.check_and_auto_save();
+                }
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // 🆕 ATAJOS DE TECLADO PARA SUBNETWORKS
+        // ═══════════════════════════════════════════════════════════════════
+        
+        // Enter: Entrar al subnetwork seleccionado
+        if ctx.input(|i| i.key_pressed(egui::Key::Enter) && !i.modifiers.ctrl && !i.modifiers.shift) {
+            if !self.interaction.selected_nodes.is_empty() && self.interaction.editing_node.is_none() {
+                if let Some(&selected_id) = self.interaction.selected_nodes.iter().next() {
+                    if let Some(node) = self.graph.node(selected_id) {
+                        if node.subnetwork_graph.is_some() {
+                            if let Err(e) = self.enter_subnetwork(selected_id) {
+                                eprintln!("Error entering subnetwork: {}", e);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Esc o Backspace: Salir del subnetwork actual (solo si no estamos editando)
+        if ctx.input(|i| (i.key_pressed(egui::Key::Escape) || i.key_pressed(egui::Key::Backspace)) 
+            && !i.modifiers.ctrl && !i.modifiers.shift) {
+            if self.interaction.editing_node.is_none() && !self.is_at_root() {
+                if let Err(e) = self.exit_subnetwork() {
+                    eprintln!("Error exiting subnetwork: {}", e);
                 }
             }
         }
@@ -384,6 +473,9 @@ impl NodeGraphApp {
         self.channel_manager.set_channel(node_title.clone(), ChannelValue::Code(node_code.clone()));
         self.channel_manager.set_channel(format!("{}/code", node_title.clone()), ChannelValue::Code(node_code.clone()));
         self.channel_manager.set_node_channel(id, "code".to_string(), ChannelValue::Code(node_code));
+        
+        // Sincronizar cambios al nivel actual
+        self.sync_current_level_to_graph();
         
         // Auto-save immediately when a node is created
         if self.workspace.has_root() {
@@ -1193,6 +1285,65 @@ impl NodeGraphApp {
         egui::CentralPanel::default()
             .frame(egui::Frame::canvas(&ctx.style()))
             .show(ctx, |ui| {
+                // ═══════════════════════════════════════════════════════════════════
+                // 🆕 BREADCRUMBS Y BOTÓN SUBIR (SUBNETWORKS)
+                // ═══════════════════════════════════════════════════════════════════
+                // Solo mostrar breadcrumbs si NO estamos en root (hay más de un nivel)
+                if !self.is_at_root() {
+                    let breadcrumbs = self.get_breadcrumbs();
+                    if !breadcrumbs.is_empty() && breadcrumbs.len() > 1 {
+                        egui::Area::new(egui::Id::new("subnetwork_breadcrumbs"))
+                            .fixed_pos(egui::pos2(10.0, 10.0))
+                            .order(egui::Order::Foreground)
+                            .show(ctx, |ui| {
+                                egui::Frame::none()
+                                    .fill(Color32::from_rgba_unmultiplied(20, 20, 20, 200))
+                                    .stroke(egui::Stroke::new(1.0, Color32::from_rgb(100, 100, 100)))
+                                    .rounding(egui::Rounding::same(6.0))
+                                    .inner_margin(egui::Margin::symmetric(12.0, 8.0))
+                                    .show(ui, |ui| {
+                                        ui.horizontal(|ui| {
+                                            // Botón "Subir" siempre visible cuando no estamos en root
+                                            if ui.button(egui::RichText::new("⬆ Subir").color(Color32::from_rgb(150, 200, 255))).clicked() {
+                                                if let Err(e) = self.exit_subnetwork() {
+                                                    eprintln!("Error exiting subnetwork: {}", e);
+                                                }
+                                            }
+                                            ui.separator();
+                                            
+                                            // Breadcrumbs (siempre incluye Root como primer elemento)
+                                            for (i, crumb) in breadcrumbs.iter().enumerate() {
+                                                if i > 0 {
+                                                    ui.label(egui::RichText::new(" > ").color(Color32::from_gray(100)));
+                                                }
+                                                
+                                                let is_last = i == breadcrumbs.len() - 1;
+                                                let crumb_text_clone = crumb.clone();
+                                                let crumb_text = if is_last {
+                                                    egui::RichText::new(&crumb_text_clone).strong().color(Color32::from_rgb(200, 200, 200))
+                                                } else {
+                                                    egui::RichText::new(&crumb_text_clone).color(Color32::from_rgb(150, 150, 150))
+                                                };
+                                                
+                                                if !is_last && ui.button(crumb_text.clone()).clicked() {
+                                                    // Saltar a ese nivel (implementar navegación a nivel específico)
+                                                    // Por ahora, simplemente salir hasta llegar al nivel correcto
+                                                    while self.network_levels.len() > i + 1 {
+                                                        if let Err(e) = self.exit_subnetwork() {
+                                                            eprintln!("Error navigating to level: {}", e);
+                                                            break;
+                                                        }
+                                                    }
+                                                } else {
+                                                    ui.label(crumb_text);
+                                                }
+                                            }
+                                        });
+                                    });
+                            });
+                    }
+                }
+
                 let (response, painter) =
                     ui.allocate_painter(ui.available_size(), Sense::click_and_drag());
                 let rect = response.rect;
@@ -2599,6 +2750,33 @@ impl NodeGraphApp {
                 if let Some(node_id) = self.hit_test(pointer_pos, rect) {
                     // Verificar que no sea un pin antes de activar drag
                     if self.hit_test_pin(pointer_pos, rect).is_none() {
+                        // ═══════════════════════════════════════════════════════════════════
+                        // 🆕 DETECTAR DOBLE CLIC PARA ENTRAR A SUBNETWORKS
+                        // ═══════════════════════════════════════════════════════════════════
+                        let now = std::time::Instant::now();
+                        let is_double_click = if let Some((last_node, last_time)) = self.interaction.last_click_node {
+                            last_node == node_id && now.duration_since(last_time).as_millis() < 500
+                        } else {
+                            false
+                        };
+                        
+                        // Si es doble clic y el nodo es un subnetwork, entrar
+                        if is_double_click {
+                            if let Some(node) = self.graph.node(node_id) {
+                                if node.subnetwork_graph.is_some() {
+                                    if let Err(e) = self.enter_subnetwork(node_id) {
+                                        eprintln!("Error entering subnetwork: {}", e);
+                                    }
+                                    // Limpiar el último click para evitar triple clic
+                                    self.interaction.last_click_node = None;
+                                    return; // No hacer selección normal en doble clic
+                                }
+                            }
+                        }
+                        
+                        // Guardar este click para detectar doble clic
+                        self.interaction.last_click_node = Some((node_id, now));
+                        
                         // Node clicked (no pin)
                         if !input.modifiers.ctrl && !self.interaction.selected_nodes.contains(&node_id) {
                             self.interaction.selected_nodes.clear();
@@ -2613,6 +2791,8 @@ impl NodeGraphApp {
                     }
                     self.interaction.box_selection_start = Some(pointer_pos);
                     self.interaction.box_selection_current = Some(pointer_pos);
+                    // Limpiar último click si se hace click en el fondo
+                    self.interaction.last_click_node = None;
                 }
             }
 
@@ -2660,8 +2840,11 @@ impl NodeGraphApp {
                          node.position += delta_world;
                      }
                  }
+                 // Sincronizar cambios de posición al nivel actual
+                 self.sync_current_level_to_graph();
             } else if !input.primary_down && was_dragging {
-                // Mouse released after dragging - auto-save
+                // Mouse released after dragging - sincronizar y auto-save
+                self.sync_current_level_to_graph();
                 self.check_and_auto_save();
             }
 
@@ -2690,6 +2873,8 @@ impl NodeGraphApp {
                             if let Some(from_pin_id) = from_pin {
                                 // Crear conexión con snap
                                 self.graph.add_link(from_pin_id, snap_pin_id, Color32::from_rgb(100, 200, 255));
+                                // Sincronizar cambios al nivel actual
+                                self.sync_current_level_to_graph();
                                 // No aplicar herencia automáticamente - se combina en tiempo de ejecución/visualización
                                 self.check_and_auto_save();
                             }
@@ -2701,9 +2886,11 @@ impl NodeGraphApp {
                                 if addr.kind == PinKind::Input {
                                     if let Some(from_pin_id) = from_pin {
                                         // Crear conexión
-                                self.graph.add_link(from_pin_id, pin_id, Color32::from_rgb(100, 200, 255));
-                                // No aplicar herencia automáticamente - se combina en tiempo de ejecución/visualización
-                                self.check_and_auto_save();
+                                        self.graph.add_link(from_pin_id, pin_id, Color32::from_rgb(100, 200, 255));
+                                        // Sincronizar cambios al nivel actual
+                                        self.sync_current_level_to_graph();
+                                        // No aplicar herencia automáticamente - se combina en tiempo de ejecución/visualización
+                                        self.check_and_auto_save();
                                     }
                                 }
                             }
@@ -3118,13 +3305,43 @@ impl NodeGraphApp {
     }
 
     pub fn save_current_graph(&mut self) -> Result<(), String> {
-        self.workspace.save_graph(&mut self.graph)?;
+        // ═══════════════════════════════════════════════════════════════════
+        // 🆕 GUARDAR GRAFO ACTUAL Y SINCRONIZAR CON NETWORK_LEVELS
+        // ═══════════════════════════════════════════════════════════════════
+        // Primero sincronizar el grafo actual al nivel activo
+        self.sync_current_level_to_graph();
+        
+        // Guardar el grafo del nivel raíz (que contiene todos los subnetworks)
+        if let Some(root_level) = self.network_levels.first() {
+            let mut root_graph = root_level.graph.clone();
+            self.workspace.save_graph(&mut root_graph)?;
+            // Actualizar el grafo raíz en network_levels
+            if let Some(level) = self.network_levels.first_mut() {
+                level.graph = root_graph;
+            }
+            // Si estamos en root, también sincronizar self.graph
+            if self.is_at_root() {
+                self.sync_graph_to_current_level();
+            }
+        } else {
+            // Fallback: guardar el grafo actual (no debería pasar, pero por seguridad)
+            self.workspace.save_graph(&mut self.graph)?;
+        }
+        
         self.last_save_hash = self.graph_hash();
         self.last_save_time = Some(std::time::Instant::now());
         Ok(())
     }
 
     pub fn load_graph_from_workspace(&mut self) -> Result<(), String> {
+        // ═══════════════════════════════════════════════════════════════════
+        // 🆕 RESETEAR A ROOT AL CARGAR PROYECTO
+        // ═══════════════════════════════════════════════════════════════════
+        // Si estamos en un subnetwork, volver al root primero
+        while self.network_levels.len() > 1 {
+            let _ = self.exit_subnetwork();
+        }
+        
         // Detectar si necesita migración ANTES de cargar
         if needs_migration(&self.workspace) {
             // Preparar estado del diálogo de migración
@@ -3137,18 +3354,70 @@ impl NodeGraphApp {
             });
             // Cargar el grafo de todas formas (en formato antiguo) para poder migrarlo
             let graph = self.workspace.load_graph()?;
+            
+            // ═══════════════════════════════════════════════════════════════════
+            // 🆕 SINCRONIZAR GRAFO CON NETWORK_LEVELS Y SELF.GRAPH
+            // ═══════════════════════════════════════════════════════════════════
+            if let Some(level) = self.network_levels.first_mut() {
+                level.graph = graph.clone();
+            }
             self.graph = graph;
         } else {
             // Cargar normalmente si no necesita migración
             let graph = self.workspace.load_graph()?;
+            
+            // ═══════════════════════════════════════════════════════════════════
+            // 🆕 SINCRONIZAR GRAFO CON NETWORK_LEVELS Y SELF.GRAPH
+            // ═══════════════════════════════════════════════════════════════════
+            if let Some(level) = self.network_levels.first_mut() {
+                level.graph = graph.clone();
+            }
             self.graph = graph;
         }
         
+        // Recalcular IDs en el grafo actual
         self.graph.recalculate_ids();
+        
+        // Recalcular IDs también para subnetworks recursivamente
+        if let Some(level) = self.network_levels.first_mut() {
+            level.graph.recalculate_ids();
+            // Recalcular IDs en subnetworks anidados
+            Self::recalculate_subnetwork_ids(&mut level.graph);
+        }
+        
+        // ═══════════════════════════════════════════════════════════════════
+        // 🆕 ASEGURAR SINCRONIZACIÓN FINAL
+        // ═══════════════════════════════════════════════════════════════════
+        self.sync_graph_to_current_level();
+        
         self.interaction.selected_nodes.clear();
         self.last_save_hash = self.graph_hash();
         self.last_save_time = Some(std::time::Instant::now());
         Ok(())
+    }
+    
+    /// Recalcular IDs recursivamente en subnetworks
+    fn recalculate_subnetwork_ids(graph: &mut NodeGraph) {
+        for node in graph.nodes_mut() {
+            if let Some(ref mut subgraph) = node.subnetwork_graph {
+                subgraph.recalculate_ids();
+                Self::recalculate_subnetwork_ids(subgraph);
+            }
+        }
+    }
+    
+    /// Sincronizar self.graph con el nivel actual de network_levels
+    fn sync_graph_to_current_level(&mut self) {
+        if let Some(level) = self.network_levels.last() {
+            self.graph = level.graph.clone();
+        }
+    }
+    
+    /// Sincronizar el nivel actual de network_levels con self.graph
+    fn sync_current_level_to_graph(&mut self) {
+        if let Some(level) = self.network_levels.last_mut() {
+            level.graph = self.graph.clone();
+        }
     }
 
     pub fn graph_hash(&self) -> u64 {
@@ -3171,6 +3440,11 @@ impl NodeGraphApp {
     }
 
     pub fn check_file_changes(&mut self) {
+        // Solo verificar cambios si estamos en root (los subnetworks se guardan en el grafo raíz)
+        if !self.is_at_root() {
+            return;
+        }
+        
         if self.workspace.has_root() {
             if let Ok(node_map_path) = self.workspace.get_node_map_path().ok_or("") {
                 if node_map_path.exists() {
@@ -3286,6 +3560,8 @@ impl NodeGraphApp {
                             for link in &links_to_remove {
                                 self.graph.remove_link(link.from, link.to);
                             }
+                            // Sincronizar cambios al nivel actual
+                            self.sync_current_level_to_graph();
                             self.check_and_auto_save();
                         }
                     }
@@ -3580,6 +3856,112 @@ impl NodeGraphApp {
                 }
             }
         }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // 🆕 MÉTODOS PARA NAVEGACIÓN DE SUBNETWORKS
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// Obtener el grafo actual (del nivel activo)
+    /// Nota: self.graph siempre debe estar sincronizado con el nivel actual
+    fn current_graph(&self) -> &NodeGraph {
+        &self.graph
+    }
+    
+    /// Obtener el grafo actual mutable (del nivel activo)
+    /// Después de modificar, llamar sync_current_level_to_graph()
+    fn current_graph_mut(&mut self) -> &mut NodeGraph {
+        &mut self.graph
+    }
+
+    /// Entrar a un subnetwork (navegar hacia dentro)
+    pub fn enter_subnetwork(&mut self, subnetwork_node_id: NodeId) -> Result<(), String> {
+        // Obtener el grafo y título antes de hacer borrows mutables
+        let (inner_graph, node_title) = {
+            let current_graph = self.current_graph();
+            let node = current_graph.node(subnetwork_node_id)
+                .ok_or_else(|| format!("Node {} not found", subnetwork_node_id.0))?;
+            
+            let inner = node.subnetwork_graph.as_ref()
+                .cloned()
+                .ok_or_else(|| format!("Node {} is not a subnetwork", subnetwork_node_id.0))?;
+            
+            (inner, node.title.clone())
+        };
+
+        // Obtener breadcrumbs actuales (clonar antes de modificar)
+        let mut breadcrumbs = self.network_levels.last()
+            .map(|l| l.breadcrumbs.clone())
+            .unwrap_or_else(|| vec!["Root".to_string()]);
+        breadcrumbs.push(node_title);
+
+        // Crear nuevo nivel
+        let new_level = NetworkLevel {
+            graph: inner_graph.clone(),
+            parent_subnetwork_id: Some(subnetwork_node_id),
+            breadcrumbs,
+        };
+
+        // Primero sincronizar el grafo actual antes de entrar (por si hay cambios pendientes)
+        // Esto guarda cualquier cambio pendiente en el nivel actual antes de navegar
+        self.sync_current_level_to_graph();
+        
+        // Ahora crear el nuevo nivel y actualizar el grafo visible
+        self.network_levels.push(new_level);
+        self.graph = inner_graph;
+        
+        Ok(())
+    }
+
+    /// Salir del subnetwork actual (volver al nivel padre)
+    pub fn exit_subnetwork(&mut self) -> Result<(), String> {
+        if self.network_levels.len() <= 1 {
+            return Err("Already at root level".to_string());
+        }
+
+        // Primero sincronizar el grafo actual antes de salir (por si hay cambios pendientes)
+        self.sync_current_level_to_graph();
+
+        // Clonar el nivel actual y su índice antes de hacer borrows mutables
+        let current_graph = self.network_levels.last().map(|l| l.graph.clone())
+            .ok_or_else(|| "No current level".to_string())?;
+        let parent_id = self.network_levels.last()
+            .and_then(|l| l.parent_subnetwork_id);
+
+        // Guardar el grafo del nivel actual de vuelta al nodo subnetwork
+        if let Some(parent_id) = parent_id {
+            // Buscar el nivel padre (el penúltimo en la pila)
+            if self.network_levels.len() >= 2 {
+                let parent_idx = self.network_levels.len() - 2;
+                if let Some(parent_level) = self.network_levels.get_mut(parent_idx) {
+                    if let Some(node) = parent_level.graph.node_mut(parent_id) {
+                        node.subnetwork_graph = Some(current_graph);
+                    }
+                }
+            }
+        }
+
+        // Volver al nivel anterior
+        self.network_levels.pop();
+        
+        // Actualizar el grafo visible y asegurar sincronización
+        if let Some(level) = self.network_levels.last() {
+            self.graph = level.graph.clone();
+        }
+        
+        Ok(())
+    }
+
+    /// Obtener los breadcrumbs actuales
+    pub fn get_breadcrumbs(&self) -> Vec<String> {
+        self.network_levels.last()
+            .map(|l| l.breadcrumbs.clone())
+            .unwrap_or_else(|| vec!["Root".to_string()])
+    }
+
+    /// Verificar si estamos en el nivel raíz
+    pub fn is_at_root(&self) -> bool {
+        self.network_levels.len() == 1
     }
 }
 

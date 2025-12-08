@@ -306,11 +306,21 @@ pub fn draw_semantic_node(
         Color32::from_black_alpha(180),
     );
     
+    // ═══════════════════════════════════════════════════════════════════
+    // 🆕 INDICADOR VISUAL PARA SUBNETWORKS
+    // ═══════════════════════════════════════════════════════════════════
+    let is_subnetwork = node.subnetwork_graph.is_some();
+    let title_with_icon = if is_subnetwork {
+        format!("📁 {}", node.title)
+    } else {
+        node.title.clone()
+    };
+    
     // Título principal
     painter.text(
         title_pos,
         Align2::CENTER_CENTER,
-        &node.title,
+        &title_with_icon,
         title_font,
         TEXT_PRIMARY,
     );

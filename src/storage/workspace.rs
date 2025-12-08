@@ -32,7 +32,13 @@ impl Workspace {
     }
 
     /// Guardar grafo (formato nuevo: código separado)
+    /// Incluye guardado recursivo de subnetworks
     pub fn save_graph(&self, graph: &mut NodeGraph) -> Result<(), String> {
+        self.save_graph_recursive(graph)
+    }
+    
+    /// Guardar grafo recursivamente (incluye subnetworks)
+    fn save_graph_recursive(&self, graph: &mut NodeGraph) -> Result<(), String> {
         let storage = NodeStorage::new(self.clone());
         
         // Asegurar que el directorio nodes/ existe
@@ -48,6 +54,14 @@ impl Workspace {
                 // Formato antiguo o nuevo nodo sin code_path: guardar código y asignar path
                 let code_path = storage.save_node_code(node.id, &node.code, node.language)?;
                 node.code_path = Some(code_path);
+            }
+            
+            // ═══════════════════════════════════════════════════════════════════
+            // 🆕 GUARDAR SUBNETWORKS RECURSIVAMENTE
+            // ═══════════════════════════════════════════════════════════════════
+            if let Some(ref mut sub_graph) = node.subnetwork_graph {
+                // Guardar el grafo interno recursivamente
+                self.save_graph_recursive(sub_graph)?;
             }
         }
 
@@ -75,7 +89,13 @@ impl Workspace {
     }
 
     /// Cargar grafo (carga código desde archivos separados si existe code_path)
+    /// Incluye carga recursiva de subnetworks
     pub fn load_graph(&self) -> Result<NodeGraph, String> {
+        self.load_graph_recursive()
+    }
+    
+    /// Cargar grafo recursivamente (incluye subnetworks)
+    fn load_graph_recursive(&self) -> Result<NodeGraph, String> {
         let path = self.get_node_map_path()
             .ok_or_else(|| "No workspace root set".to_string())?;
         
@@ -105,6 +125,28 @@ impl Workspace {
                 }
             }
             // Si no hay code_path, el código ya está en node.code (formato antiguo o sin código)
+            
+            // ═══════════════════════════════════════════════════════════════════
+            // 🆕 CARGAR SUBNETWORKS RECURSIVAMENTE
+            // ═══════════════════════════════════════════════════════════════════
+            if let Some(ref mut sub_graph) = node.subnetwork_graph {
+                // Cargar el grafo interno recursivamente
+                // Nota: Los subnetworks se guardan en el mismo node_map.json, así que
+                // ya están cargados desde la deserialización. Solo necesitamos cargar
+                // el código de sus nodos.
+                for sub_node in sub_graph.nodes_mut() {
+                    if let Some(sub_code_path) = &sub_node.code_path {
+                        match storage.load_node_code(sub_code_path) {
+                            Ok(code) => {
+                                sub_node.code = code;
+                            }
+                            Err(e) => {
+                                eprintln!("Warning: Failed to load subnetwork code from {}: {}", sub_code_path, e);
+                            }
+                        }
+                    }
+                }
+            }
         }
         
         Ok(graph)

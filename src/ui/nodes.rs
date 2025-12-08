@@ -104,18 +104,29 @@ pub fn draw_node(
     // 4. Title Text
     let text_zoom = zoom.clamp(0.5, 1.25);
     let title_font = FontId::proportional(18.0 * text_zoom);
+    
+    // ═══════════════════════════════════════════════════════════════════
+    // 🆕 INDICADOR VISUAL PARA SUBNETWORKS
+    // ═══════════════════════════════════════════════════════════════════
+    let is_subnetwork = node.subnetwork_graph.is_some();
+    let title_with_icon = if is_subnetwork {
+        format!("📁 {}", node.title)
+    } else {
+        node.title.clone()
+    };
+    
     // Shadow for text
     painter.text(
         header_rect.left_center() + Vec2::new(13.0 * zoom, 1.0 * zoom),
         Align2::LEFT_CENTER,
-        &node.title,
+        &title_with_icon,
         title_font.clone(),
         Color32::BLACK.gamma_multiply(0.5),
     );
     painter.text(
         header_rect.left_center() + Vec2::new(12.0 * zoom, 0.0),
         Align2::LEFT_CENTER,
-        &node.title,
+        &title_with_icon,
         title_font,
         Color32::WHITE,
     );
