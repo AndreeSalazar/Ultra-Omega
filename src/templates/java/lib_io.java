@@ -1,6 +1,8 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // Java 25 - Librería de I/O
 // ═══════════════════════════════════════════════════════════════════════════
+// Esta librería proporciona operaciones de entrada/salida mejoradas
+// que pueden ser heredadas por otros nodos usando ch("lib_io")
 
 import java.io.*;
 import java.nio.file.*;

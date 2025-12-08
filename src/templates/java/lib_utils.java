@@ -1,9 +1,12 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // Java 25 - Librería de Utilidades
 // ═══════════════════════════════════════════════════════════════════════════
+// Esta librería proporciona funciones de utilidad reutilizables
+// que pueden ser heredadas por otros nodos usando ch("lib_utils")
 
 import java.util.*;
 import java.util.function.*;
+import java.util.stream.Collectors;
 
 public class Utils {
     // Validación de entrada

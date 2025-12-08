@@ -1,6 +1,8 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // Java 25 - Librería de Programación Asíncrona
 // ═══════════════════════════════════════════════════════════════════════════
+// Esta librería proporciona utilidades para programación asíncrona
+// que pueden ser heredadas por otros nodos usando ch("lib_async")
 
 import java.util.concurrent.*;
 import java.util.function.Supplier;

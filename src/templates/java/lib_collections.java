@@ -1,6 +1,8 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // Java 25 - Librería de Colecciones Extendidas
 // ═══════════════════════════════════════════════════════════════════════════
+// Esta librería proporciona extensiones útiles para colecciones
+// que pueden ser heredadas por otros nodos usando ch("lib_collections")
 
 import java.util.*;
 import java.util.stream.Collectors;

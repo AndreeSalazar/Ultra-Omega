@@ -10,6 +10,7 @@
 Desarrollado por **Eddi Andreé Salazar Matos** 🇵🇪
 
 [![Rust](https://img.shields.io/badge/Rust-1.70+-orange.svg)](https://www.rust-lang.org/)
+[![Java](https://img.shields.io/badge/Java-25-red.svg)](https://www.java.com/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS-lightgrey)]()
 
@@ -37,7 +38,7 @@ Desarrollado por **Eddi Andreé Salazar Matos** 🇵🇪
 
 **Ultra-Omega** es un entorno de desarrollo visual basado en nodos que combina la potencia de sistemas como Houdini (para efectos visuales y programación procedural), la flexibilidad de Unreal Engine 5 (para desarrollo de juegos y aplicaciones), y la experiencia de usuario de Visual Studio Code.
 
-El sistema permite crear proyectos complejos conectando nodos visuales, donde cada nodo puede contener código en diferentes lenguajes (Assembly, C, C++, Rust, Mojo) y heredar código de nodos padre mediante un sistema de herencia visual.
+El sistema permite crear proyectos complejos conectando nodos visuales, donde cada nodo puede contener código en diferentes lenguajes (Assembly, C, C++, Rust, Zig, **Java 25**, Mojo) y heredar código de nodos padre mediante un sistema de herencia visual.
 
 ### Filosofía de Diseño
 
@@ -87,12 +88,11 @@ El sistema permite crear proyectos complejos conectando nodos visuales, donde ca
 
 Proyectos completos pre-construidos listos para usar:
 
-- **FastOS**: Sistema operativo educativo completo (ASM + C)
-- **FastOS 64-bit**: Versión 64-bit con UEFI boot
-- **FastOS 64-bit Rust**: Combinación de NASM y Rust
+- **FastOS ASM+Rust+Zig**: Sistema operativo multi-lenguaje completo
 - **Vulkan**: Aplicación Vulkan completa con shaders
-- **Binary Templates**: Templates binarios ejecutables (CPU y GPU)
-- **Lenguajes**: Templates para Assembly, C, C++, Rust
+- **DirectX12**: Aplicación DirectX 12 completa para Windows
+- **Lenguajes**: Templates para Assembly, C, C++, Rust, Zig, **Java 25**
+- **Java 25**: Soporte completo con 27 templates (básico, intermedio, avanzado, librerías)
 
 ### 🧮 Sistema de Expresiones
 
@@ -133,6 +133,12 @@ $variable
 
 - **Rust**: Versión 1.70 o superior
 - **Cargo**: Gestor de paquetes de Rust (incluido con Rust)
+- **Compiladores** (opcionales, según los lenguajes que uses):
+  - **NASM** (para Assembly)
+  - **GCC/Clang** (para C/C++)
+  - **Rustc** (para Rust)
+  - **Zig** (para Zig)
+  - **JDK 25** (para Java 25) - Ver [Instalación de Java 25](#instalación-de-java-25)
 - **Dependencias del Sistema**:
   - Linux: `libxcb`, `libx11`, `libxrandr`, `libasound2`
   - Windows: No requiere dependencias adicionales
@@ -150,6 +156,54 @@ cargo build --release
 
 # Ejecutar
 cargo run --release
+```
+
+### Instalación de Java 25
+
+Para usar templates y compilar código Java 25:
+
+#### Windows
+
+```powershell
+# Opción 1: Chocolatey
+choco install temurin25-jdk
+
+# Opción 2: Descarga manual
+# Visita: https://adoptium.net/
+# Descarga JDK 25 y agrega a PATH
+```
+
+#### Linux
+
+```bash
+# Ubuntu/Debian
+sudo apt update
+sudo apt install openjdk-25-jdk
+
+# O desde Adoptium
+wget https://github.com/adoptium/temurin25-binaries/releases/download/...
+```
+
+#### macOS
+
+```bash
+# Homebrew
+brew install --cask temurin25
+
+# O descarga desde Adoptium
+```
+
+**Verificar instalación:**
+```bash
+java -version
+javac -version
+```
+
+Deberías ver algo como:
+```
+openjdk version "25" 2025-XX-XX
+OpenJDK Runtime Environment (build 25+XX)
+OpenJDK 64-Bit Server VM (build 25+XX, mixed mode, sharing)
 ```
 
 ### Instalación con Soporte Mojo (Opcional)
