@@ -1,5 +1,5 @@
 use eframe::egui;
-use crate::app::NodeGraphApp;
+use crate::core::NodeGraphApp;
 
 pub fn draw_edit_menu(ui: &mut egui::Ui, _ctx: &egui::Context, _app: &mut NodeGraphApp) {
     ui.menu_button("Edit", |ui| {

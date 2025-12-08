@@ -2,7 +2,7 @@
 // Este archivo muestra cómo integrar el sistema con el grafo de nodos
 
 use crate::expressions::{ChannelManager, ChannelValue, ExpressionEvaluator};
-use crate::node_graph::NodeId;
+use crate::core::node_graph::NodeId;
 
 /// Ejemplo básico de uso de ch()
 pub fn example_basic_ch() -> Result<(), String> {

@@ -2,7 +2,7 @@
 // Permite almacenar y acceder a valores de nodos mediante referencias
 
 use std::collections::HashMap;
-use crate::node_graph::NodeId;
+use crate::core::node_graph::NodeId;
 
 #[allow(dead_code)] // Listo para usar
 

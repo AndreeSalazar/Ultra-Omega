@@ -4,7 +4,7 @@
 // Incluye FastOS: Templates completos para crear un sistema operativo
 // ═══════════════════════════════════════════════════════════════════════════
 
-use crate::node_graph::NodeLanguage;
+use crate::core::node_graph::NodeLanguage;
 
 // ══════════════════════════════════════════
 // ASSEMBLER (NASM x64) - WINDOWS

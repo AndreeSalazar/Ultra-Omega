@@ -6,7 +6,7 @@ pub mod run;
 pub mod terminal;
 
 use eframe::egui;
-use crate::app::NodeGraphApp;
+use crate::core::NodeGraphApp;
 
 pub fn draw_menu_bar(app: &mut NodeGraphApp, ctx: &egui::Context, _open_factor: f32) {
     egui::TopBottomPanel::top("menu_bar")

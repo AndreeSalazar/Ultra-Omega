@@ -1,5 +1,5 @@
 use eframe::egui;
-use crate::app::NodeGraphApp;
+use crate::core::NodeGraphApp;
 
 pub fn draw_selection_menu(ui: &mut egui::Ui, ctx: &egui::Context, app: &mut NodeGraphApp) {
     ui.menu_button("Selection", |ui| {

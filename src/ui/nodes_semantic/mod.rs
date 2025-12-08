@@ -6,7 +6,7 @@
 
 use eframe::egui::{self, Align2, Color32, FontId, Painter, Pos2, Rect, Stroke, Vec2, Visuals};
 use eframe::egui::epaint::{RectShape, Shape, TextureId};
-use crate::node_graph::{Node, Pin, PinId};
+use crate::core::node_graph::{Node, Pin, PinId};
 use std::collections::HashSet;
 
 // ══════════════════════════════════════════

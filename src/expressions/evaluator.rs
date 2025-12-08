@@ -2,7 +2,7 @@
 
 use crate::expressions::parser::{Expression, ExpressionToken};
 use crate::expressions::channels::{ChannelManager, ChannelValue};
-use crate::node_graph::NodeId;
+use crate::core::node_graph::NodeId;
 
 #[allow(dead_code)] // Listo para usar
 pub struct ExpressionEvaluator {

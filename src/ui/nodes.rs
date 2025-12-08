@@ -1,6 +1,6 @@
 use eframe::egui::{self, Align2, Color32, FontId, Painter, Pos2, Rect, Stroke, Vec2, Visuals};
 use eframe::egui::epaint::{RectShape, Shape, TextureId};
-use crate::node_graph::{Node, Pin};
+use crate::core::node_graph::{Node, Pin};
 
 // Shared constants should ideally be in a config, but duplicating for now to keep UI self-contained
 // or we can update node_graph to export them.
@@ -19,7 +19,7 @@ pub fn draw_node(
     selected: bool,
     is_inherited: bool,
     _visuals: &Visuals,
-    connected_pins: &std::collections::HashSet<crate::node_graph::PinId>, // Pins que están conectados
+    connected_pins: &std::collections::HashSet<crate::core::node_graph::PinId>, // Pins que están conectados
 ) {
     let rounding = egui::Rounding::same(12.0 * zoom);
 

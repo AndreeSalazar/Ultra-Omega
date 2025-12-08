@@ -1,16 +1,15 @@
-mod node_graph;
-mod app;
-mod terminal;
+mod core;
+mod compilation;
+mod utils;
 mod ui;
-mod workspace;
+mod storage;
 mod templates;
 mod config;
-mod editor_history;
 mod expressions;
 #[cfg(feature = "mojo")]
 mod mojo;
 
-use crate::app::NodeGraphApp;
+use crate::core::NodeGraphApp;
 use crate::config::AppConfig;
 use eframe::egui;
 

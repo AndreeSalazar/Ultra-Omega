@@ -1,5 +1,5 @@
 use eframe::egui;
-use crate::app::NodeGraphApp;
+use crate::core::NodeGraphApp;
 
 pub fn draw_file_menu(ui: &mut egui::Ui, ctx: &egui::Context, app: &mut NodeGraphApp) {
     ui.menu_button("File", |ui| {
@@ -28,7 +28,7 @@ pub fn draw_file_menu(ui: &mut egui::Ui, ctx: &egui::Context, app: &mut NodeGrap
                 .pick_file()
             {
                 if let Ok(json) = std::fs::read_to_string(&path) {
-                    if let Ok(graph) = serde_json::from_str::<crate::node_graph::NodeGraph>(&json) {
+                    if let Ok(graph) = serde_json::from_str::<crate::core::node_graph::NodeGraph>(&json) {
                         app.graph = graph;
                         app.graph.recalculate_ids();
                         app.interaction.selected_nodes.clear();

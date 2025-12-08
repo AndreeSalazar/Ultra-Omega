@@ -1,6 +1,6 @@
 use eframe::egui;
-use crate::app::NodeGraphApp;
-use crate::terminal::TerminalTab;
+use crate::core::NodeGraphApp;
+use crate::compilation::terminal::TerminalTab;
 
 pub fn draw_terminal_menu(ui: &mut egui::Ui, _ctx: &egui::Context, app: &mut NodeGraphApp) {
     ui.menu_button("Terminal", |ui| {

@@ -1,5 +1,5 @@
 use eframe::egui;
-use crate::app::NodeGraphApp;
+use crate::core::NodeGraphApp;
 use crate::ui::layout::{LayoutStyle, LayoutConfig};
 
 pub fn draw_view_menu(ui: &mut egui::Ui, _ctx: &egui::Context, app: &mut NodeGraphApp) {

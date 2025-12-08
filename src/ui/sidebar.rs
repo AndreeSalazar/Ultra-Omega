@@ -1,5 +1,5 @@
 use eframe::egui::{self, ScrollArea};
-use crate::app::NodeGraphApp;
+use crate::core::NodeGraphApp;
 
 pub fn draw_sidebar(app: &mut NodeGraphApp, ctx: &egui::Context, _open_factor: f32) {
     egui::SidePanel::left("sidebar")
@@ -83,7 +83,7 @@ pub fn draw_sidebar(app: &mut NodeGraphApp, ctx: &egui::Context, _open_factor: f
                                             if let Some(root) = &app.workspace.root_path {
                                                 let file_path = root.join(&name);
                                                 if let Ok(json) = std::fs::read_to_string(&file_path) {
-                                                    if let Ok(graph) = serde_json::from_str::<crate::node_graph::NodeGraph>(&json) {
+                                                    if let Ok(graph) = serde_json::from_str::<crate::core::node_graph::NodeGraph>(&json) {
                                                         app.graph = graph;
                                                         app.graph.recalculate_ids();
                                                         app.interaction.selected_nodes.clear();
