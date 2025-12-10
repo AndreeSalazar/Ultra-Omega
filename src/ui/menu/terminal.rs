@@ -10,6 +10,7 @@ pub fn draw_terminal_menu(ui: &mut egui::Ui, _ctx: &egui::Context, app: &mut Nod
         ui.selectable_value(&mut app.terminal.active_tab, TerminalTab::Rust, "Rust Output");
         ui.selectable_value(&mut app.terminal.active_tab, TerminalTab::Zig, "Zig Output");
         ui.selectable_value(&mut app.terminal.active_tab, TerminalTab::Java, "Java Output");
+        ui.selectable_value(&mut app.terminal.active_tab, TerminalTab::Python, "Python Output");
     });
 }
 

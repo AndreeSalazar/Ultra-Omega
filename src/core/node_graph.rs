@@ -24,6 +24,8 @@ pub enum NodeLanguage {
     Zig,
     /// Java - Lenguaje orientado a objetos multiplataforma (Java 25)
     Java,
+    /// Python - Lenguaje de programación interpretado de alto nivel (Python 3.12)
+    Python,
     /// Texto/Documentación - NO se compila, solo visualización
     Text,
     /// Mojo - Lenguaje de alto rendimiento para IA/ML
@@ -80,8 +82,18 @@ pub struct Node {
     
     /// Si este nodo es un subnetwork, contiene un grafo completo dentro
     /// Cuando está presente, el nodo actúa como contenedor de otros nodos
+    /// También usado para Nodos Carpeta (Idea 11)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub subnetwork_graph: Option<NodeGraph>,
+    
+    // ═══════════════════════════════════════════════════════════════════
+    // 🆕 SISTEMA DE NODO CARPETA (Idea 11)
+    // ═══════════════════════════════════════════════════════════════════
+    
+    /// Si este nodo hereda de un nodo carpeta, contiene el ID del nodo carpeta
+    /// Permite que el nodo acceda a todo el código contenido en la carpeta
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inherits_from_folder: Option<NodeId>,
     
     /// Pines expuestos al nivel padre (para subnetworks)
     /// Estos son los inputs/outputs que se pueden conectar desde el nivel padre
@@ -307,6 +319,7 @@ impl NodeGraph {
             subnetwork_graph: None, // No es subnetwork por defecto
             exposed_inputs: Vec::new(),
             exposed_outputs: Vec::new(),
+            inherits_from_folder: None, // No hereda de carpeta por defecto
         });
 
         id

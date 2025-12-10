@@ -486,6 +486,72 @@ Nodo B: "Render Loop"
 
 ---
 
+### 🆕 Fase 9: Integración Completa de Python 3.12 🆕
+
+#### 📋 **PLANIFICACIÓN:**
+
+**Versión Recomendada**: **Python 3.12** ⭐
+- ✅ Estabilidad y madurez
+- ✅ Mejoras de rendimiento (10-15% más rápido que 3.11)
+- ✅ Amplia compatibilidad con librerías
+- ✅ Características modernas (Type Hints, Pattern Matching, Async/Await)
+
+**Documentación**: Ver `PYTHON_INTEGRATION_PLAN.md` para detalles completos
+
+#### ⏳ **PENDIENTE:**
+
+**Fase 1: Integración Básica**
+- [ ] Agregar `Python` al enum `NodeLanguage` en `src/core/node_graph.rs`
+- [ ] Agregar `Python` al enum `Language` en `src/compilation/terminal.rs`
+- [ ] Implementar detección de Python (`python3` / `python`)
+- [ ] Implementar ejecución de Python en terminal
+- [ ] Agregar soporte UTF-8 para salida Python
+- [ ] Agregar "Python" a categorías del menú de templates
+- [ ] Agregar color Python (#3776AB) e icono 🐍
+
+**Fase 2: Templates Básicos (10-15 templates)**
+- [ ] Crear `src/templates/python/` directory
+- [ ] Hello World
+- [ ] Variables y Tipos
+- [ ] Condicionales
+- [ ] Bucles
+- [ ] Funciones
+- [ ] Listas/Diccionarios
+- [ ] Registrar templates en `src/templates/mod.rs`
+
+**Fase 3: Templates Intermedios (10-15 templates)**
+- [ ] Clases y Objetos
+- [ ] Decoradores
+- [ ] Generadores
+- [ ] Manejo de Excepciones
+- [ ] Archivos I/O
+- [ ] JSON
+
+**Fase 4: Templates Avanzados (10-15 templates)**
+- [ ] Type Hints
+- [ ] Pattern Matching (match/case)
+- [ ] Async/Await
+- [ ] Dataclasses
+- [ ] Exception Groups
+
+**Fase 5: Librerías Modulares (4-6 templates)**
+- [ ] Lib: Utils
+- [ ] Lib: Collections
+- [ ] Lib: I/O
+- [ ] Lib: Async
+- [ ] Lib: Networking
+
+**Fase 6: Documentación**
+- [ ] Crear `src/templates/python/README.md`
+- [ ] Actualizar `README.md` principal
+- [ ] Actualizar `PLAN_REFACTORIZACION.md`
+
+**Estado**: ⏳ **PLANIFICADO** - Ver `PYTHON_INTEGRATION_PLAN.md` para detalles
+
+**Esfuerzo estimado**: ~5-6 horas (Integración: 2h, Templates: 3h, Documentación: 1h)
+
+---
+
 ### 🔄 Fase 5: Inspiración Houdini - Sistema Avanzado de Nodos 🔄 (Continuación - detalles arriba)
 
 #### 🎨 Ideas de Houdini para implementar:
@@ -608,10 +674,15 @@ Nodo B: "Render Loop"
   - Restaurar estado al abrir proyecto
   - Multi-root workspaces
   
-- [ ] **Folder Organization**: Organización visual mejorada
+- [ ] **Folder Organization**: Organización visual mejorada 🆕
   - Crear carpetas virtuales (como VS Code)
   - Agrupar nodos por categoría/carpeta
   - Folders en el grafo visual
+  - **Sincronización bidireccional en tiempo real** con estructura de archivos
+  - **Vista de árbol expandible** en sidebar
+  - **Regiones visuales** en viewport que agrupan nodos
+  - **Persistencia** en node_map.json
+  - **Ver documento detallado**: `FOLDER_ORGANIZATION_IDEAS.md`
 
 **Búsqueda y Navegación:**
 - [ ] **Global Search**: Buscar en todos los archivos
@@ -1060,7 +1131,7 @@ impl Workspace {
 
 ## 📊 Estado General del Proyecto
 
-**Última actualización**: 2025-01-27 (Java 25 - Integración Completa)
+**Última actualización**: 2025-01-27 (Python 3.12 - Plan de Integración Creado)
 
 ### Progreso por Fases:
 
@@ -1074,6 +1145,7 @@ impl Workspace {
 | **Fase 6: Inspiración VS Code** | 🆕 PLANIFICADO | 0% | Media |
 | **Fase 7: Librerías Modulares** | ✅ COMPLETADO | 80% | Alta |
 | **Fase 8: Java 25** | ✅ COMPLETADO | 100% | Alta |
+| **Fase 9: Python 3.12** | ⏳ PLANIFICADO | 0% | Alta |
 
 ### Resumen:
 - ✅ **Sistema de código separado funcionando** - Los nodos ahora guardan código en archivos separados
@@ -1089,11 +1161,12 @@ impl Workspace {
 - ⏳ **Preparación para GitHub pendiente** - Documentación y CI/CD
 
 ### Próximos Pasos Recomendados:
-1. **Inmediato**: Testing de Java 25 - Validar compilación y ejecución de todos los templates
-2. **Corto plazo**: Testing de Subnetworks - Validar navegación y guardado/carga (Fase 5)
-3. **Corto plazo**: Testing de migración automática con proyectos reales (Fase 3)
-4. **Medio plazo**: File Explorer mejorado y Quick Search (Fase 6)
-5. **Largo plazo**: Preparar para GitHub (Fase 4)
+1. **Inmediato**: Integración de Python 3.12 (Fase 9) - Comenzar con Fase 1 (Integración Básica)
+2. **Corto plazo**: Testing de Java 25 - Validar compilación y ejecución de todos los templates
+3. **Corto plazo**: Testing de Subnetworks - Validar navegación y guardado/carga (Fase 5)
+4. **Corto plazo**: Testing de migración automática con proyectos reales (Fase 3)
+5. **Medio plazo**: File Explorer mejorado y Quick Search (Fase 6)
+6. **Largo plazo**: Preparar para GitHub (Fase 4)
 
 ### 🎨 Roadmap Inspirado en Houdini + VS Code:
 
@@ -1133,7 +1206,8 @@ impl Workspace {
 ✅ Mejor mantenibilidad y extensibilidad del código  
 ✅ Tema visual negro profesional con líneas blancas (mejora UX)  
 ✅ Sistema de Subnetworks COMPLETO - Estructura, navegación UI, y guardado/carga recursivo (Fase 5 - 100%)  
-✅ Java 25 COMPLETO - Integración completa con 27 templates, compilación, ejecución y documentación (Fase 8 - 100%)
+✅ Java 25 COMPLETO - Integración completa con 27 templates, compilación, ejecución y documentación (Fase 8 - 100%)  
+🆕 Python 3.12 PLANIFICADO - Plan de integración completo creado con recomendaciones y estructura de templates (Fase 9 - 0%)
 
 ---
 

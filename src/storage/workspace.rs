@@ -119,8 +119,14 @@ impl Workspace {
                         node.code = code;
                     }
                     Err(e) => {
-                        // Si falla, mantener el código embebido si existe (compatibilidad)
-                        eprintln!("Warning: Failed to load code from {}: {}", code_path, e);
+                        // Si falla, limpiar code_path si el archivo no existe
+                        // Esto evita warnings repetidos para archivos eliminados
+                        if e.contains("cannot find") || e.contains("No such file") || e.contains("os error 3") {
+                            node.code_path = None;
+                        } else {
+                            // Solo mostrar warning si es otro tipo de error
+                            eprintln!("Warning: Failed to load code from {}: {}", code_path, e);
+                        }
                     }
                 }
             }

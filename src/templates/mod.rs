@@ -142,6 +142,18 @@ pub mod cpp {
 // RUST
 // ══════════════════════════════════════════
 // ══════════════════════════════════════════
+// PYTHON 3.12 - Lenguaje de programación interpretado de alto nivel
+// ══════════════════════════════════════════
+pub mod python {
+    // Básicos
+    pub const HELLO_WORLD: &str = include_str!("python/hello_world.py");
+    pub const VARIABLES: &str = include_str!("python/variables.py");
+    pub const CONDITIONALS: &str = include_str!("python/conditionals.py");
+    pub const LOOPS: &str = include_str!("python/loops.py");
+    pub const FUNCTIONS: &str = include_str!("python/functions.py");
+    pub const LISTS_DICTS: &str = include_str!("python/lists_dicts.py");
+}
+
 // JAVA 25 - Lenguaje orientado a objetos multiplataforma
 // ══════════════════════════════════════════
 pub mod java {
@@ -1294,6 +1306,64 @@ pub fn all_templates() -> Vec<Template> {
             color: (0x80, 0x40, 0x00),
             icon: "⚡",
             language: NodeLanguage::Java,
+        },
+        
+        // ══════════════════════════════════════════════════════════════
+        // PYTHON 3.12 - BÁSICO
+        // ══════════════════════════════════════════════════════════════
+        Template {
+            name: "Hola Mundo",
+            code: python::HELLO_WORLD,
+            category: "Python",
+            subcategory: "Básico",
+            color: (0x37, 0x76, 0xAB), // Python blue oficial
+            icon: "🐍",
+            language: NodeLanguage::Python,
+        },
+        Template {
+            name: "Variables y Tipos",
+            code: python::VARIABLES,
+            category: "Python",
+            subcategory: "Básico",
+            color: (0x37, 0x76, 0xAB),
+            icon: "📦",
+            language: NodeLanguage::Python,
+        },
+        Template {
+            name: "Condicionales",
+            code: python::CONDITIONALS,
+            category: "Python",
+            subcategory: "Básico",
+            color: (0x37, 0x76, 0xAB),
+            icon: "🔀",
+            language: NodeLanguage::Python,
+        },
+        Template {
+            name: "Bucles",
+            code: python::LOOPS,
+            category: "Python",
+            subcategory: "Básico",
+            color: (0x37, 0x76, 0xAB),
+            icon: "↻",
+            language: NodeLanguage::Python,
+        },
+        Template {
+            name: "Funciones",
+            code: python::FUNCTIONS,
+            category: "Python",
+            subcategory: "Básico",
+            color: (0x37, 0x76, 0xAB),
+            icon: "⚡",
+            language: NodeLanguage::Python,
+        },
+        Template {
+            name: "Listas y Diccionarios",
+            code: python::LISTS_DICTS,
+            category: "Python",
+            subcategory: "Básico",
+            color: (0x37, 0x76, 0xAB),
+            icon: "📚",
+            language: NodeLanguage::Python,
         },
         
         // ══════════════════════════════════════════════════════════════

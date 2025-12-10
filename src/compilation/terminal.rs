@@ -1,5 +1,6 @@
 use std::process::Command;
 use std::path::{Path, PathBuf};
+use crate::expressions::channels::ChannelValue;
 
 #[cfg(target_os = "windows")]
 const EXE_EXTENSION: &str = ".exe";
@@ -23,6 +24,7 @@ pub struct TerminalManager {
     pub rust_output: String,
     pub zig_output: String,
     pub java_output: String,
+    pub python_output: String,
     pub active_tab: TerminalTab,
     pub visible: bool,
     pub pinned: bool,
@@ -40,6 +42,7 @@ pub enum TerminalTab {
     Rust,
     Zig,
     Java,
+    Python,
     Mojo,
 }
 
@@ -52,6 +55,7 @@ impl Default for TerminalManager {
             rust_output: String::new(),
             zig_output: String::new(),
             java_output: String::new(),
+            python_output: String::new(),
             active_tab: TerminalTab::default(),
             visible: false,
             pinned: false,
@@ -69,6 +73,7 @@ pub enum Language {
     Rust,
     Zig,
     Java,
+    Python,
     Mojo,
 }
 
@@ -134,6 +139,7 @@ impl TerminalManager {
             Language::Rust => (&mut self.rust_output, TerminalTab::Rust),
             Language::Zig => (&mut self.zig_output, TerminalTab::Zig),
             Language::Java => (&mut self.java_output, TerminalTab::Java),
+            Language::Python => (&mut self.python_output, TerminalTab::Python),
             Language::Mojo => {
                 // Mojo usa el buffer de Rust por ahora (o se puede crear uno específico)
                 (&mut self.rust_output, TerminalTab::Mojo)
@@ -142,13 +148,32 @@ impl TerminalManager {
         
         self.active_tab = tab;
         output_buffer.clear();
-        output_buffer.push_str(">>> Iniciando compilación...\n");
-
+        
+        // Header visual mejorado
+        output_buffer.push_str("╔═══════════════════════════════════════════════════════════════╗\n");
+        output_buffer.push_str("║              🚀 INICIANDO PROCESO DE COMPILACIÓN             ║\n");
+        output_buffer.push_str("╚═══════════════════════════════════════════════════════════════╝\n\n");
+        
+        // Información del lenguaje
+        let lang_name = match lang {
+            Language::Nasm => "NASM (Assembly)",
+            Language::C => "C",
+            Language::Cpp => "C++",
+            Language::Rust => "Rust",
+            Language::Zig => "Zig",
+            Language::Java => "Java 25",
+            Language::Python => "Python 3.12",
+            Language::Mojo => "Mojo",
+        };
+        output_buffer.push_str(&format!("📝 Lenguaje: {}\n", lang_name));
+        
         // Determinar el directorio de trabajo
         let work_dir = workspace_path
             .map(|p| p.clone())
             .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
         
+        output_buffer.push_str(&format!("📁 Directorio: {}\n\n", work_dir.display()));
+
         let exe_file = format!("program{}", EXE_EXTENSION);
         let exe_path = work_dir.join(&exe_file);
         let exe_file_str = exe_file.as_str();
@@ -162,10 +187,21 @@ impl TerminalManager {
             Language::Java => {
                 if let Some(main_class) = Self::compile_java(code, &work_dir, output_buffer) {
                     self.java_main_class = Some(main_class.clone());
-                    // Ejecutar Java con codificación UTF-8
-                    output_buffer.push_str(">>> Ejecutando programa...\n");
+                    
+                    // Separador visual antes de ejecución
+                    output_buffer.push_str("\n");
+                    output_buffer.push_str("╔═══════════════════════════════════════════════════════════════╗\n");
+                    output_buffer.push_str("║                    ▶️  EJECUTANDO PROGRAMA                    ║\n");
+                    output_buffer.push_str("╚═══════════════════════════════════════════════════════════════╝\n\n");
+                    
+                    output_buffer.push_str(&format!("🔍 Clase principal: {}\n", main_class));
+                    output_buffer.push_str("⏳ Ejecutando...\n\n");
+                    
                     let java_path = Self::find_compiler_cmd("java", output_buffer);
                     if let Some(java_cmd) = java_path {
+                        // Medir tiempo de ejecución
+                        let start_time = std::time::Instant::now();
+                        
                         // Configurar variables de entorno para UTF-8
                         let mut cmd = Command::new(&java_cmd);
                         cmd.current_dir(&work_dir);
@@ -180,58 +216,99 @@ impl TerminalManager {
                         
                         match cmd.output() {
                             Ok(run_out) => {
+                                let elapsed = start_time.elapsed();
+                                
                                 // Decodificar correctamente como UTF-8
                                 let stdout_str = String::from_utf8_lossy(&run_out.stdout);
                                 let stderr_str = String::from_utf8_lossy(&run_out.stderr);
                                 
-                                // Reorganizar: primero info de compilación, luego resultados
+                                // Sección de resultados mejorada con más espacio y claridad
                                 output_buffer.push_str("\n");
-                                output_buffer.push_str("═══════════════════════════════════════════════════════════════\n");
-                                output_buffer.push_str("                    📊 RESULTADOS DEL PROGRAMA\n");
-                                output_buffer.push_str("═══════════════════════════════════════════════════════════════\n\n");
+                                output_buffer.push_str("╔═══════════════════════════════════════════════════════════════╗\n");
+                                output_buffer.push_str("║                  📊 RESULTADOS DEL PROGRAMA                    ║\n");
+                                output_buffer.push_str("╚═══════════════════════════════════════════════════════════════╝\n\n");
                                 
                                 if !stdout_str.is_empty() {
-                                    output_buffer.push_str("📤 Salida estándar:\n");
-                                    output_buffer.push_str("───────────────────────────────────────────────────────────\n");
-                                    output_buffer.push_str(&stdout_str);
-                                    if !stdout_str.ends_with('\n') {
-                                        output_buffer.push_str("\n");
+                                    output_buffer.push_str("📤 SALIDA ESTÁNDAR (Resultado del programa):\n");
+                                    output_buffer.push_str("═══════════════════════════════════════════════════════════════\n");
+                                    output_buffer.push_str("\n");
+                                    // Mostrar cada línea de salida de forma destacada con mejor formato
+                                    let lines: Vec<&str> = stdout_str.lines().collect();
+                                    for (i, line) in lines.iter().enumerate() {
+                                        // Agregar indentación y formato mejorado
+                                        if line.trim().is_empty() {
+                                            output_buffer.push_str("\n");
+                                        } else {
+                                            output_buffer.push_str(&format!("  {}\n", line));
+                                        }
                                     }
-                                    output_buffer.push_str("───────────────────────────────────────────────────────────\n\n");
+                                    // Si hay una línea sin salto al final del stdout_str original
+                                    if !stdout_str.ends_with('\n') && !stdout_str.is_empty() && lines.is_empty() {
+                                        // Si no hay líneas procesadas, usar el texto completo
+                                        output_buffer.push_str(&format!("  {}\n", stdout_str));
+                                    }
+                                    output_buffer.push_str("\n");
+                                    output_buffer.push_str("═══════════════════════════════════════════════════════════════\n");
+                                    output_buffer.push_str("\n");
                                 }
                                 
                                 if !stderr_str.is_empty() {
-                                    output_buffer.push_str("⚠️  Salida de errores:\n");
-                                    output_buffer.push_str("───────────────────────────────────────────────────────────\n");
-                                    output_buffer.push_str(&stderr_str);
-                                    if !stderr_str.ends_with('\n') {
-                                        output_buffer.push_str("\n");
+                                    output_buffer.push_str("⚠️  ERRORES/ADVERTENCIAS:\n");
+                                    output_buffer.push_str("─────────────────────────────────────────────────────────────\n");
+                                    output_buffer.push_str("\n");
+                                    for line in stderr_str.lines() {
+                                        output_buffer.push_str(&format!("  {}\n", line));
                                     }
-                                    output_buffer.push_str("───────────────────────────────────────────────────────────\n\n");
+                                    if !stderr_str.ends_with('\n') && !stderr_str.is_empty() {
+                                        let last_line = stderr_str.lines().last().unwrap_or("");
+                                        if !last_line.is_empty() {
+                                            output_buffer.push_str(&format!("  {}\n", last_line));
+                                        }
+                                    }
+                                    output_buffer.push_str("\n");
+                                    output_buffer.push_str("─────────────────────────────────────────────────────────────\n");
+                                    output_buffer.push_str("\n");
                                 }
                                 
-                                // Estado final
+                                // Estado final mejorado
+                                output_buffer.push_str("╔═══════════════════════════════════════════════════════════════╗\n");
                                 if let Some(exit_code) = run_out.status.code() {
                                     if exit_code == 0 {
-                                        output_buffer.push_str("✅ Programa ejecutado exitosamente\n");
+                                        output_buffer.push_str("║  ✅ Estado: Ejecución exitosa                              ║\n");
                                     } else {
-                                        output_buffer.push_str(&format!("❌ Programa terminó con código de salida: {}\n", exit_code));
+                                        output_buffer.push_str(&format!("║  ❌ Estado: Error (código de salida: {})                  ║\n", exit_code));
                                     }
                                 } else {
-                                    output_buffer.push_str("⚠️  El programa fue terminado por una señal del sistema\n");
+                                    output_buffer.push_str("║  ⚠️  Estado: Terminado por señal del sistema              ║\n");
                                 }
-                                
-                                output_buffer.push_str("═══════════════════════════════════════════════════════════════\n");
+                                output_buffer.push_str(&format!("║  ⏱️  Tiempo de ejecución: {:.2} ms                        ║\n", elapsed.as_millis()));
+                                output_buffer.push_str("╚═══════════════════════════════════════════════════════════════╝\n");
                             }
                             Err(e) => {
-                                output_buffer.push_str(&format!("❌ Error ejecutando programa: {}\n", e));
+                                output_buffer.push_str("╔═══════════════════════════════════════════════════════════════╗\n");
+                                output_buffer.push_str("║                    ❌ ERROR DE EJECUCIÓN                      ║\n");
+                                output_buffer.push_str("╚═══════════════════════════════════════════════════════════════╝\n\n");
+                                output_buffer.push_str(&format!("Detalle: {}\n\n", e));
+                                output_buffer.push_str("💡 Sugerencias:\n");
+                                output_buffer.push_str(&format!("   1. Verifica que la clase '{}' existe y está compilada\n", main_class));
+                                output_buffer.push_str("   2. Asegúrate de tener el JRE (Java Runtime Environment) instalado\n");
+                                output_buffer.push_str("   3. Verifica que 'java' esté en tu PATH\n");
                             }
                         }
                     } else {
-                        output_buffer.push_str(">>> Error: No se encontró 'java' en PATH.\n");
-                        output_buffer.push_str(">>> Asegúrate de tener el JDK instalado.\n");
+                        output_buffer.push_str("╔═══════════════════════════════════════════════════════════════╗\n");
+                        output_buffer.push_str("║                    ❌ ERROR: JAVA NO ENCONTRADO                 ║\n");
+                        output_buffer.push_str("╚═══════════════════════════════════════════════════════════════╝\n\n");
+                        output_buffer.push_str("No se encontró 'java' en PATH.\n");
+                        output_buffer.push_str("Asegúrate de tener el JDK instalado.\n");
                     }
                 }
+                return;
+            }
+            Language::Python => {
+                // Por ahora ejecutar sin contexto (sin ChannelManager)
+                // En el futuro, se puede pasar contexto desde app.rs
+                Self::run_python(code, &work_dir, output_buffer);
                 return;
             }
             Language::Mojo => Self::compile_mojo(code, &work_dir, exe_file_str, output_buffer),
@@ -239,7 +316,24 @@ impl TerminalManager {
 
         // Run if compiled (para Java se maneja por separado)
         if exe_path.exists() {
-            output_buffer.push_str(">>> Ejecutando programa...\n");
+            // Obtener tamaño del ejecutable
+            let exe_size = if let Ok(metadata) = std::fs::metadata(&exe_path) {
+                metadata.len()
+            } else {
+                0
+            };
+            
+            // Separador visual antes de ejecución
+            output_buffer.push_str("\n");
+            output_buffer.push_str("╔═══════════════════════════════════════════════════════════════╗\n");
+            output_buffer.push_str("║                    ▶️  EJECUTANDO PROGRAMA                    ║\n");
+            output_buffer.push_str("╚═══════════════════════════════════════════════════════════════╝\n\n");
+            
+            output_buffer.push_str(&format!("📦 Ejecutable: {}\n", exe_file));
+            output_buffer.push_str(&format!("📏 Tamaño: {} bytes ({:.2} KB)\n", exe_size, exe_size as f64 / 1024.0));
+            output_buffer.push_str("⏳ Ejecutando...\n\n");
+            
+            let start_time = std::time::Instant::now();
             let mut cmd = Command::new(&exe_path);
             cmd.current_dir(&work_dir);
             
@@ -251,44 +345,65 @@ impl TerminalManager {
             
             match cmd.output() {
                 Ok(run_out) => {
+                    let elapsed = start_time.elapsed();
+                    
                     // Decodificar correctamente como UTF-8
                     let stdout_str = String::from_utf8_lossy(&run_out.stdout);
                     let stderr_str = String::from_utf8_lossy(&run_out.stderr);
                     
-                    // Reorganizar: primero info de compilación, luego resultados
+                    // Sección de resultados mejorada con más espacio y claridad
                     output_buffer.push_str("\n");
-                    output_buffer.push_str("═══════════════════════════════════════════════════════════════\n");
-                    output_buffer.push_str("                    📊 RESULTADOS DEL PROGRAMA\n");
-                    output_buffer.push_str("═══════════════════════════════════════════════════════════════\n\n");
+                    output_buffer.push_str("╔═══════════════════════════════════════════════════════════════╗\n");
+                    output_buffer.push_str("║                  📊 RESULTADOS DEL PROGRAMA                    ║\n");
+                    output_buffer.push_str("╚═══════════════════════════════════════════════════════════════╝\n\n");
                     
                     if !stdout_str.is_empty() {
-                        output_buffer.push_str("📤 Salida estándar:\n");
-                        output_buffer.push_str("───────────────────────────────────────────────────────────\n");
-                        output_buffer.push_str(&stdout_str);
-                        if !stdout_str.ends_with('\n') {
-                            output_buffer.push_str("\n");
+                        output_buffer.push_str("📤 SALIDA ESTÁNDAR (Resultado del programa):\n");
+                        output_buffer.push_str("═══════════════════════════════════════════════════════════════\n");
+                        output_buffer.push_str("\n");
+                        // Mostrar cada línea de salida de forma destacada
+                        for line in stdout_str.lines() {
+                            output_buffer.push_str(&format!("  {}\n", line));
                         }
-                        output_buffer.push_str("───────────────────────────────────────────────────────────\n\n");
+                        // Si hay una línea sin salto al final
+                        if !stdout_str.ends_with('\n') && !stdout_str.is_empty() {
+                            let last_line = stdout_str.lines().last().unwrap_or("");
+                            if !last_line.is_empty() {
+                                output_buffer.push_str(&format!("  {}\n", last_line));
+                            }
+                        }
+                        output_buffer.push_str("\n");
+                        output_buffer.push_str("═══════════════════════════════════════════════════════════════\n");
+                        output_buffer.push_str("\n");
                     }
                     
                     if !stderr_str.is_empty() {
-                        output_buffer.push_str("⚠️  Salida de errores:\n");
-                        output_buffer.push_str("───────────────────────────────────────────────────────────\n");
-                        output_buffer.push_str(&stderr_str);
-                        if !stderr_str.ends_with('\n') {
-                            output_buffer.push_str("\n");
+                        output_buffer.push_str("⚠️  ERRORES/ADVERTENCIAS:\n");
+                        output_buffer.push_str("─────────────────────────────────────────────────────────────\n");
+                        output_buffer.push_str("\n");
+                        for line in stderr_str.lines() {
+                            output_buffer.push_str(&format!("  {}\n", line));
                         }
-                        output_buffer.push_str("───────────────────────────────────────────────────────────\n\n");
+                        if !stderr_str.ends_with('\n') && !stderr_str.is_empty() {
+                            let last_line = stderr_str.lines().last().unwrap_or("");
+                            if !last_line.is_empty() {
+                                output_buffer.push_str(&format!("  {}\n", last_line));
+                            }
+                        }
+                        output_buffer.push_str("\n");
+                        output_buffer.push_str("─────────────────────────────────────────────────────────────\n");
+                        output_buffer.push_str("\n");
                     }
                     
                     // Analizar el código de salida
                     let exit_code = run_out.status.code();
+                    output_buffer.push_str("╔═══════════════════════════════════════════════════════════════╗\n");
                     if let Some(code) = exit_code {
                         if code == 139 || code == -11 {
                             // SIGSEGV (segmentation fault)
-                            output_buffer.push_str("❌ SEGMENTATION FAULT detectado!\n");
-                            output_buffer.push_str("═══════════════════════════════════════════════════════════════\n");
-                            output_buffer.push_str("   Posibles causas:\n");
+                            output_buffer.push_str("║  ❌ Estado: SEGMENTATION FAULT detectado!                ║\n");
+                            output_buffer.push_str("╚═══════════════════════════════════════════════════════════════╝\n\n");
+                            output_buffer.push_str("🔍 Posibles causas:\n");
                             #[cfg(not(target_os = "windows"))]
                             {
                                 output_buffer.push_str("   1. Código escrito para Windows ejecutándose en Linux\n");
@@ -296,7 +411,7 @@ impl TerminalManager {
                                 output_buffer.push_str("      - Linux usa:   mov rdi, arg (primer argumento)\n");
                                 output_buffer.push_str("   2. Pila mal alineada (debe ser múltiplo de 16 bytes)\n");
                                 output_buffer.push_str("   3. Acceso a memoria inválida\n\n");
-                                output_buffer.push_str("   Solución: Adapta el código para Linux:\n");
+                                output_buffer.push_str("💡 Solución: Adapta el código para Linux:\n");
                                 output_buffer.push_str("   - Cambia 'mov rcx' por 'mov rdi' para primer argumento\n");
                                 output_buffer.push_str("   - Cambia 'mov rdx' por 'mov rsi' para segundo argumento\n");
                                 output_buffer.push_str("   - Asegura alineación de pila (sub rsp, 8 o múltiplo de 16)\n");
@@ -307,22 +422,28 @@ impl TerminalManager {
                                 output_buffer.push_str("   2. Pila mal alineada\n");
                                 output_buffer.push_str("   3. Argumentos incorrectos en llamadas a funciones\n");
                             }
-                            output_buffer.push_str("═══════════════════════════════════════════════════════════════\n");
                         } else if code != 0 {
-                            output_buffer.push_str(&format!("❌ Programa terminó con código de salida: {}\n", code));
-                            output_buffer.push_str("═══════════════════════════════════════════════════════════════\n");
+                            output_buffer.push_str(&format!("║  ❌ Estado: Error (código de salida: {})                  ║\n", code));
+                            output_buffer.push_str(&format!("║  ⏱️  Tiempo de ejecución: {:.2} ms                        ║\n", elapsed.as_millis()));
+                            output_buffer.push_str("╚═══════════════════════════════════════════════════════════════╝\n");
                         } else {
-                            output_buffer.push_str("✅ Programa ejecutado exitosamente\n");
-                            output_buffer.push_str("═══════════════════════════════════════════════════════════════\n");
+                            output_buffer.push_str("║  ✅ Estado: Ejecución exitosa                              ║\n");
+                            output_buffer.push_str(&format!("║  ⏱️  Tiempo de ejecución: {:.2} ms                        ║\n", elapsed.as_millis()));
+                            output_buffer.push_str("╚═══════════════════════════════════════════════════════════════╝\n");
                         }
                     } else {
                         // Proceso terminado por señal
-                        output_buffer.push_str("⚠️  El programa fue terminado por una señal del sistema.\n");
-                        output_buffer.push_str("═══════════════════════════════════════════════════════════════\n");
+                        output_buffer.push_str("║  ⚠️  Estado: Terminado por señal del sistema              ║\n");
+                        output_buffer.push_str(&format!("║  ⏱️  Tiempo de ejecución: {:.2} ms                        ║\n", elapsed.as_millis()));
+                        output_buffer.push_str("╚═══════════════════════════════════════════════════════════════╝\n");
                     }
                 }
                 Err(e) => {
-                    output_buffer.push_str(&format!("❌ Error ejecutando programa: {}\n", e));
+                    output_buffer.push_str("╔═══════════════════════════════════════════════════════════════╗\n");
+                    output_buffer.push_str("║                    ❌ ERROR DE EJECUCIÓN                      ║\n");
+                    output_buffer.push_str("╚═══════════════════════════════════════════════════════════════╝\n\n");
+                    output_buffer.push_str(&format!("Detalle: {}\n\n", e));
+                    output_buffer.push_str("💡 Verifica que el ejecutable tenga permisos de ejecución.\n");
                 }
             }
         }
@@ -937,6 +1058,306 @@ impl TerminalManager {
             }
         }
         None
+    }
+
+    /// Resolver código completo para Python: heredado + expresiones ch()
+    fn resolve_python_code(
+        code: &str,
+        inherited_code: Option<&str>,
+    ) -> String {
+        let mut resolved = String::new();
+        
+        // 1. Agregar código heredado al inicio si existe
+        if let Some(inherited) = inherited_code {
+            resolved.push_str("# ════════════════════════════════════════════════════════════\n");
+            resolved.push_str("# 🔗 CÓDIGO HEREDADO (del nodo padre)\n");
+            resolved.push_str("# ════════════════════════════════════════════════════════════\n");
+            resolved.push_str(inherited);
+            resolved.push_str("\n\n");
+        }
+        
+        // 2. Resolver expresiones ch() en el código actual (sin contexto por ahora)
+        let code_with_ch_resolved = Self::resolve_python_ch_with_context(code, None, None);
+        
+        // 3. Agregar el código actual
+        resolved.push_str("# ════════════════════════════════════════════════════════════\n");
+        resolved.push_str("# 📝 CÓDIGO ACTUAL (este nodo)\n");
+        resolved.push_str("# ════════════════════════════════════════════════════════════\n");
+        resolved.push_str(&code_with_ch_resolved);
+        
+        resolved
+    }
+
+    /// Resolver expresiones ch() con acceso a ChannelManager
+    fn resolve_python_ch_with_context(
+        code: &str,
+        channel_manager: Option<&crate::expressions::channels::ChannelManager>,
+        current_node_id: Option<crate::core::node_graph::NodeId>,
+    ) -> String {
+        let mut resolved_code = code.to_string();
+        let mut i = 0;
+        
+        // Buscar patrones ch("...") o ch('...') y resolverlos
+        while i < resolved_code.len() {
+            // Buscar "ch("
+            if let Some(ch_pos) = resolved_code[i..].find("ch(") {
+                let start = i + ch_pos;
+                let after_ch = start + 2; // Después de "ch"
+                
+                if after_ch < resolved_code.len() && resolved_code.as_bytes()[after_ch] == b'(' {
+                    // Buscar comillas
+                    let quote_pos = resolved_code[after_ch + 1..]
+                        .find(|c| c == '"' || c == '\'');
+                    
+                    if let Some(quote_offset) = quote_pos {
+                        let quote_char = resolved_code.as_bytes()[after_ch + 1 + quote_offset] as char;
+                        let node_name_start = after_ch + 2 + quote_offset;
+                        
+                        // Buscar la comilla de cierre
+                        if let Some(end_quote_pos) = resolved_code[node_name_start..]
+                            .find(quote_char) {
+                            let node_name_end = node_name_start + end_quote_pos;
+                            let node_name = &resolved_code[node_name_start..node_name_end];
+                            
+                            // Buscar el paréntesis de cierre
+                            if node_name_end + 1 < resolved_code.len() 
+                                && resolved_code.as_bytes()[node_name_end + 1] == b')' {
+                                let expr_end = node_name_end + 2;
+                                let full_expr = &resolved_code[start..expr_end];
+                                
+                                // Intentar resolver desde ChannelManager
+                                let replacement = if let Some(cm) = channel_manager {
+                                    if let Some(code_value) = cm.get_node_code(node_name) {
+                                        // Encontró código del nodo - inyectarlo como código Python
+                                        format!(
+                                            "\n# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n# 📦 Código heredado de nodo: '{}'\n# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n{}\n# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n",
+                                            node_name, code_value
+                                        )
+                                    } else if let Some(ChannelValue::Code(code)) = cm.get_channel(node_name) {
+                                        format!(
+                                            "\n# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n# 📦 Código del canal: '{}'\n# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n{}\n# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n",
+                                            node_name, code
+                                        )
+                                    } else {
+                                        format!(
+                                            "# ⚠️ Error: No se encontró código para nodo '{}' (ch('{}'))",
+                                            node_name, node_name
+                                        )
+                                    }
+                                } else {
+                                    format!(
+                                        "# 🔗 Referencia a nodo: '{}' (ch('{}'))\n# 💡 Conecta este nodo al nodo '{}' para heredar su código",
+                                        node_name, node_name, node_name
+                                    )
+                                };
+                                
+                                resolved_code.replace_range(start..expr_end, &replacement);
+                                i = start + replacement.len();
+                                continue;
+                            }
+                        }
+                    }
+                }
+                i = start + 3;
+            } else {
+                break;
+            }
+        }
+        
+        resolved_code
+    }
+
+    /// Ejecutar Python con contexto completo (ChannelManager + herencia)
+    pub fn run_python_with_context(
+        code: &str,
+        work_dir: &Path,
+        output: &mut String,
+        channel_manager: Option<&crate::expressions::channels::ChannelManager>,
+        inherited_code: Option<&str>,
+        current_node_id: Option<crate::core::node_graph::NodeId>,
+    ) {
+        // Resolver código completo (herencia + ch())
+        let mut resolved = String::new();
+        
+        // 1. Agregar código heredado al inicio si existe
+        if let Some(inherited) = inherited_code {
+            resolved.push_str("# ════════════════════════════════════════════════════════════\n");
+            resolved.push_str("# 🔗 CÓDIGO HEREDADO (del nodo padre)\n");
+            resolved.push_str("# ════════════════════════════════════════════════════════════\n");
+            resolved.push_str(inherited);
+            resolved.push_str("\n\n");
+        }
+        
+        // 2. Resolver expresiones ch() en el código actual con contexto
+        let code_with_ch_resolved = Self::resolve_python_ch_with_context(
+            code,
+            channel_manager,
+            current_node_id,
+        );
+        
+        // 3. Agregar el código actual
+        resolved.push_str("# ════════════════════════════════════════════════════════════\n");
+        resolved.push_str("# 📝 CÓDIGO ACTUAL (este nodo)\n");
+        resolved.push_str("# ════════════════════════════════════════════════════════════\n");
+        resolved.push_str(&code_with_ch_resolved);
+        
+        // Ejecutar el código resuelto
+        Self::run_python(&resolved, work_dir, output);
+    }
+
+    fn run_python(code: &str, work_dir: &Path, output: &mut String) {
+        
+        let temp_file = work_dir.join("temp.py");
+        if let Err(e) = std::fs::write(&temp_file, code) {
+            output.push_str(&format!("❌ Error guardando archivo: {}\n", e));
+            return;
+        }
+        
+        // Buscar Python: intentar python3 primero (Linux/Mac), luego python (Windows)
+        let python_cmd = Self::find_compiler_cmd("python3", output)
+            .or_else(|| Self::find_compiler_cmd("python", output));
+        
+        if python_cmd.is_none() {
+            output.push_str("╔═══════════════════════════════════════════════════════════════╗\n");
+            output.push_str("║                    ❌ ERROR: PYTHON NO ENCONTRADO              ║\n");
+            output.push_str("╚═══════════════════════════════════════════════════════════════╝\n\n");
+            output.push_str("Python 3.12 no está instalado o no está en PATH.\n\n");
+            output.push_str("💡 Instalación:\n");
+            #[cfg(target_os = "windows")]
+            {
+                output.push_str("   1. Descarga desde: https://www.python.org/downloads/\n");
+                output.push_str("   2. Durante la instalación, marca 'Add python.exe to PATH'\n");
+                output.push_str("   3. O con chocolatey: choco install python312\n");
+            }
+            #[cfg(target_os = "linux")]
+            {
+                output.push_str("   sudo apt update && sudo apt install python3.12\n");
+                output.push_str("   O desde: https://www.python.org/downloads/\n");
+            }
+            #[cfg(target_os = "macos")]
+            {
+                output.push_str("   brew install python@3.12\n");
+                output.push_str("   O desde: https://www.python.org/downloads/\n");
+            }
+            return;
+        }
+        
+        let python_path = python_cmd.unwrap();
+        output.push_str(&format!(">>> Usando Python: {}\n", python_path));
+        
+        // Verificar versión de Python
+        if let Ok(version_out) = Command::new(&python_path).arg("--version").output() {
+            let version_str = String::from_utf8_lossy(&version_out.stdout);
+            output.push_str(&format!(">>> Versión: {}\n\n", version_str.trim()));
+        }
+        
+        // Separador visual antes de ejecución
+        output.push_str("\n");
+        output.push_str("╔═══════════════════════════════════════════════════════════════╗\n");
+        output.push_str("║                    ▶️  EJECUTANDO PROGRAMA                    ║\n");
+        output.push_str("╚═══════════════════════════════════════════════════════════════╝\n\n");
+        
+        output.push_str(&format!("📝 Archivo: {}\n", temp_file.file_name().unwrap().to_str().unwrap()));
+        output.push_str("⏳ Ejecutando...\n\n");
+        
+        // Medir tiempo de ejecución
+        let start_time = std::time::Instant::now();
+        
+        // Ejecutar Python con -u (unbuffered) para salida inmediata
+        let mut cmd = Command::new(&python_path);
+        cmd.current_dir(work_dir);
+        cmd.arg("-u"); // Unbuffered output
+        cmd.arg(temp_file.file_name().unwrap().to_str().unwrap());
+        
+        // Configurar variables de entorno para UTF-8
+        #[cfg(target_os = "windows")]
+        {
+            cmd.env("PYTHONIOENCODING", "utf-8");
+            cmd.env("PYTHONUTF8", "1");
+        }
+        
+        match cmd.output() {
+            Ok(run_out) => {
+                let elapsed = start_time.elapsed();
+                
+                // Decodificar correctamente como UTF-8
+                let stdout_str = String::from_utf8_lossy(&run_out.stdout);
+                let stderr_str = String::from_utf8_lossy(&run_out.stderr);
+                
+                // Sección de resultados mejorada
+                output.push_str("\n");
+                output.push_str("╔═══════════════════════════════════════════════════════════════╗\n");
+                output.push_str("║                  📊 RESULTADOS DEL PROGRAMA                    ║\n");
+                output.push_str("╚═══════════════════════════════════════════════════════════════╝\n\n");
+                
+                if !stdout_str.is_empty() {
+                    output.push_str("📤 SALIDA ESTÁNDAR (Resultado del programa):\n");
+                    output.push_str("═══════════════════════════════════════════════════════════════\n");
+                    output.push_str("\n");
+                    // Mostrar cada línea de salida de forma destacada
+                    let lines: Vec<&str> = stdout_str.lines().collect();
+                    for line in lines.iter() {
+                        if line.trim().is_empty() {
+                            output.push_str("\n");
+                        } else {
+                            output.push_str(&format!("  {}\n", line));
+                        }
+                    }
+                    // Si hay una línea sin salto al final
+                    if !stdout_str.ends_with('\n') && !stdout_str.is_empty() && lines.is_empty() {
+                        output.push_str(&format!("  {}\n", stdout_str));
+                    }
+                    output.push_str("\n");
+                    output.push_str("═══════════════════════════════════════════════════════════════\n");
+                    output.push_str("\n");
+                }
+                
+                if !stderr_str.is_empty() {
+                    output.push_str("⚠️  ERRORES/ADVERTENCIAS:\n");
+                    output.push_str("─────────────────────────────────────────────────────────────\n");
+                    output.push_str("\n");
+                    for line in stderr_str.lines() {
+                        output.push_str(&format!("  {}\n", line));
+                    }
+                    if !stderr_str.ends_with('\n') && !stderr_str.is_empty() {
+                        let last_line = stderr_str.lines().last().unwrap_or("");
+                        if !last_line.is_empty() {
+                            output.push_str(&format!("  {}\n", last_line));
+                        }
+                    }
+                    output.push_str("\n");
+                    output.push_str("─────────────────────────────────────────────────────────────\n");
+                    output.push_str("\n");
+                }
+                
+                // Estado final
+                output.push_str("╔═══════════════════════════════════════════════════════════════╗\n");
+                if let Some(exit_code) = run_out.status.code() {
+                    if exit_code == 0 {
+                        output.push_str("║  ✅ Estado: Ejecución exitosa                              ║\n");
+                    } else {
+                        output.push_str(&format!("║  ❌ Estado: Error (código de salida: {})                  ║\n", exit_code));
+                    }
+                } else {
+                    output.push_str("║  ⚠️  Estado: Terminado por señal del sistema              ║\n");
+                }
+                output.push_str(&format!("║  ⏱️  Tiempo de ejecución: {:.2} ms                        ║\n", elapsed.as_millis()));
+                output.push_str("╚═══════════════════════════════════════════════════════════════╝\n");
+            }
+            Err(e) => {
+                output.push_str("╔═══════════════════════════════════════════════════════════════╗\n");
+                output.push_str("║                    ❌ ERROR DE EJECUCIÓN                      ║\n");
+                output.push_str("╚═══════════════════════════════════════════════════════════════╝\n\n");
+                output.push_str(&format!("Detalle: {}\n\n", e));
+                output.push_str("💡 Sugerencias:\n");
+                output.push_str("   1. Verifica que Python 3.12 esté instalado correctamente\n");
+                output.push_str("   2. Asegúrate de que 'python3' o 'python' esté en tu PATH\n");
+                output.push_str("   3. Verifica que el archivo Python tenga sintaxis correcta\n");
+            }
+        }
+        
+        // Limpiar archivo temporal (opcional, puede dejarse para debugging)
+        // let _ = std::fs::remove_file(&temp_file);
     }
 
     fn compile_mojo(code: &str, work_dir: &Path, exe_file: &str, output: &mut String) {

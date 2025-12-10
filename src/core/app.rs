@@ -52,6 +52,19 @@ pub struct NodeGraphApp {
     // Parámetros del HDA que se está importando (nombre -> valor)
     pub hda_import_parameter_values: std::collections::HashMap<String, String>,
     pub hda_import_selected_asset: Option<(std::path::PathBuf, crate::storage::HDAInfo)>,
+    // ═══════════════════════════════════════════════════════════════════
+    // 🆕 MENÚ CONTEXTUAL DEL EXPLORADOR (Eliminar, Renombrar, etc.)
+    // ═══════════════════════════════════════════════════════════════════
+    pub explorer_context_menu: Option<ExplorerContextMenuState>,
+    // ═══════════════════════════════════════════════════════════════════
+    // 🆕 BÚSQUEDA EN SIDEBAR
+    // ═══════════════════════════════════════════════════════════════════
+    pub sidebar_search_query: String,
+    pub sidebar_search_visible: bool,
+    // ═══════════════════════════════════════════════════════════════════
+    // 🆕 NODO CARPETA (Idea 11)
+    // ═══════════════════════════════════════════════════════════════════
+    pub folder_node_mode: crate::core::folder_node::FolderNodeMode,
 }
 
 /// Representa un nivel de red en la jerarquía de subnetworks
@@ -72,6 +85,22 @@ pub struct MigrationDialogState {
     pub backup_path: Option<std::path::PathBuf>,
     pub result: Option<MigrationResult>,
     pub error: Option<String>,
+}
+
+/// Estado del menú contextual del explorador de archivos
+#[derive(Debug, Clone)]
+pub struct ExplorerContextMenuState {
+    pub show: bool,
+    pub position: Pos2,
+    pub file_name: String,
+    pub is_directory: bool,
+    pub rename_mode: bool,
+    pub rename_text: String,
+    pub delete_confirm: bool,
+    // Flags para acciones que se ejecutarán después de cerrar el menú
+    pub pending_rename: Option<(String, String)>, // (old_name, new_name)
+    pub pending_delete: Option<String>, // file_name
+    pub pending_goto_node: Option<NodeId>,
 }
 
 #[derive(Default)]
@@ -193,6 +222,10 @@ impl NodeGraphApp {
             hda_export_parameters: Vec::new(),
             hda_import_parameter_values: std::collections::HashMap::new(),
             hda_import_selected_asset: None,
+            explorer_context_menu: None,
+            sidebar_search_query: String::new(),
+            sidebar_search_visible: false,
+            folder_node_mode: crate::core::folder_node::FolderNodeMode::Organization,
         };
         
         // Load workspace if configured
@@ -258,26 +291,29 @@ impl NodeGraphApp {
     fn render_terminal_line(ui: &mut egui::Ui, line: &str, font_id: &egui::FontId) {
         use egui::RichText;
         
-        // Colores para diferentes tipos de mensajes
+        // Colores mejorados para mejor contraste y visibilidad
         let color_success = Color32::from_rgb(86, 200, 86);      // Verde para éxito
         let color_error = Color32::from_rgb(244, 135, 113);      // Rojo para errores
-        let color_warning = Color32::from_rgb(204, 204, 0);      // Amarillo para advertencias
-        let color_info = Color32::from_rgb(100, 150, 255);       // Azul para información
-        let color_command = Color32::from_rgb(78, 148, 206);     // Cyan para comandos
+        let color_warning = Color32::from_rgb(255, 200, 50);     // Amarillo más brillante para advertencias
+        let color_info = Color32::from_rgb(100, 180, 255);       // Azul más brillante para información
+        let color_command = Color32::from_rgb(100, 200, 255);    // Cyan más brillante para comandos
         let color_path = Color32::from_rgb(200, 150, 255);       // Púrpura para rutas
-        let color_default = Color32::from_rgb(212, 212, 212);    // Blanco/gris por defecto
-        let color_separator = Color32::from_rgb(100, 100, 120);  // Gris para separadores
+        let color_output = Color32::from_rgb(220, 240, 255);     // Cyan muy claro para salida del programa
+        let color_default = Color32::from_rgb(230, 230, 235);    // Blanco/gris más claro por defecto
+        let color_separator = Color32::from_rgb(120, 120, 140);  // Gris más claro para separadores
+        let color_result = Color32::from_rgb(255, 255, 255);     // Blanco brillante para resultados del programa
         
         let trimmed = line.trim();
         
         // Detectar tipo de línea y aplicar colores
         if trimmed.is_empty() {
-            ui.add_space(2.0);
+            ui.add_space(3.0);
             return;
         }
         
-        // Líneas con separadores (═══, ───, ===)
-        if trimmed.starts_with("═══") || trimmed.starts_with("───") || trimmed.starts_with("===") {
+        // Líneas con separadores (═══, ───, ===, ╔═══, ╚═══)
+        if trimmed.starts_with("═══") || trimmed.starts_with("───") || trimmed.starts_with("===") ||
+           trimmed.starts_with("╔═══") || trimmed.starts_with("╚═══") || trimmed.starts_with("║") {
             ui.label(
                 RichText::new(line)
                     .font(font_id.clone())
@@ -286,16 +322,86 @@ impl NodeGraphApp {
             return;
         }
         
-        // Mensajes de éxito (✅, exitosa, exitosamente, Success)
+        // Sección de resultados del programa - destacar especialmente
+        if trimmed.contains("RESULTADOS DEL PROGRAMA") || trimmed.contains("📊") {
+            ui.label(
+                RichText::new(line)
+                    .font(font_id.clone())
+                    .color(color_result)
+                    .strong()
+            );
+            return;
+        }
+        
+        // Salida estándar del programa - hacer muy visible
+        // Detectar si es salida del programa (líneas que no son comandos, errores, o información del sistema)
+        let is_program_output = trimmed.len() > 0 && 
+           !trimmed.starts_with(">>>") && 
+           !trimmed.starts_with("Error") && 
+           !trimmed.starts_with("Warning") && 
+           !trimmed.starts_with("⚠️") &&
+           !trimmed.contains("Compilación") && 
+           !trimmed.contains("Ejecutando") &&
+           !trimmed.contains("═══") && 
+           !trimmed.contains("╔═══") && 
+           !trimmed.contains("╚═══") &&
+           !trimmed.starts_with("📝") && 
+           !trimmed.starts_with("📁") && 
+           !trimmed.starts_with("📦") && 
+           !trimmed.starts_with("📏") &&
+           !trimmed.starts_with("⏳") &&
+           !trimmed.starts_with("⏱️") && 
+           !trimmed.starts_with("✅") && 
+           !trimmed.starts_with("❌") && 
+           !trimmed.starts_with("🔍") &&
+           !trimmed.starts_with("💡") && 
+           !trimmed.starts_with("📤") &&
+           !trimmed.contains("Estado:") &&
+           !trimmed.contains("SALIDA ESTÁNDAR") &&
+           !trimmed.contains("RESULTADOS DEL PROGRAMA") &&
+           !trimmed.starts_with("Versión:") &&
+           !trimmed.starts_with("Clase principal:") &&
+           !line.contains(":\\") &&
+           !line.contains("/home/") &&
+           !line.contains("/usr/");
+        
+        if is_program_output {
+            // Es salida del programa - destacarla mucho más
+            ui.label(
+                RichText::new(line)
+                    .font(font_id.clone())
+                    .color(color_result) // Blanco brillante para máxima visibilidad
+                    .size(15.5) // Tamaño más grande para resultados
+                    .strong() // Texto en negrita para destacar
+            );
+            return;
+        }
+        
+        // Título de sección "SALIDA ESTÁNDAR"
+        if trimmed.starts_with("📤") || trimmed.starts_with("SALIDA ESTÁNDAR") || 
+           trimmed.starts_with("Salida estándar") {
+            ui.label(
+                RichText::new(line)
+                    .font(font_id.clone())
+                    .color(color_info)
+                    .size(15.0)
+                    .strong()
+            );
+            return;
+        }
+        
+        // Mensajes de éxito (✅, exitosa, exitosamente, Success, COMPLETADO)
         if trimmed.contains("✅") || 
            trimmed.contains("exitosa") || 
            trimmed.contains("exitosamente") || 
            trimmed.contains("Success") ||
-           trimmed.contains("COMPLETADO") {
+           trimmed.contains("COMPLETADO") ||
+           trimmed.contains("ejecución exitosa") {
             ui.label(
                 RichText::new(line)
                     .font(font_id.clone())
                     .color(color_success)
+                    .strong()
             );
             return;
         }
@@ -307,11 +413,13 @@ impl NodeGraphApp {
            trimmed.contains("Falló") ||
            trimmed.contains("Failed") ||
            trimmed.contains("error:") ||
-           trimmed.contains("ERROR") {
+           trimmed.contains("ERROR") ||
+           trimmed.contains("SEGMENTATION FAULT") {
             ui.label(
                 RichText::new(line)
                     .font(font_id.clone())
                     .color(color_error)
+                    .strong()
             );
             return;
         }
@@ -320,7 +428,8 @@ impl NodeGraphApp {
         if trimmed.contains("⚠️") || 
            trimmed.contains("Warning") || 
            trimmed.contains("Advertencia") ||
-           trimmed.contains("ADVERTENCIA") {
+           trimmed.contains("ADVERTENCIA") ||
+           trimmed.contains("ERRORES/ADVERTENCIAS") {
             ui.label(
                 RichText::new(line)
                     .font(font_id.clone())
@@ -329,7 +438,7 @@ impl NodeGraphApp {
             return;
         }
         
-        // Comandos (>>>) - azul para el comando
+        // Comandos y acciones (>>>) - azul para el comando
         if trimmed.starts_with(">>>") {
             ui.label(
                 RichText::new(line)
@@ -340,10 +449,11 @@ impl NodeGraphApp {
             return;
         }
         
-        // Líneas con rutas (púrpura)
+        // Líneas con rutas y archivos (púrpura)
         if line.contains(":\\") || line.contains("/home/") || line.contains("/usr/") || 
            line.contains(".exe") || line.contains(".dll") || line.contains(".java") || 
-           line.contains(".class") || line.contains("javac") {
+           line.contains(".class") || line.contains("javac") || line.contains(".c") ||
+           line.contains(".cpp") || line.contains(".rs") || line.contains(".zig") {
             ui.label(
                 RichText::new(line)
                     .font(font_id.clone())
@@ -352,9 +462,13 @@ impl NodeGraphApp {
             return;
         }
         
-        // Información (Iniciando, Compilación, Ejecutando)
-        if trimmed.starts_with("Iniciando") || trimmed.starts_with("Compilación") || 
-           trimmed.starts_with("Ejecutando") || trimmed.starts_with("Usando") {
+        // Información del proceso (Iniciando, Compilación, Ejecutando, Usando, Estado)
+        if trimmed.starts_with("📝") || trimmed.starts_with("📁") || trimmed.starts_with("📦") ||
+           trimmed.starts_with("📏") || trimmed.starts_with("🔍") || trimmed.starts_with("⏳") ||
+           trimmed.starts_with("Iniciando") || trimmed.starts_with("Compilación") || 
+           trimmed.starts_with("Ejecutando") || trimmed.starts_with("Usando") ||
+           trimmed.starts_with("Estado:") || trimmed.starts_with("⏱️") ||
+           trimmed.starts_with("Versión:") || trimmed.starts_with("Clase principal:") {
             ui.label(
                 RichText::new(line)
                     .font(font_id.clone())
@@ -363,7 +477,7 @@ impl NodeGraphApp {
             return;
         }
         
-        // Renderizar línea normal
+        // Renderizar línea normal con mejor contraste
         ui.label(
             RichText::new(line)
                 .font(font_id.clone())
@@ -371,6 +485,221 @@ impl NodeGraphApp {
         );
     }
     
+    /// Obtener colores del editor según el lenguaje (especialmente para Java)
+    fn get_editor_colors_for_language(language: NodeLanguage) -> (Color32, Color32) {
+        match language {
+            NodeLanguage::Java => {
+                // Colores inspirados en Java: fondo oscuro con acentos naranjas
+                let bg_color = Color32::from_rgb(30, 30, 35); // Fondo ligeramente más claro que negro
+                let text_color = Color32::from_rgb(240, 240, 240); // Texto casi blanco para mejor contraste
+                (bg_color, text_color)
+            },
+            _ => {
+                // Colores por defecto (tema oscuro)
+                let bg_color = Color32::from_rgb(0, 0, 0);
+                let text_color = Color32::from_rgb(212, 212, 212);
+                (bg_color, text_color)
+            }
+        }
+    }
+    
+    /// Renderizar una línea de código Java con resaltado de sintaxis (simplificado)
+    fn render_java_syntax_line(ui: &mut egui::Ui, line: &str, font_id: &egui::FontId) {
+        use egui::RichText;
+        
+        // Colores para sintaxis Java
+        let color_keyword = Color32::from_rgb(197, 134, 192);      // Púrpura para palabras clave
+        let color_string = Color32::from_rgb(152, 195, 121);       // Verde para strings
+        let color_comment = Color32::from_rgb(106, 153, 85);       // Verde oscuro para comentarios
+        let color_java_orange = Color32::from_rgb(237, 139, 0);    // Naranja Java para System
+        let color_default = Color32::from_rgb(212, 212, 212);      // Blanco por defecto
+        
+        let trimmed = line.trim_start();
+        
+        // Comentarios (// o /*)
+        if trimmed.starts_with("//") {
+            ui.label(
+                RichText::new(line)
+                    .font(font_id.clone())
+                    .color(color_comment)
+            );
+            return;
+        }
+        
+        // Líneas con System (naranja Java)
+        if line.contains("System") {
+            ui.label(
+                RichText::new(line)
+                    .font(font_id.clone())
+                    .color(color_java_orange)
+            );
+            return;
+        }
+        
+        // Líneas con strings (verde)
+        if line.contains('"') {
+            ui.label(
+                RichText::new(line)
+                    .font(font_id.clone())
+                    .color(color_string)
+            );
+            return;
+        }
+        
+        // Palabras clave de Java (púrpura)
+        let java_keywords = ["public", "private", "class", "static", "void", "main", 
+                            "String", "int", "return", "if", "else", "for", "while"];
+        for keyword in &java_keywords {
+            if trimmed.starts_with(keyword) || line.contains(&format!(" {} ", keyword)) {
+                ui.label(
+                    RichText::new(line)
+                        .font(font_id.clone())
+                        .color(color_keyword)
+                );
+                return;
+            }
+        }
+        
+        // Línea normal
+        ui.label(
+            RichText::new(line)
+                .font(font_id.clone())
+                .color(color_default)
+        );
+    }
+}
+
+impl NodeGraphApp {
+    // ═══════════════════════════════════════════════════════════════════
+    // 🆕 FUNCIONES DEL EXPLORADOR (Eliminar, Renombrar, Sincronizar)
+    // ═══════════════════════════════════════════════════════════════════
+    
+    /// Eliminar un archivo del proyecto y su nodo asociado (si existe)
+    pub fn delete_file_from_explorer(&mut self, file_name: &str) -> Result<(), String> {
+        let root = self.workspace.root_path.as_ref()
+            .ok_or_else(|| "No workspace root set".to_string())?;
+        
+        let file_path = root.join(file_name);
+        
+        // Si es un archivo de nodo (nodes/node_XXXXXX.ext), encontrar y eliminar el nodo asociado
+        if file_name.starts_with("nodes/") {
+            // Extraer el ID del nodo del nombre del archivo
+            if let Some(id_str) = file_name.strip_prefix("nodes/node_") {
+                if let Some(id_str) = id_str.split('.').next() {
+                    if let Ok(node_id) = id_str.parse::<u64>() {
+                        let node_id = NodeId(node_id);
+                        // Eliminar el nodo del grafo
+                        self.graph.remove_node(node_id);
+                        // Eliminar de selección si estaba seleccionado
+                        self.interaction.selected_nodes.remove(&node_id);
+                        // Actualizar canales (el canal se eliminará automáticamente al no existir el nodo)
+                    }
+                }
+            }
+        }
+        
+        // Eliminar el archivo del sistema de archivos
+        if file_path.exists() {
+            if file_path.is_file() {
+                std::fs::remove_file(&file_path)
+                    .map_err(|e| format!("Failed to delete file: {}", e))?;
+            } else if file_path.is_dir() {
+                std::fs::remove_dir_all(&file_path)
+                    .map_err(|e| format!("Failed to delete directory: {}", e))?;
+            }
+        }
+        
+        // Guardar cambios
+        self.check_and_auto_save();
+        
+        Ok(())
+    }
+    
+    /// Renombrar un archivo y actualizar referencias en nodos
+    pub fn rename_file_in_explorer(&mut self, old_name: &str, new_name: &str) -> Result<(), String> {
+        let root = self.workspace.root_path.as_ref()
+            .ok_or_else(|| "No workspace root set".to_string())?;
+        
+        let old_path = root.join(old_name);
+        let new_path = root.join(new_name);
+        
+        if !old_path.exists() {
+            return Err("File does not exist".to_string());
+        }
+        
+        // Si es un archivo de nodo, actualizar la referencia en el nodo
+        if old_name.starts_with("nodes/") && new_name.starts_with("nodes/") {
+            // Extraer el ID del nodo del nombre antiguo
+            if let Some(id_str) = old_name.strip_prefix("nodes/node_") {
+                if let Some(id_str) = id_str.split('.').next() {
+                    if let Ok(node_id) = id_str.parse::<u64>() {
+                        let node_id = NodeId(node_id);
+                        // Actualizar code_path en el nodo
+                        if let Some(node) = self.graph.node_mut(node_id) {
+                            node.code_path = Some(new_name.to_string());
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Renombrar el archivo
+        std::fs::rename(&old_path, &new_path)
+            .map_err(|e| format!("Failed to rename file: {}", e))?;
+        
+        // Guardar cambios
+        self.check_and_auto_save();
+        
+        Ok(())
+    }
+    
+    /// Sincronizar posiciones de nodos basándose en organización de archivos
+    /// Esto permite reorganizar nodos visualmente cuando se reorganizan archivos
+    pub fn sync_nodes_from_file_organization(&mut self) {
+        // Esta función puede ser extendida para organizar nodos basándose en
+        // la estructura de archivos o carpetas
+        // Por ahora, solo actualizamos las referencias de code_path
+        
+        let storage = crate::storage::NodeStorage::new(self.workspace.clone());
+        
+        for node in self.graph.nodes_mut() {
+            // Si el nodo tiene un code_path pero el archivo no existe, intentar encontrarlo
+            if let Some(ref code_path) = node.code_path {
+                if !storage.code_file_exists(code_path) {
+                    // Buscar archivo con el mismo ID de nodo
+                    let expected_path = storage.get_node_code_path_relative(node.id, node.language);
+                    if storage.code_file_exists(&expected_path) {
+                        node.code_path = Some(expected_path);
+                    }
+                }
+            } else if !node.code.is_empty() {
+                // Si no tiene code_path pero tiene código, crear el archivo
+                if let Ok(path) = storage.save_node_code(node.id, &node.code, node.language) {
+                    node.code_path = Some(path);
+                }
+            }
+        }
+    }
+    
+    /// Obtener el nodo asociado a un archivo (si existe)
+    pub fn get_node_for_file(&self, file_name: &str) -> Option<NodeId> {
+        if !file_name.starts_with("nodes/") {
+            return None;
+        }
+        
+        if let Some(id_str) = file_name.strip_prefix("nodes/node_") {
+            if let Some(id_str) = id_str.split('.').next() {
+                if let Ok(node_id) = id_str.parse::<u64>() {
+                    let node_id = NodeId(node_id);
+                    if self.graph.node(node_id).is_some() {
+                        return Some(node_id);
+                    }
+                }
+            }
+        }
+        
+        None
+    }
 }
 
 impl eframe::App for NodeGraphApp {
@@ -660,6 +989,7 @@ impl NodeGraphApp {
             NodeLanguage::Rust => crate::compilation::terminal::Language::Rust,
             NodeLanguage::Zig => crate::compilation::terminal::Language::Zig,
             NodeLanguage::Java => crate::compilation::terminal::Language::Java,
+            NodeLanguage::Python => crate::compilation::terminal::Language::Python,
             NodeLanguage::Text => crate::compilation::terminal::Language::C, // Text no se compila realmente
             NodeLanguage::Mojo => crate::compilation::terminal::Language::Mojo,
             NodeLanguage::MojoAI => crate::compilation::terminal::Language::Mojo, // MojoAI también usa Mojo
@@ -669,6 +999,8 @@ impl NodeGraphApp {
                     crate::compilation::terminal::Language::Nasm
                 } else if lower.contains("java") {
                     crate::compilation::terminal::Language::Java
+                } else if lower.contains("python") {
+                    crate::compilation::terminal::Language::Python
                 } else if lower.contains("zig") {
                     crate::compilation::terminal::Language::Zig
                 } else if lower.contains("cpp") || lower.contains("c++") {
@@ -845,6 +1177,7 @@ impl NodeGraphApp {
                     ui.selectable_value(&mut self.terminal.active_tab, TerminalTab::Rust, "Terminal Rust");
                     ui.selectable_value(&mut self.terminal.active_tab, TerminalTab::Zig, "Terminal Zig");
                     ui.selectable_value(&mut self.terminal.active_tab, TerminalTab::Java, "Terminal Java");
+                    ui.selectable_value(&mut self.terminal.active_tab, TerminalTab::Python, "Terminal Python");
                     
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         // Pin button
@@ -864,34 +1197,50 @@ impl NodeGraphApp {
                 });
                 ui.separator();
 
-                egui::ScrollArea::vertical()
-                    .auto_shrink([false, false])
+                // Panel con fondo oscuro mejorado para el terminal
+                egui::Frame::none()
+                    .fill(Color32::from_rgb(12, 12, 16)) // Fondo más oscuro para mejor contraste
+                    .inner_margin(egui::Margin::same(16.0)) // Más margen interno
+                    .stroke(egui::Stroke::new(1.0, Color32::from_rgb(40, 40, 50))) // Borde sutil
                     .show(ui, |ui| {
-                        let text = match self.terminal.active_tab {
-                            TerminalTab::Nasm => &self.terminal.asm_output,
-                            TerminalTab::C => &self.terminal.c_output,
-                            TerminalTab::Cpp => &self.terminal.cpp_output,
-                            TerminalTab::Rust => &self.terminal.rust_output,
-                            TerminalTab::Zig => &self.terminal.zig_output,
-                            TerminalTab::Java => &self.terminal.java_output,
-                            TerminalTab::Mojo => &self.terminal.rust_output, // Mojo usa el buffer de Rust por ahora
-                        };
-                        
-                        // Crear fuente monoespaciada más grande y legible
-                        let font_id = egui::FontId {
-                            size: 14.5,
-                            family: egui::FontFamily::Monospace,
-                        };
-                        
-                        // Configurar espaciado mejorado
-                        ui.style_mut().spacing.item_spacing.y = 2.0;
-                        
-                        // Renderizar texto con colores según el contenido
-                        ui.vertical(|ui| {
-                            for line in text.lines() {
-                                Self::render_terminal_line(ui, line, &font_id);
-                            }
-                        });
+                        egui::ScrollArea::vertical()
+                            .auto_shrink([false, false])
+                            .show(ui, |ui| {
+                                let text = match self.terminal.active_tab {
+                                    TerminalTab::Nasm => &self.terminal.asm_output,
+                                    TerminalTab::C => &self.terminal.c_output,
+                                    TerminalTab::Cpp => &self.terminal.cpp_output,
+                                    TerminalTab::Rust => &self.terminal.rust_output,
+                                    TerminalTab::Zig => &self.terminal.zig_output,
+                                    TerminalTab::Java => &self.terminal.java_output,
+                                    TerminalTab::Python => &self.terminal.python_output,
+                                    TerminalTab::Mojo => &self.terminal.rust_output, // Mojo usa el buffer de Rust por ahora
+                                };
+                                
+                                // Crear fuente monoespaciada más grande y legible
+                                let font_id = egui::FontId {
+                                    size: 14.5,
+                                    family: egui::FontFamily::Monospace,
+                                };
+                                
+                                // Configurar espaciado mejorado
+                                ui.style_mut().spacing.item_spacing.y = 4.0; // Aún más espacio entre líneas para mejor legibilidad
+                                
+                                // Renderizar texto con colores según el contenido
+                                ui.vertical(|ui| {
+                                    for line in text.lines() {
+                                        Self::render_terminal_line(ui, line, &font_id);
+                                    }
+                                    
+                                    // Si el texto no termina en salto de línea, renderizar la última línea
+                                    if !text.ends_with('\n') && !text.is_empty() {
+                                        let last_line = text.lines().last().unwrap_or("");
+                                        if !last_line.is_empty() {
+                                            Self::render_terminal_line(ui, last_line, &font_id);
+                                        }
+                                    }
+                                });
+                            });
                     });
             });
     }
@@ -935,7 +1284,7 @@ impl NodeGraphApp {
                                             ui.label(egui::RichText::new("➕").size(18.0).color(Color32::from_rgb(100, 200, 255)));
                                             ui.label(egui::RichText::new("Add").strong().size(14.0));
                                             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                                ui.label(egui::RichText::new("Shift+A").small().color(Color32::from_rgb(150, 180, 200)));
+                                                ui.label(egui::RichText::new("Tab").small().color(Color32::from_rgb(150, 180, 200)));
                                             });
                                         });
                                     });
@@ -972,6 +1321,74 @@ impl NodeGraphApp {
                                     self.selected_category = Some("new".to_string());
                                 }
                                 
+                                ui.add_space(4.0);
+                                
+                                // 🆕 NODO CARPETA (Idea 11)
+                                let folder_selected = self.selected_category.as_deref() == Some("folder");
+                                
+                                // Crear área interactiva primero
+                                let (rect, response) = ui.allocate_exact_size(
+                                    egui::vec2(ui.available_width(), 38.0),
+                                    egui::Sense::click()
+                                );
+                                
+                                let is_hovered = response.hovered();
+                                
+                                // Determinar colores según estado
+                                let folder_bg = if folder_selected {
+                                    Color32::from_rgba_unmultiplied(100, 150, 255, 150)
+                                } else if is_hovered {
+                                    Color32::from_rgba_unmultiplied(100, 150, 255, 70)
+                                } else {
+                                    Color32::from_rgba_unmultiplied(40, 45, 55, 100)
+                                };
+                                let folder_border = if folder_selected {
+                                    Color32::from_rgb(150, 200, 255)
+                                } else if is_hovered {
+                                    Color32::from_rgba_unmultiplied(100, 150, 255, 200)
+                                } else {
+                                    Color32::from_rgb(80, 90, 100)
+                                };
+                                
+                                // Dibujar fondo
+                                ui.painter().rect_filled(
+                                    rect,
+                                    5.0,
+                                    folder_bg
+                                );
+                                ui.painter().rect_stroke(
+                                    rect,
+                                    5.0,
+                                    egui::Stroke::new(if folder_selected { 2.0 } else { 1.0 }, folder_border)
+                                );
+                                
+                                // Dibujar contenido
+                                let icon_pos = rect.left_top() + egui::vec2(12.0, 11.0);
+                                ui.painter().text(
+                                    icon_pos,
+                                    egui::Align2::LEFT_CENTER,
+                                    "📁",
+                                    egui::FontId::proportional(16.0),
+                                    Color32::from_rgb(100, 200, 255)
+                                );
+                                
+                                let text_pos = rect.left_top() + egui::vec2(40.0, 19.0);
+                                ui.painter().text(
+                                    text_pos,
+                                    egui::Align2::LEFT_CENTER,
+                                    "Nodo Carpeta",
+                                    egui::FontId::proportional(13.0),
+                                    if folder_selected {
+                                        Color32::WHITE
+                                    } else {
+                                        Color32::from_rgb(220, 220, 230)
+                                    }
+                                );
+                                
+                                if response.clicked() {
+                                    self.selected_category = Some("folder".to_string());
+                                }
+                                
                                 ui.add_space(6.0);
                                 
                                 // Separador visual mejorado
@@ -992,8 +1409,8 @@ impl NodeGraphApp {
                                 }
                                 
                                 // Categorías de templates con mejor diseño
-                                let categories = ["Assembler (Windows)", "Assembler (Linux)", "C", "C++", "Rust", "Zig", "Java", "FastOS ASM+Rust+Zig", "Vulkan", "DirectX12"];
-                                let category_icons = ["🔧", "🐧", "📘", "📗", "🦀", "⚡", "☕", "🚀", "🎮", "💎"];
+                                let categories = ["Assembler (Windows)", "Assembler (Linux)", "C", "C++", "Rust", "Zig", "Java", "Python", "FastOS ASM+Rust+Zig", "Vulkan", "DirectX12"];
+                                let category_icons = ["🔧", "🐧", "📘", "📗", "🦀", "⚡", "☕", "🐍", "🚀", "🎮", "💎"];
                                 let category_colors = [
                                     Color32::from_rgb(0xff, 0x47, 0x00), // Naranja para Windows
                                     Color32::from_rgb(0x00, 0xaa, 0xff), // Cyan para Linux
@@ -1002,6 +1419,7 @@ impl NodeGraphApp {
                                     Color32::from_rgb(0xde, 0x39, 0x00),
                                     Color32::from_rgb(0xf0, 0xaa, 0x00), // Amarillo/naranja para Zig
                                     Color32::from_rgb(0xed, 0x8b, 0x00), // Naranja Java (Java orange)
+                                    Color32::from_rgb(0x37, 0x76, 0xAB), // Azul Python (Python blue oficial)
                                     Color32::from_rgb(0xFF, 0x44, 0x00), // Naranja/Rojo para FastOS ASM+Rust+Zig
                                     Color32::from_rgb(0xac, 0x14, 0x2c), // Rojo Vulkan
                                     Color32::from_rgb(0x00, 0x7a, 0xcc), // Azul DirectX12
@@ -1147,6 +1565,101 @@ impl NodeGraphApp {
                                             
                                             close_menu = true;
                                         }
+                                    } else if cat == "folder" {
+                                        // 🆕 Panel para crear Nodo Carpeta
+                                        ui.heading(egui::RichText::new("📁 Nodo Carpeta").color(Color32::from_rgb(100, 200, 255)));
+                                        ui.add_space(4.0);
+                                        ui.label(egui::RichText::new("Contenedor de trabajo y unidad de herencia")
+                                            .small()
+                                            .color(Color32::from_rgb(150, 150, 170)));
+                                        ui.add_space(8.0);
+                                        
+                                        ui.horizontal(|ui| {
+                                            ui.label("Nombre:");
+                                            ui.text_edit_singleline(&mut self.new_node_title);
+                                        });
+                                        
+                                        ui.add_space(8.0);
+                                        
+                                        // Modo del nodo carpeta
+                                        ui.label(egui::RichText::new("Modo:").size(12.0).color(Color32::from_rgb(180, 190, 210)));
+                                        ui.radio_value(&mut self.folder_node_mode, crate::core::folder_node::FolderNodeMode::Organization, 
+                                            "📦 Solo Organización (guardar nodos)");
+                                        ui.radio_value(&mut self.folder_node_mode, crate::core::folder_node::FolderNodeMode::Inheritable, 
+                                            "🔗 Heredable (otros nodos pueden heredar)");
+                                        
+                                        ui.add_space(8.0);
+                                        
+                                        // Botón para crear nodo carpeta
+                                        let create_btn = egui::Button::new(egui::RichText::new("📁 Crear Nodo Carpeta")
+                                            .size(13.0)
+                                            .color(Color32::WHITE))
+                                            .fill(Color32::from_rgb(100, 150, 255))
+                                            .min_size(egui::vec2(ui.available_width(), 32.0));
+                                        
+                                        let btn_response = ui.add(create_btn);
+                                        
+                                        if btn_response.clicked() {
+                                            // Obtener título
+                                            let title = if self.new_node_title.trim().is_empty() {
+                                                // Contar nodos carpeta existentes
+                                                let folder_count = self.graph.nodes()
+                                                    .iter()
+                                                    .filter(|n| n.title.starts_with("📁 "))
+                                                    .count();
+                                                format!("Carpeta {}", folder_count + 1)
+                                            } else {
+                                                self.new_node_title.trim().to_string()
+                                            };
+                                            
+                                            // Calcular posición en el mundo
+                                            let world_pos = self.viewport.screen_to_world(
+                                                self.node_menu_pos, 
+                                                Rect::from_min_size(Pos2::ZERO, Vec2::new(10000.0, 10000.0))
+                                            );
+                                            
+                                            // Crear nodo carpeta usando la función del módulo folder_node
+                                            let folder_id = self.graph.create_folder_node(
+                                                title.clone(),
+                                                world_pos,
+                                                self.folder_node_mode,
+                                            );
+                                            
+                                            // Registrar en canales
+                                            if let Some(node) = self.graph.node(folder_id) {
+                                                let title_clone = node.title.clone();
+                                                use crate::expressions::ChannelValue;
+                                                self.channel_manager.set_channel(title_clone.clone(), ChannelValue::Code(String::new()));
+                                                self.channel_manager.set_node_channel(folder_id, "code".to_string(), ChannelValue::Code(String::new()));
+                                            }
+                                            
+                                            // Limpiar y cerrar
+                                            self.new_node_title.clear();
+                                            
+                                            if self.workspace.has_root() {
+                                                let _ = self.save_current_graph();
+                                            }
+                                            
+                                            close_menu = true;
+                                        }
+                                        
+                                        ui.add_space(12.0);
+                                        ui.separator();
+                                        ui.add_space(8.0);
+                                        
+                                        // Información sobre nodos carpeta
+                                        ui.label(egui::RichText::new("💡 Cómo usar:")
+                                            .size(11.0)
+                                            .color(Color32::from_rgb(150, 200, 255)));
+                                        ui.label(egui::RichText::new("• Doble clic en el nodo carpeta para abrir")
+                                            .small()
+                                            .color(Color32::from_rgb(180, 180, 200)));
+                                        ui.label(egui::RichText::new("• Crea nodos dentro de la carpeta")
+                                            .small()
+                                            .color(Color32::from_rgb(180, 180, 200)));
+                                        ui.label(egui::RichText::new("• Si es heredable, otros nodos pueden usar ch(\"nombre\")")
+                                            .small()
+                                            .color(Color32::from_rgb(180, 180, 200)));
                                     } else if cat == "FastOS ASM+Rust+Zig" {
                                         // Panel especial para FastOS ASM+Rust+Zig
                                         ui.heading(egui::RichText::new("🚀 FastOS ASM+Rust+Zig").color(Color32::from_rgb(0xFF, 0x44, 0x00)));
@@ -2995,13 +3508,62 @@ impl NodeGraphApp {
                                     ui.separator();
                                     
                                     // EDITOR DE CÓDIGO
-                        let text_output = egui::TextEdit::multiline(&mut own_code_editable)
-                            .font(egui::TextStyle::Monospace)
-                            .code_editor()
-                            .desired_width(f32::INFINITY)
-                            .desired_rows(own_lines_count.max(5))
-                            .show(ui);
-
+                        // Obtener el lenguaje efectivo para aplicar colores específicos
+                        let effective_language = if let Some(node) = self.graph.node(id) {
+                            self.resolve_effective_language(id, &inheritance_chain)
+                        } else {
+                            NodeLanguage::Auto
+                        };
+                        
+                        // TextEdit para edición con estilos personalizados para Java
+                        let text_output = if effective_language == NodeLanguage::Java {
+                            // Configurar estilo temporal para Java (texto más brillante)
+                            let old_text_color = ui.style().visuals.override_text_color;                                                                    
+                            ui.style_mut().visuals.override_text_color = Some(Color32::from_rgb(245, 245, 250));
+                            
+                            // Usar Frame para envolver el TextEdit - el Frame dibuja el fondo y borde ANTES del contenido
+                            let mut text_edit_output_option: Option<egui::text_edit::TextEditOutput> = None;
+                            
+                            egui::Frame::none()
+                                .fill(Color32::from_rgba_unmultiplied(25, 25, 30, 255))
+                                .stroke(egui::Stroke::new(2.5, Color32::from_rgb(237, 139, 0)))
+                                .rounding(egui::Rounding::same(6.0))
+                                .inner_margin(egui::Margin::same(4.0))
+                                .show(ui, |ui| {
+                                    // Crear TextEdit dentro del Frame y guardar el output
+                                    text_edit_output_option = Some(
+                                        egui::TextEdit::multiline(&mut own_code_editable)
+                                            .font(egui::TextStyle::Monospace)
+                                            .code_editor()
+                                            .desired_width(f32::INFINITY)
+                                            .desired_rows(own_lines_count.max(5))
+                                            .show(ui)
+                                    );
+                                });
+                            
+                            // Restaurar color
+                            ui.style_mut().visuals.override_text_color = old_text_color;
+                            
+                            // Extraer el TextEditOutput del Option
+                            text_edit_output_option.unwrap_or_else(|| {
+                                // Fallback: crear TextEdit sin Frame si algo falla
+                                egui::TextEdit::multiline(&mut own_code_editable)
+                                    .font(egui::TextStyle::Monospace)
+                                    .code_editor()
+                                    .desired_width(f32::INFINITY)
+                                    .desired_rows(own_lines_count.max(5))
+                                    .show(ui)
+                            })
+                        } else {
+                            // Editor normal para otros lenguajes
+                            egui::TextEdit::multiline(&mut own_code_editable)
+                                .font(egui::TextStyle::Monospace)
+                                .code_editor()
+                                .desired_width(f32::INFINITY)
+                                .desired_rows(own_lines_count.max(5))
+                                .show(ui)
+                        };
+                        
                         let mut code_changed = text_output.response.changed();
                         let mut convert_selection_request: Option<(usize, usize, String)> = None;
 
@@ -3262,6 +3824,7 @@ impl NodeGraphApp {
                                                                             NodeLanguage::Rust => ("Rust", "🦀", Color32::from_rgb(80, 40, 40)),
                                                                             NodeLanguage::Zig => ("Zig", "⚡", Color32::from_rgb(240, 170, 0)),
                                                                             NodeLanguage::Java => ("Java", "☕", Color32::from_rgb(237, 139, 0)),
+                                                                            NodeLanguage::Python => ("Python", "🐍", Color32::from_rgb(55, 118, 171)), // Python blue oficial
                                                                             NodeLanguage::Text => ("Doc", "📄", Color32::from_rgb(60, 60, 40)),
                                                                             NodeLanguage::Mojo => ("Mojo", "🔥", Color32::from_rgb(200, 50, 50)),
                                                                             NodeLanguage::MojoAI => ("MojoAI", "🤖", Color32::from_rgb(200, 100, 50)),
@@ -3274,6 +3837,7 @@ impl NodeGraphApp {
                                                                             NodeLanguage::Rust => Color32::from_rgb(255, 130, 100),
                                                                             NodeLanguage::Zig => Color32::from_rgb(240, 170, 0), // Amarillo/naranja para Zig
                                                                             NodeLanguage::Java => Color32::from_rgb(237, 139, 0), // Naranja Java
+                                                                            NodeLanguage::Python => Color32::from_rgb(55, 118, 171), // Azul Python oficial
                                                                             NodeLanguage::Text => Color32::from_rgb(200, 200, 150),
                                                                             NodeLanguage::Mojo => Color32::from_rgb(255, 100, 100), // Rojo para Mojo
                                                                             NodeLanguage::MojoAI => Color32::from_rgb(255, 150, 100), // Naranja para MojoAI
@@ -3887,6 +4451,8 @@ impl NodeGraphApp {
                  for id in nodes_to_move {
                      if let Some(node) = self.graph.node_mut(id) {
                          node.position += delta_world;
+                         // Sincronizar cambios de posición en tiempo real
+                         // (La sincronización bidireccional se maneja automáticamente al guardar)
                      }
                  }
                  // Sincronizar cambios de posición al nivel actual
