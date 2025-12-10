@@ -37,6 +37,21 @@ impl Workspace {
         self.save_graph_recursive(graph)
     }
     
+    /// Limpiar código embebido recursivamente de todos los nodos (para serialización)
+    fn clear_embedded_code_recursive(graph: &mut NodeGraph) {
+        for node in graph.nodes_mut() {
+            if node.code_path.is_some() {
+                // Limpiar código embebido para nodos con code_path (se carga desde archivo)
+                node.code = String::new();
+            }
+            
+            // Limpiar código de nodos dentro de subnetworks/carpetas recursivamente
+            if let Some(ref mut sub_graph) = node.subnetwork_graph {
+                Self::clear_embedded_code_recursive(sub_graph);
+            }
+        }
+    }
+
     /// Guardar grafo recursivamente (incluye subnetworks)
     fn save_graph_recursive(&self, graph: &mut NodeGraph) -> Result<(), String> {
         let storage = NodeStorage::new(self.clone());
@@ -44,23 +59,41 @@ impl Workspace {
         // Asegurar que el directorio nodes/ existe
         storage.ensure_nodes_directory()?;
 
-        // 1. Guardar código de cada nodo en archivos separados
+        // 1. Guardar código de cada nodo en archivos separados (recursivamente)
         for node in graph.nodes_mut() {
-            // Si ya tiene code_path, actualizar código en archivo
-            if let Some(code_path) = &node.code_path {
-                // Guardar código (siempre actualizar si hay cambios)
-                let _ = storage.save_node_code(node.id, &node.code, node.language)?;
-            } else if !node.code.is_empty() {
-                // Formato antiguo o nuevo nodo sin code_path: guardar código y asignar path
-                let code_path = storage.save_node_code(node.id, &node.code, node.language)?;
-                node.code_path = Some(code_path);
-            }
+            // ═══════════════════════════════════════════════════════════════════
+            // GUARDAR CÓDIGO DEL NODO ACTUAL (siempre, incluso si está vacío para asignar code_path)
+            // ═══════════════════════════════════════════════════════════════════
+            // Verificar si el code_path actual coincide con el ID del nodo
+            let expected_path = storage.get_node_code_path_relative(node.id, node.language);
+            let needs_path_update = node.code_path.as_ref()
+                .map(|path| path != &expected_path)
+                .unwrap_or(true);
             
             // ═══════════════════════════════════════════════════════════════════
-            // 🆕 GUARDAR SUBNETWORKS RECURSIVAMENTE
+            // IMPORTANTE: Siempre guardar el código ANTES de cualquier otra operación
+            // Esto asegura que los cambios se persistan incluso si el nodo está dentro de una carpeta
+            // ═══════════════════════════════════════════════════════════════════
+            
+            // Si el nodo tiene código, SIEMPRE guardarlo (incluso si code_path existe)
+            // Esto asegura que los cambios recientes se guarden
+            if !node.code.is_empty() {
+                // Guardar código y obtener/actualizar code_path
+                let code_path = storage.save_node_code(node.id, &node.code, node.language)?;
+                node.code_path = Some(code_path);
+            } else if node.code_path.is_none() {
+                // Si no hay código pero tampoco code_path, asignar code_path para consistencia
+                node.code_path = Some(expected_path);
+            }
+            // Si code_path existe pero el código está vacío, mantener el code_path
+            // (el código vacío se guardará como archivo vacío si es necesario)
+            
+            // ═══════════════════════════════════════════════════════════════════
+            // 🆕 GUARDAR SUBNETWORKS/CARPETAS RECURSIVAMENTE
             // ═══════════════════════════════════════════════════════════════════
             if let Some(ref mut sub_graph) = node.subnetwork_graph {
-                // Guardar el grafo interno recursivamente
+                // Guardar el grafo interno recursivamente (esto guarda código de nodos dentro de carpetas)
+                // IMPORTANTE: Esto guarda TODOS los nodos dentro de la carpeta, incluso los modificados
                 self.save_graph_recursive(sub_graph)?;
             }
         }
@@ -72,12 +105,9 @@ impl Workspace {
         
         // Crear una copia del grafo para serialización (sin código embebido si hay code_path)
         let mut graph_for_serialization = graph.clone();
-        for node in graph_for_serialization.nodes_mut() {
-            if node.code_path.is_some() {
-                // Limpiar código embebido para nodos con code_path (se carga desde archivo)
-                node.code = String::new();
-            }
-        }
+        
+        // Limpiar código embebido recursivamente (incluye nodos dentro de carpetas)
+        Self::clear_embedded_code_recursive(&mut graph_for_serialization);
         
         let json = serde_json::to_string_pretty(&graph_for_serialization)
             .map_err(|e| format!("Failed to serialize graph: {}", e))?;
@@ -94,6 +124,47 @@ impl Workspace {
         self.load_graph_recursive()
     }
     
+    /// Cargar código de nodos recursivamente (incluye todos los niveles de carpetas)
+    fn load_node_code_recursive(graph: &mut NodeGraph, storage: &NodeStorage) {
+        for node in graph.nodes_mut() {
+            // Cargar código del nodo actual si tiene code_path
+            if let Some(code_path) = &node.code_path.clone() {
+                match storage.load_node_code(code_path) {
+                    Ok(code) => {
+                        node.code = code;
+                    }
+                    Err(e) => {
+                        // Verificar si es un error de archivo no encontrado (varios formatos y idiomas)
+                        let is_file_not_found = e.contains("cannot find") 
+                            || e.contains("No such file") 
+                            || e.contains("No se puede encontrar")
+                            || e.contains("El sistema no puede encontrar")
+                            || e.contains("El sistema no puede encontrar el archivo especificado")
+                            || e.contains("os error 2")
+                            || e.contains("os error 3")
+                            || e.contains("not found")
+                            || e.contains("No existe el archivo")
+                            || e.contains("does not exist");
+                        
+                        if is_file_not_found {
+                            // Archivo no encontrado: limpiar code_path silenciosamente
+                            // No mostrar warning porque es un caso común (archivos eliminados manualmente, etc.)
+                            node.code_path = None;
+                        } else {
+                            // Otro tipo de error (permisos, I/O, etc.): mostrar warning
+                            eprintln!("Warning: Failed to load code from {}: {}", code_path, e);
+                        }
+                    }
+                }
+            }
+            
+            // Cargar código de nodos dentro de subnetworks/carpetas recursivamente
+            if let Some(ref mut sub_graph) = node.subnetwork_graph {
+                Self::load_node_code_recursive(sub_graph, storage);
+            }
+        }
+    }
+
     /// Cargar grafo recursivamente (incluye subnetworks)
     fn load_graph_recursive(&self) -> Result<NodeGraph, String> {
         let path = self.get_node_map_path()
@@ -109,51 +180,9 @@ impl Workspace {
         let mut graph: NodeGraph = serde_json::from_str(&json)
             .map_err(|e| format!("Failed to parse graph: {}", e))?;
         
-        // Cargar código desde archivos separados si tienen code_path
+        // Cargar código desde archivos separados recursivamente (incluye todos los niveles)
         let storage = NodeStorage::new(self.clone());
-        for node in graph.nodes_mut() {
-            if let Some(code_path) = &node.code_path {
-                // Cargar código desde archivo separado
-                match storage.load_node_code(code_path) {
-                    Ok(code) => {
-                        node.code = code;
-                    }
-                    Err(e) => {
-                        // Si falla, limpiar code_path si el archivo no existe
-                        // Esto evita warnings repetidos para archivos eliminados
-                        if e.contains("cannot find") || e.contains("No such file") || e.contains("os error 3") {
-                            node.code_path = None;
-                        } else {
-                            // Solo mostrar warning si es otro tipo de error
-                            eprintln!("Warning: Failed to load code from {}: {}", code_path, e);
-                        }
-                    }
-                }
-            }
-            // Si no hay code_path, el código ya está en node.code (formato antiguo o sin código)
-            
-            // ═══════════════════════════════════════════════════════════════════
-            // 🆕 CARGAR SUBNETWORKS RECURSIVAMENTE
-            // ═══════════════════════════════════════════════════════════════════
-            if let Some(ref mut sub_graph) = node.subnetwork_graph {
-                // Cargar el grafo interno recursivamente
-                // Nota: Los subnetworks se guardan en el mismo node_map.json, así que
-                // ya están cargados desde la deserialización. Solo necesitamos cargar
-                // el código de sus nodos.
-                for sub_node in sub_graph.nodes_mut() {
-                    if let Some(sub_code_path) = &sub_node.code_path {
-                        match storage.load_node_code(sub_code_path) {
-                            Ok(code) => {
-                                sub_node.code = code;
-                            }
-                            Err(e) => {
-                                eprintln!("Warning: Failed to load subnetwork code from {}: {}", sub_code_path, e);
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        Self::load_node_code_recursive(&mut graph, &storage);
         
         Ok(graph)
     }

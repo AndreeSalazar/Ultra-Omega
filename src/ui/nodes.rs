@@ -163,7 +163,7 @@ pub fn draw_node(
     }
 }
 
-/// Renderizado personalizado para Nodos Carpeta - Estilo Carpeta Amarilla Mejorado
+/// Renderizado personalizado para Nodos Carpeta - Estilo Windows 11 Elegante
 fn draw_folder_node_custom(
     painter: &Painter,
     node: &Node,
@@ -173,61 +173,90 @@ fn draw_folder_node_custom(
     _is_inherited: bool,
     _connected_pins: &std::collections::HashSet<crate::core::node_graph::PinId>,
 ) {
-    let rounding = egui::Rounding::same(12.0 * zoom);
+    // Bordes más redondeados estilo Windows 11
+    let rounding = egui::Rounding::same(16.0 * zoom);
     
     // ═══════════════════════════════════════════════════════════════════
-    // 1. GLOW AMARILLO INTENSO (Múltiples capas para efecto brillante)
+    // 🆕 DETECTAR SI ES CARPETA HEREDABLE
     // ═══════════════════════════════════════════════════════════════════
-    let glow_intensity = if selected { 1.0 } else { 0.6 };
-    
-    // Capa 1: Glow exterior muy suave (más grande)
-    painter.rect_filled(
-        rect.expand(10.0 * zoom),
-        rounding,
-        Color32::from_rgba_unmultiplied(255, 200, 50, (15.0 * glow_intensity) as u8),
-    );
-    
-    // Capa 2: Glow medio
-    painter.rect_filled(
-        rect.expand(6.0 * zoom),
-        rounding,
-        Color32::from_rgba_unmultiplied(255, 200, 50, (30.0 * glow_intensity) as u8),
-    );
-    
-    // Capa 3: Glow cercano
-    painter.rect_filled(
-        rect.expand(3.0 * zoom),
-        rounding,
-        Color32::from_rgba_unmultiplied(255, 200, 50, (50.0 * glow_intensity) as u8),
-    );
+    let is_inheritable = node.title.contains("(Heredable)");
     
     // ═══════════════════════════════════════════════════════════════════
-    // 2. BORDE AMARILLO DORADO PROMINENTE (Estilo carpeta)
+    // 1. SOMBRA PROFESIONAL (Estilo Windows 11 - suave y elegante)
     // ═══════════════════════════════════════════════════════════════════
-    let border_color_outer = if selected {
-        Color32::from_rgb(255, 230, 100) // Amarillo muy brillante
+    let shadow_color = if is_inheritable {
+        Color32::from_rgba_unmultiplied(150, 100, 255, 60) // Sombra púrpura para heredables
     } else {
-        Color32::from_rgb(255, 200, 50) // Amarillo dorado
+        Color32::from_black_alpha(50) // Sombra normal
     };
     
-    let border_color_inner = Color32::from_rgb(255, 180, 40); // Amarillo más oscuro interior
+    let shadow = eframe::egui::epaint::Shadow {
+        offset: Vec2::new(0.0, 4.0 * zoom),
+        blur: 20.0 * zoom,
+        spread: 0.0,
+        color: shadow_color,
+    };
+    painter.add(shadow.tessellate(rect, rounding));
     
-    // Borde exterior grueso (estilo carpeta)
+    // ═══════════════════════════════════════════════════════════════════
+    // 2. GLOW SUTIL (Solo cuando está seleccionado, más profesional)
+    // ═══════════════════════════════════════════════════════════════════
+    if selected {
+        if is_inheritable {
+            // Glow púrpura/magenta para carpetas heredables
+            painter.rect_filled(
+                rect.expand(6.0 * zoom),
+                rounding,
+                Color32::from_rgba_unmultiplied(180, 120, 255, 25),
+            );
+            painter.rect_filled(
+                rect.expand(3.0 * zoom),
+                rounding,
+                Color32::from_rgba_unmultiplied(200, 140, 255, 40),
+            );
+        } else {
+            // Glow dorado para carpetas normales
+            painter.rect_filled(
+                rect.expand(6.0 * zoom),
+                rounding,
+                Color32::from_rgba_unmultiplied(255, 215, 100, 20),
+            );
+            painter.rect_filled(
+                rect.expand(3.0 * zoom),
+                rounding,
+                Color32::from_rgba_unmultiplied(255, 215, 100, 35),
+            );
+        }
+    }
+    
+    // ═══════════════════════════════════════════════════════════════════
+    // 3. BORDE SUAVE Y ELEGANTE (Estilo Windows 11)
+    // ═══════════════════════════════════════════════════════════════════
+    let border_color = if is_inheritable {
+        // Bordes púrpura/magenta únicos para carpetas heredables
+        if selected {
+            Color32::from_rgb(220, 160, 255) // Púrpura brillante cuando seleccionado
+        } else {
+            Color32::from_rgb(180, 130, 240) // Púrpura suave base
+        }
+    } else {
+        // Bordes dorados para carpetas normales
+        if selected {
+            Color32::from_rgb(255, 220, 120) // Dorado suave cuando seleccionado
+        } else {
+            Color32::from_rgb(240, 190, 90) // Dorado más sutil
+        }
+    };
+    
+    // Borde delgado y elegante (no grueso)
     painter.rect_stroke(
         rect,
         rounding,
-        Stroke::new(4.0 * zoom, border_color_outer),
-    );
-    
-    // Borde interior sutil para profundidad
-    painter.rect_stroke(
-        rect.shrink(1.5 * zoom),
-        rounding,
-        Stroke::new(1.0 * zoom, border_color_inner),
+        Stroke::new(1.5 * zoom, border_color),
     );
     
     // ═══════════════════════════════════════════════════════════════════
-    // 3. HEADER AMARILLO CON GRADIENTE (Sección superior tipo carpeta)
+    // 4. HEADER CON GRADIENTE SUAVE (Estilo Windows 11)
     // ═══════════════════════════════════════════════════════════════════
     let header_height = HEADER_HEIGHT * zoom;
     let header_rect = Rect::from_min_size(rect.min, Vec2::new(rect.width(), header_height));
@@ -238,19 +267,38 @@ fn draw_folder_node_custom(
         se: 0.0,
     };
     
-    // Fondo amarillo del header (esquema completamente amarillo)
-    let header_bg_base = if selected {
-        Color32::from_rgb(255, 220, 100) // Amarillo más brillante cuando está seleccionado
+    // ═══════════════════════════════════════════════════════════════════
+    // 🆕 COLORES ÚNICOS PARA CARPETAS HEREDABLES
+    // ═══════════════════════════════════════════════════════════════════
+    let (header_bg_base, header_bg_top) = if is_inheritable {
+        // Esquema de colores púrpura/magenta único para heredables
+        if selected {
+            (
+                Color32::from_rgb(200, 150, 255), // Púrpura brillante base
+                Color32::from_rgb(230, 180, 255), // Púrpura claro superior
+            )
+        } else {
+            (
+                Color32::from_rgb(180, 130, 240), // Púrpura base suave
+                Color32::from_rgb(210, 160, 250), // Púrpura claro superior
+            )
+        }
     } else {
-        Color32::from_rgb(255, 200, 50) // Amarillo dorado base
-    };
-    let header_bg_top = if selected {
-        Color32::from_rgb(255, 240, 140) // Amarillo muy claro arriba
-    } else {
-        Color32::from_rgb(255, 220, 80) // Amarillo más claro arriba
+        // Esquema de colores dorado para carpetas normales
+        if selected {
+            (
+                Color32::from_rgb(250, 210, 110), // Dorado suave cuando seleccionado
+                Color32::from_rgb(255, 230, 140), // Gradiente superior más claro
+            )
+        } else {
+            (
+                Color32::from_rgb(240, 195, 95), // Dorado base más sutil
+                Color32::from_rgb(250, 215, 115), // Gradiente superior suave
+            )
+        }
     };
     
-    // Base amarilla
+    // Base del header
     painter.add(Shape::Rect(RectShape {
         rect: header_rect,
         rounding: header_rounding,
@@ -260,8 +308,8 @@ fn draw_folder_node_custom(
         uv: Rect::ZERO,
     }));
     
-    // Gradiente superior más pronunciado (simula brillo de carpeta amarilla)
-    let gradient_height = header_height * 0.4;
+    // Gradiente superior suave (más sutil que antes)
+    let gradient_height = header_height * 0.35;
     let gradient_rect = Rect::from_min_size(
         header_rect.min,
         Vec2::new(header_rect.width(), gradient_height)
@@ -275,94 +323,116 @@ fn draw_folder_node_custom(
         uv: Rect::ZERO,
     }));
     
-    // Línea de brillo superior (efecto 3D)
+    // Línea de brillo superior muy sutil
     painter.line_segment(
         [
-            Pos2::new(header_rect.min.x + rounding.nw, header_rect.min.y + 1.0 * zoom),
-            Pos2::new(header_rect.max.x - rounding.ne, header_rect.min.y + 1.0 * zoom),
+            Pos2::new(header_rect.min.x + rounding.nw + 2.0 * zoom, header_rect.min.y + 1.0 * zoom),
+            Pos2::new(header_rect.max.x - rounding.ne - 2.0 * zoom, header_rect.min.y + 1.0 * zoom),
         ],
-        Stroke::new(1.5 * zoom, Color32::from_white_alpha(100)),
+        Stroke::new(1.0 * zoom, Color32::from_white_alpha(60)),
     );
     
-    // Línea de separación entre header y body (más visible)
+    // Separador sutil entre header y body
     painter.line_segment(
         [
-            Pos2::new(header_rect.min.x, header_rect.max.y),
-            Pos2::new(header_rect.max.x, header_rect.max.y),
+            Pos2::new(header_rect.min.x, header_rect.max.y - 0.5 * zoom),
+            Pos2::new(header_rect.max.x, header_rect.max.y - 0.5 * zoom),
         ],
-        Stroke::new(2.0 * zoom, Color32::from_black_alpha(80)),
+        Stroke::new(1.0 * zoom, Color32::from_black_alpha(40)),
     );
     
     // ═══════════════════════════════════════════════════════════════════
-    // 4. ICONOS DE CARPETA Y TÍTULO (Mejorados para fondo amarillo)
+    // 5. ICONO Y TÍTULO ELEGANTES (Estilo Windows 11 - un solo icono centrado)
     // ═══════════════════════════════════════════════════════════════════
     let text_zoom = zoom.clamp(0.5, 1.25);
-    let title_font = FontId::proportional(17.0 * text_zoom);
+    let title_font = FontId::proportional(16.0 * text_zoom);
     
-    // Extraer título sin el emoji 📁
-    let clean_title = node.title.strip_prefix("📁 ").unwrap_or(&node.title);
+    // Extraer título sin el emoji 📁 y mostrar el lenguaje si es heredable
+    let mut clean_title = node.title.strip_prefix("📁 ").unwrap_or(&node.title).to_string();
     
-    // Dibujar iconos de carpeta (2 iconos, más grandes y con sombra)
-    let icon_size = 22.0 * zoom;
+    // Si es heredable y tiene lenguaje específico, asegurar que se muestre en el título
+    if is_inheritable && !matches!(node.language, crate::core::node_graph::NodeLanguage::Auto | crate::core::node_graph::NodeLanguage::Text) {
+        let lang_name = match node.language {
+            crate::core::node_graph::NodeLanguage::Rust => "Rust",
+            crate::core::node_graph::NodeLanguage::C => "C",
+            crate::core::node_graph::NodeLanguage::Cpp => "C++",
+            crate::core::node_graph::NodeLanguage::Python => "Python",
+            crate::core::node_graph::NodeLanguage::Java => "Java",
+            crate::core::node_graph::NodeLanguage::Zig => "Zig",
+            crate::core::node_graph::NodeLanguage::Asm => "Assembly",
+            _ => "",
+        };
+        
+        if !lang_name.is_empty() && !clean_title.contains(&format!("[{}]", lang_name)) {
+            // Agregar el lenguaje al título si no está ya presente
+            if clean_title.contains("(Heredable)") {
+                clean_title = clean_title.replace("(Heredable)", &format!("(Heredable) [{}]", lang_name));
+            } else {
+                clean_title = format!("{} [{}]", clean_title, lang_name);
+            }
+        }
+    }
+    
+    // Un solo icono más grande y centrado (estilo Windows 11)
+    let icon_size = 24.0 * zoom;
     let icon_y = header_rect.center().y;
-    let icon_x1 = header_rect.min.x + 14.0 * zoom;
-    let icon_x2 = icon_x1 + icon_size + 6.0 * zoom;
+    let icon_x = header_rect.min.x + 16.0 * zoom;
     
-    // Color de iconos y texto: oscuro para contraste con fondo amarillo
-    let icon_color = Color32::from_rgb(40, 30, 10); // Marrón oscuro para contraste
-    let text_color = Color32::from_rgb(50, 35, 15); // Marrón oscuro para texto
+    // ═══════════════════════════════════════════════════════════════════
+    // 🆕 COLORES DE TEXTO ÚNICOS PARA HEREDABLES
+    // ═══════════════════════════════════════════════════════════════════
+    let (icon_color, text_color) = if is_inheritable {
+        // Colores oscuros púrpura para contraste con fondo púrpura
+        (
+            Color32::from_rgb(80, 50, 120), // Púrpura oscuro para icono
+            Color32::from_rgb(90, 60, 130), // Púrpura oscuro para texto
+        )
+    } else {
+        // Colores marrón oscuro para carpetas normales
+        (
+            Color32::from_rgb(60, 45, 20), // Marrón oscuro elegante
+            Color32::from_rgb(70, 50, 25), // Marrón oscuro para texto
+        )
+    };
     
-    // Sombra de los iconos (más sutil en fondo amarillo)
+    // Sombra sutil del icono
     painter.text(
-        Pos2::new(icon_x1 + 1.0 * zoom, icon_y + 1.0 * zoom),
+        Pos2::new(icon_x + 0.5 * zoom, icon_y + 0.5 * zoom),
         Align2::LEFT_CENTER,
         "📁",
         FontId::proportional(icon_size),
-        Color32::from_rgba_unmultiplied(0, 0, 0, 60),
-    );
-    painter.text(
-        Pos2::new(icon_x2 + 1.0 * zoom, icon_y + 1.0 * zoom),
-        Align2::LEFT_CENTER,
-        "📁",
-        FontId::proportional(icon_size),
-        Color32::from_rgba_unmultiplied(0, 0, 0, 60),
+        Color32::from_rgba_unmultiplied(0, 0, 0, 40),
     );
     
-    // Iconos principales (color oscuro para contraste)
+    // Icono principal
     painter.text(
-        Pos2::new(icon_x1, icon_y),
+        Pos2::new(icon_x, icon_y),
         Align2::LEFT_CENTER,
         "📁",
         FontId::proportional(icon_size),
         icon_color,
     );
-    painter.text(
-        Pos2::new(icon_x2, icon_y),
-        Align2::LEFT_CENTER,
-        "📁",
-        FontId::proportional(icon_size),
-        icon_color,
-    );
     
-    // Título con sombra para legibilidad en fondo amarillo
-    let title_x = icon_x2 + icon_size + 10.0 * zoom;
+    // Título con sombra sutil (usar referencia para evitar move)
+    let title_x = icon_x + icon_size + 12.0 * zoom;
+    let clean_title_ref = &clean_title;
     painter.text(
-        Pos2::new(title_x + 1.0 * zoom, icon_y + 1.0 * zoom),
+        Pos2::new(title_x + 0.5 * zoom, icon_y + 0.5 * zoom),
         Align2::LEFT_CENTER,
-        clean_title,
+        clean_title_ref,
         title_font.clone(),
-        Color32::from_rgba_unmultiplied(0, 0, 0, 80),
+        Color32::from_rgba_unmultiplied(0, 0, 0, 50),
     );
     painter.text(
         Pos2::new(title_x, icon_y),
         Align2::LEFT_CENTER,
-        clean_title,
+        clean_title_ref,
         title_font,
         text_color,
     );
     
     // ═══════════════════════════════════════════════════════════════════
-    // 5. BODY OSCURO CON EFECTO PROFUNDIDAD (Sección inferior)
+    // 6. BODY ELEGANTE (Fondo suave y profesional)
     // ═══════════════════════════════════════════════════════════════════
     let body_rect = Rect::from_min_max(
         Pos2::new(rect.min.x, rect.min.y + header_height),
@@ -375,8 +445,8 @@ fn draw_folder_node_custom(
         se: rounding.se,
     };
     
-    // Fondo oscuro del body (más profundo)
-    let body_color = Color32::from_rgb(12, 12, 18);
+    // Fondo más claro y elegante (no tan oscuro)
+    let body_color = Color32::from_rgb(28, 28, 35);
     painter.add(Shape::Rect(RectShape {
         rect: body_rect,
         rounding: body_rounding,
@@ -386,41 +456,41 @@ fn draw_folder_node_custom(
         uv: Rect::ZERO,
     }));
     
-    // Efecto de profundidad (sombra interna superior)
+    // Efecto de profundidad muy sutil
     let depth_shadow = Rect::from_min_size(
         body_rect.min,
-        Vec2::new(body_rect.width(), 4.0 * zoom)
+        Vec2::new(body_rect.width(), 3.0 * zoom)
     );
     painter.add(Shape::Rect(RectShape {
         rect: depth_shadow,
         rounding: body_rounding,
-        fill: Color32::from_black_alpha(60),
+        fill: Color32::from_black_alpha(30),
         stroke: Stroke::NONE,
         fill_texture_id: TextureId::default(),
         uv: Rect::ZERO,
     }));
     
-    // Indicador visual mejorado
+    // Indicador visual minimalista
     if let Some(_subgraph) = &node.subnetwork_graph {
         let indicator_text = "Contenedor de nodos";
-        let indicator_font = FontId::proportional(12.0 * text_zoom);
+        let indicator_font = FontId::proportional(11.0 * text_zoom);
         
-        // Sombra del texto
+        // Texto con sombra sutil
         painter.text(
-            body_rect.center() + Vec2::new(1.0, 1.0) * zoom,
+            body_rect.center() + Vec2::new(0.5, 0.5) * zoom,
             Align2::CENTER_CENTER,
             indicator_text,
             indicator_font.clone(),
-            Color32::from_black_alpha(150),
+            Color32::from_black_alpha(100),
         );
         
-        // Texto principal
+        // Texto principal más claro
         painter.text(
             body_rect.center(),
             Align2::CENTER_CENTER,
             indicator_text,
             indicator_font,
-            Color32::from_rgb(120, 120, 140),
+            Color32::from_rgb(140, 140, 155),
         );
     }
 }

@@ -6,6 +6,7 @@ mod storage;
 mod templates;
 mod config;
 mod expressions;
+mod inheritance;
 #[cfg(feature = "mojo")]
 mod mojo;
 

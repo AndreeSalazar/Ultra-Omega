@@ -47,6 +47,7 @@ impl NodeGraph {
         title: impl Into<String>,
         position: Pos2,
         mode: FolderNodeMode,
+        required_language: Option<NodeLanguage>, // Lenguaje requerido para carpetas heredables
     ) -> NodeId {
         // Color especial para nodos carpeta (azul más claro)
         let color = Color32::from_rgb(100, 150, 255);
@@ -57,6 +58,15 @@ impl NodeGraph {
             folder_title = format!("📁 {}", folder_title);
         }
         
+        // Determinar el lenguaje del nodo carpeta
+        let folder_language = if matches!(mode, FolderNodeMode::Inheritable) {
+            // Para carpetas heredables, usar el lenguaje especificado o Auto por defecto
+            required_language.unwrap_or(NodeLanguage::Auto)
+        } else {
+            // Para carpetas de organización, usar Text
+            NodeLanguage::Text
+        };
+        
         // Crear nodo usando add_node y luego modificar
         let id = self.add_node(
             folder_title,
@@ -64,7 +74,7 @@ impl NodeGraph {
             color,
             &[], // Sin inputs
             &[], // Sin outputs
-            NodeLanguage::Text, // Nodo carpeta no tiene lenguaje específico
+            folder_language, // Usar el lenguaje determinado
         );
         
         // Configurar como nodo carpeta
@@ -72,7 +82,13 @@ impl NodeGraph {
             node.subnetwork_graph = Some(NodeGraph::default()); // Usar subnetwork_graph como contenedor
             if matches!(mode, FolderNodeMode::Inheritable) {
                 if !node.title.contains("(Heredable)") {
-                    node.title = format!("{} (Heredable)", node.title);
+                    // Agregar el lenguaje requerido al título para que sea visible
+                    let lang_suffix = if !matches!(folder_language, NodeLanguage::Auto | NodeLanguage::Text) {
+                        format!(" [{}]", Self::language_display_name(folder_language))
+                    } else {
+                        String::new()
+                    };
+                    node.title = format!("{} (Heredable){}", node.title, lang_suffix);
                 }
             }
         }
@@ -129,11 +145,72 @@ impl NodeGraph {
         inputs: &[&str],
         outputs: &[&str],
         language: NodeLanguage,
-    ) -> Option<NodeId> {
+    ) -> Result<NodeId, String> {
+        // ═══════════════════════════════════════════════════════════════════
+        // 🆕 VALIDAR LENGUAJE SI ES CARPETA HEREDABLE
+        // ═══════════════════════════════════════════════════════════════════
+        if let Some(folder_node) = self.node(folder_node_id) {
+            // Verificar si es carpeta heredable
+            if folder_node.title.contains("(Heredable)") {
+                // Obtener el lenguaje requerido de la carpeta
+                let mut folder_language = folder_node.language;
+                
+                // Si el lenguaje es Auto o Text, intentar extraer del título
+                if matches!(folder_language, NodeLanguage::Auto | NodeLanguage::Text) {
+                    if folder_node.title.contains("[C++]") {
+                        folder_language = NodeLanguage::Cpp;
+                    } else if folder_node.title.contains("[Rust]") {
+                        folder_language = NodeLanguage::Rust;
+                    } else if folder_node.title.contains("[Python]") {
+                        folder_language = NodeLanguage::Python;
+                    } else if folder_node.title.contains("[Java]") {
+                        folder_language = NodeLanguage::Java;
+                    } else if folder_node.title.contains("[C]") && !folder_node.title.contains("[C++]") {
+                        folder_language = NodeLanguage::C;
+                    } else if folder_node.title.contains("[Assembly]") || folder_node.title.contains("[ASM]") {
+                        folder_language = NodeLanguage::Asm;
+                    } else if folder_node.title.contains("[Zig]") {
+                        folder_language = NodeLanguage::Zig;
+                    }
+                }
+                
+                // Si el lenguaje de la carpeta no es Auto o Text, validar compatibilidad
+                if !matches!(folder_language, NodeLanguage::Auto | NodeLanguage::Text) {
+                    // SOLO bloquear si el lenguaje NO coincide
+                    if language != folder_language {
+                        return Err(format!(
+                            "❌ ERROR: El nodo tiene lenguaje '{}' pero la carpeta heredable solo acepta '{}'.\n\
+                            Las carpetas heredables solo pueden contener un único lenguaje de programación.",
+                            Self::language_display_name(language),
+                            Self::language_display_name(folder_language)
+                        ));
+                    }
+                    // Si el lenguaje SÍ coincide, continuar normalmente
+                }
+            }
+        }
+        
         if let Some(folder_graph) = self.get_folder_content_mut(folder_node_id) {
-            Some(folder_graph.add_node(title, position, color, inputs, outputs, language))
+            Ok(folder_graph.add_node(title, position, color, inputs, outputs, language))
         } else {
-            None
+            Err("No se pudo acceder al contenido de la carpeta".to_string())
+        }
+    }
+    
+    /// Obtener nombre de visualización para un lenguaje
+    fn language_display_name(lang: NodeLanguage) -> String {
+        match lang {
+            NodeLanguage::Rust => "Rust".to_string(),
+            NodeLanguage::C => "C".to_string(),
+            NodeLanguage::Cpp => "C++".to_string(),
+            NodeLanguage::Python => "Python".to_string(),
+            NodeLanguage::Java => "Java".to_string(),
+            NodeLanguage::Zig => "Zig".to_string(),
+            NodeLanguage::Asm => "Assembly".to_string(),
+            NodeLanguage::Text => "Text".to_string(),
+            NodeLanguage::Auto => "Auto".to_string(),
+            NodeLanguage::Mojo => "Mojo".to_string(),
+            NodeLanguage::MojoAI => "MojoAI".to_string(),
         }
     }
     
@@ -150,23 +227,70 @@ impl NodeGraph {
             return Err("El nodo especificado no es un nodo carpeta".to_string());
         }
         
+        // ═══════════════════════════════════════════════════════════════════
+        // 🆕 VALIDAR LENGUAJE SI ES CARPETA HEREDABLE
+        // ═══════════════════════════════════════════════════════════════════
+        let folder_language_opt = {
+            if let Some(folder_node) = self.node(folder_node_id) {
+                if folder_node.title.contains("(Heredable)") {
+                    let lang = folder_node.language;
+                    // Si no es Auto o Text, necesitamos validar
+                    if !matches!(lang, NodeLanguage::Auto | NodeLanguage::Text) {
+                        Some(lang)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        };
+        
         // Recolectar TODA la información necesaria ANTES de cualquier referencia mutable
         let node_ids_set: std::collections::HashSet<NodeId> = node_ids.iter().copied().collect();
         
         // Obtener todos los PinIds de los nodos que se moverán
         let mut pins_to_move: std::collections::HashSet<PinId> = std::collections::HashSet::new();
+        let mut incompatible_nodes: Vec<String> = Vec::new();
+        
         let nodes_to_move: Vec<_> = {
             node_ids.iter()
                 .filter_map(|&node_id| {
-                    self.node(node_id).map(|node| {
+                    if let Some(node) = self.node(node_id) {
+                        // Validar lenguaje si es carpeta heredable
+                        if let Some(required_lang) = folder_language_opt {
+                            if node.language != required_lang {
+                                incompatible_nodes.push(node.title.clone());
+                                return None; // Filtrar nodos incompatibles
+                            }
+                        }
+                        
                         for pin in node.inputs.iter().chain(node.outputs.iter()) {
                             pins_to_move.insert(pin.id);
                         }
-                        node.clone()
-                    })
+                        Some(node.clone())
+                    } else {
+                        None
+                    }
                 })
                 .collect()
         };
+        
+        // Verificar si se filtraron nodos por incompatibilidad de lenguaje
+        if !incompatible_nodes.is_empty() {
+            if let Some(required_lang) = folder_language_opt {
+                let nodes_list = incompatible_nodes.join(", ");
+                return Err(format!(
+                    "❌ ERROR: Los siguientes nodos tienen lenguajes incompatibles: {}\n\
+                    La carpeta heredable solo acepta '{}'.\n\
+                    Las carpetas heredables solo pueden contener un único lenguaje de programación.",
+                    nodes_list,
+                    Self::language_display_name(required_lang)
+                ));
+            }
+        }
         
         // Recolectar links que conectan estos pines
         let links_to_remove: Vec<_> = {
@@ -201,7 +325,12 @@ impl NodeGraph {
             // Copiar código y otros campos
             if let Some(inner_node) = folder_graph.node_mut(inner_id) {
                 inner_node.code = node.code;
-                inner_node.code_path = node.code_path;
+                // ═══════════════════════════════════════════════════════════════════
+                // IMPORTANTE: No copiar code_path porque el nuevo nodo tiene un ID diferente
+                // El code_path se generará automáticamente cuando se guarde el grafo
+                // basándose en el nuevo ID del nodo dentro de la carpeta
+                // ═══════════════════════════════════════════════════════════════════
+                inner_node.code_path = None; // Se generará nuevo code_path basado en inner_id
                 inner_node.parent_node = node.parent_node;
                 inner_node.inherits_from_folder = node.inherits_from_folder;
             }
@@ -312,7 +441,7 @@ impl NodeGraph {
         }
         
         // Crear el nodo carpeta
-        let folder_id = self.create_folder_node(title, position, mode);
+        let folder_id = self.create_folder_node(title, position, mode, None);
         
         // Mover los nodos seleccionados a la carpeta
         self.move_nodes_to_folder(folder_id, node_ids)?;
@@ -332,6 +461,7 @@ mod tests {
             "Test Folder",
             pos2(100.0, 100.0),
             FolderNodeMode::Organization,
+            None,
         );
         
         assert!(graph.is_folder_node(folder_id));
@@ -344,6 +474,7 @@ mod tests {
             "Test Folder",
             pos2(100.0, 100.0),
             FolderNodeMode::Organization,
+            None,
         );
         
         let inner_node_id = graph.add_node_to_folder(
@@ -356,7 +487,7 @@ mod tests {
             NodeLanguage::Rust,
         );
         
-        assert!(inner_node_id.is_some());
+        assert!(inner_node_id.is_ok());
         
         if let Some(folder_graph) = graph.get_folder_content(folder_id) {
             assert_eq!(folder_graph.nodes().len(), 1);

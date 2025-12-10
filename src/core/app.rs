@@ -65,6 +65,12 @@ pub struct NodeGraphApp {
     // 🆕 NODO CARPETA (Idea 11)
     // ═══════════════════════════════════════════════════════════════════
     pub folder_node_mode: crate::core::folder_node::FolderNodeMode,
+    pub folder_node_language: crate::core::node_graph::NodeLanguage, // Lenguaje para carpetas heredables
+    // ═══════════════════════════════════════════════════════════════════
+    // 🆕 DIÁLOGO DE ERRORES
+    // ═══════════════════════════════════════════════════════════════════
+    pub show_error_dialog: bool,
+    pub error_dialog_message: String,
 }
 
 /// Representa un nivel de red en la jerarquía de subnetworks
@@ -226,6 +232,9 @@ impl NodeGraphApp {
             sidebar_search_query: String::new(),
             sidebar_search_visible: false,
             folder_node_mode: crate::core::folder_node::FolderNodeMode::Organization,
+            folder_node_language: crate::core::node_graph::NodeLanguage::Auto, // Por defecto Auto
+            show_error_dialog: false,
+            error_dialog_message: String::new(),
         };
         
         // Load workspace if configured
@@ -930,12 +939,119 @@ impl NodeGraphApp {
     }
 
     fn add_template_node(&mut self, ctx: &egui::Context, title: &str, code: &str, color: Color32, language: NodeLanguage) {
+        // Función helper para obtener nombre de lenguaje
+        fn language_display_name(lang: crate::core::node_graph::NodeLanguage) -> String {
+            match lang {
+                crate::core::node_graph::NodeLanguage::Rust => "Rust".to_string(),
+                crate::core::node_graph::NodeLanguage::C => "C".to_string(),
+                crate::core::node_graph::NodeLanguage::Cpp => "C++".to_string(),
+                crate::core::node_graph::NodeLanguage::Python => "Python".to_string(),
+                crate::core::node_graph::NodeLanguage::Java => "Java".to_string(),
+                crate::core::node_graph::NodeLanguage::Zig => "Zig".to_string(),
+                crate::core::node_graph::NodeLanguage::Asm => "Assembly".to_string(),
+                crate::core::node_graph::NodeLanguage::Text => "Text".to_string(),
+                crate::core::node_graph::NodeLanguage::Auto => "Auto".to_string(),
+                crate::core::node_graph::NodeLanguage::Mojo => "Mojo".to_string(),
+                crate::core::node_graph::NodeLanguage::MojoAI => "MojoAI".to_string(),
+            }
+        }
+        
+        // ═══════════════════════════════════════════════════════════════════
+        // 🆕 VALIDAR LENGUAJE SI ESTAMOS DENTRO DE UNA CARPETA HEREDABLE
+        // ═══════════════════════════════════════════════════════════════════
+        if !self.is_at_root() {
+            // Estamos dentro de una carpeta/subnetwork
+            if let Some(current_level) = self.network_levels.last() {
+                if let Some(parent_id) = current_level.parent_subnetwork_id {
+                    // Buscar el nodo padre en todos los niveles posibles
+                    let mut parent_node_opt = None;
+                    
+                    // Primero intentar en el nivel raíz
+                    if let Some(root_level) = self.network_levels.first() {
+                        parent_node_opt = root_level.graph.node(parent_id);
+                    }
+                    
+                    // Si no se encuentra, buscar en el nivel actual (por si la carpeta está anidada)
+                    if parent_node_opt.is_none() {
+                        parent_node_opt = current_level.graph.node(parent_id);
+                    }
+                    
+                    // Si encontramos el nodo padre, validar
+                    if let Some(parent_node) = parent_node_opt {
+                        // Verificar si es carpeta heredable (por título)
+                        let is_inheritable = parent_node.title.contains("(Heredable)");
+                        
+                        if is_inheritable {
+                            // Obtener el lenguaje requerido de la carpeta
+                            // Primero intentar desde el campo language del nodo
+                            let mut folder_language = parent_node.language;
+                            
+                            // Si el lenguaje es Auto o Text, intentar extraer del título
+                            if matches!(folder_language, crate::core::node_graph::NodeLanguage::Auto | crate::core::node_graph::NodeLanguage::Text) {
+                                // Intentar extraer el lenguaje del título (ej: "[C++]")
+                                if parent_node.title.contains("[C++]") {
+                                    folder_language = crate::core::node_graph::NodeLanguage::Cpp;
+                                } else if parent_node.title.contains("[Rust]") {
+                                    folder_language = crate::core::node_graph::NodeLanguage::Rust;
+                                } else if parent_node.title.contains("[Python]") {
+                                    folder_language = crate::core::node_graph::NodeLanguage::Python;
+                                } else if parent_node.title.contains("[Java]") {
+                                    folder_language = crate::core::node_graph::NodeLanguage::Java;
+                                } else if parent_node.title.contains("[C]") && !parent_node.title.contains("[C++]") {
+                                    folder_language = crate::core::node_graph::NodeLanguage::C;
+                                } else if parent_node.title.contains("[Assembly]") || parent_node.title.contains("[ASM]") {
+                                    folder_language = crate::core::node_graph::NodeLanguage::Asm;
+                                } else if parent_node.title.contains("[Zig]") {
+                                    folder_language = crate::core::node_graph::NodeLanguage::Zig;
+                                }
+                            }
+                            
+                            // Validar que el lenguaje coincide SOLO si la carpeta tiene un lenguaje específico
+                            if !matches!(folder_language, crate::core::node_graph::NodeLanguage::Auto | crate::core::node_graph::NodeLanguage::Text) {
+                                // SOLO bloquear si el lenguaje NO coincide
+                                if language != folder_language {
+                                    // Mostrar error al usuario
+                                    let error_msg = format!(
+                                        "❌ ERROR: No se puede crear un nodo con lenguaje '{}'.\n\
+                                        Esta carpeta heredable solo acepta '{}'.\n\
+                                        Las carpetas heredables solo pueden contener un único lenguaje de programación.",
+                                        language_display_name(language),
+                                        language_display_name(folder_language)
+                                    );
+                                    
+                                    // Mostrar diálogo de error
+                                    self.show_error_dialog = true;
+                                    self.error_dialog_message = error_msg;
+                                    
+                                    return; // No crear el nodo
+                                }
+                                // Si el lenguaje SÍ coincide (language == folder_language), continuar normalmente
+                            }
+                            // Si el lenguaje es Auto o Text, permitir cualquier lenguaje
+                        }
+                    }
+                }
+            }
+        }
+        
         let world_pos = self.viewport.screen_to_world(self.node_menu_pos, Rect::from_min_size(Pos2::ZERO, Vec2::new(10000.0, 10000.0)));
         
+        // Obtener el grafo actual (puede ser el raíz o un subnetwork)
+        let current_graph = if self.is_at_root() {
+            &mut self.graph
+        } else {
+            // Estamos dentro de un subnetwork/carpeta
+            if let Some(current_level) = self.network_levels.last_mut() {
+                &mut current_level.graph
+            } else {
+                &mut self.graph
+            }
+        };
+        
         // Todos los nodos tienen una entrada "Entrada" y una salida "Código"
-        let id = self.graph.add_node(title, world_pos, color, &["Entrada"], &["Código"], language);
+        let id = current_graph.add_node(title, world_pos, color, &["Entrada"], &["Código"], language);
         let (node_title, node_code) = {
-            if let Some(node) = self.graph.node_mut(id) {
+            if let Some(node) = current_graph.node_mut(id) {
                 node.code = code.to_string();
                 node.language = language;
                 (node.title.clone(), node.code.clone())
@@ -1590,6 +1706,38 @@ impl NodeGraphApp {
                                         
                                         ui.add_space(8.0);
                                         
+                                        // ═══════════════════════════════════════════════════════════════════
+                                        // 🆕 SELECTOR DE LENGUAJE PARA CARPETAS HEREDABLES
+                                        // ═══════════════════════════════════════════════════════════════════
+                                        if matches!(self.folder_node_mode, crate::core::folder_node::FolderNodeMode::Inheritable) {
+                                            ui.label(egui::RichText::new("Lenguaje requerido:")
+                                                .size(12.0)
+                                                .color(Color32::from_rgb(180, 190, 210)));
+                                            ui.label(egui::RichText::new("(Solo se puede elegir UNA VEZ al crear)")
+                                                .small()
+                                                .color(Color32::from_rgb(150, 150, 170)));
+                                            
+                                            egui::ComboBox::from_id_source("folder_language_selector")
+                                                .selected_text(format!("{:?}", self.folder_node_language))
+                                                .show_ui(ui, |ui| {
+                                                    ui.selectable_value(&mut self.folder_node_language, crate::core::node_graph::NodeLanguage::Rust, "🦀 Rust");
+                                                    ui.selectable_value(&mut self.folder_node_language, crate::core::node_graph::NodeLanguage::C, "© C");
+                                                    ui.selectable_value(&mut self.folder_node_language, crate::core::node_graph::NodeLanguage::Cpp, "⊕ C++");
+                                                    ui.selectable_value(&mut self.folder_node_language, crate::core::node_graph::NodeLanguage::Python, "🐍 Python");
+                                                    ui.selectable_value(&mut self.folder_node_language, crate::core::node_graph::NodeLanguage::Java, "☕ Java");
+                                                    ui.selectable_value(&mut self.folder_node_language, crate::core::node_graph::NodeLanguage::Zig, "⚡ Zig");
+                                                    ui.selectable_value(&mut self.folder_node_language, crate::core::node_graph::NodeLanguage::Asm, "⚡ Assembly");
+                                                    ui.selectable_value(&mut self.folder_node_language, crate::core::node_graph::NodeLanguage::Text, "📄 Text");
+                                                });
+                                            
+                                            ui.add_space(4.0);
+                                            ui.label(egui::RichText::new("⚠️ IMPORTANTE: Todos los nodos dentro de esta carpeta deben usar el mismo lenguaje.")
+                                                .small()
+                                                .color(Color32::from_rgb(255, 200, 100)));
+                                            
+                                            ui.add_space(8.0);
+                                        }
+                                        
                                         // Botón para crear nodo carpeta
                                         let create_btn = egui::Button::new(egui::RichText::new("📁 Crear Nodo Carpeta")
                                             .size(13.0)
@@ -1619,11 +1767,74 @@ impl NodeGraphApp {
                                             );
                                             
                                             // Crear nodo carpeta usando la función del módulo folder_node
+                                            // Si es heredable, pasar el lenguaje seleccionado
+                                            let required_language = if matches!(self.folder_node_mode, crate::core::folder_node::FolderNodeMode::Inheritable) {
+                                                // Asegurar que el lenguaje no sea Auto o Text para carpetas heredables
+                                                let lang = self.folder_node_language;
+                                                if matches!(lang, crate::core::node_graph::NodeLanguage::Auto | crate::core::node_graph::NodeLanguage::Text) {
+                                                    // Si es Auto o Text, usar C++ por defecto para carpetas heredables
+                                                    Some(crate::core::node_graph::NodeLanguage::Cpp)
+                                                } else {
+                                                    Some(lang)
+                                                }
+                                            } else {
+                                                None
+                                            };
+                                            
                                             let folder_id = self.graph.create_folder_node(
                                                 title.clone(),
                                                 world_pos,
                                                 self.folder_node_mode,
+                                                required_language,
                                             );
+                                            
+                                            // ═══════════════════════════════════════════════════════════════════
+                                            // 🆕 ASEGURAR QUE EL LENGUAJE SE GUARDE CORRECTAMENTE
+                                            // ═══════════════════════════════════════════════════════════════════
+                                            if let Some(folder_node) = self.graph.node_mut(folder_id) {
+                                                if matches!(self.folder_node_mode, crate::core::folder_node::FolderNodeMode::Inheritable) {
+                                                    if let Some(lang) = required_language {
+                                                        // CRÍTICO: Establecer el lenguaje en el nodo carpeta
+                                                        folder_node.language = lang;
+                                                        
+                                                        // Actualizar el título para incluir el lenguaje si no está ya
+                                                        let lang_name = match lang {
+                                                            crate::core::node_graph::NodeLanguage::Rust => "Rust",
+                                                            crate::core::node_graph::NodeLanguage::C => "C",
+                                                            crate::core::node_graph::NodeLanguage::Cpp => "C++",
+                                                            crate::core::node_graph::NodeLanguage::Python => "Python",
+                                                            crate::core::node_graph::NodeLanguage::Java => "Java",
+                                                            crate::core::node_graph::NodeLanguage::Zig => "Zig",
+                                                            crate::core::node_graph::NodeLanguage::Asm => "Assembly",
+                                                            _ => "",
+                                                        };
+                                                        
+                                                        if !lang_name.is_empty() {
+                                                            // Asegurar que el título tenga el formato correcto
+                                                            if folder_node.title.contains("(Heredable)") {
+                                                                // Si ya tiene (Heredable), agregar o actualizar el lenguaje
+                                                                if !folder_node.title.contains(&format!("[{}]", lang_name)) {
+                                                                    // Remover cualquier lenguaje anterior del título
+                                                                    let title_without_lang = folder_node.title
+                                                                        .replace("[Rust]", "")
+                                                                        .replace("[C]", "")
+                                                                        .replace("[C++]", "")
+                                                                        .replace("[Python]", "")
+                                                                        .replace("[Java]", "")
+                                                                        .replace("[Zig]", "")
+                                                                        .replace("[Assembly]", "")
+                                                                        .trim()
+                                                                        .to_string();
+                                                                    folder_node.title = format!("{} [{}]", title_without_lang, lang_name);
+                                                                }
+                                                            } else {
+                                                                // Si no tiene (Heredable), agregarlo junto con el lenguaje
+                                                                folder_node.title = format!("{} (Heredable) [{}]", folder_node.title, lang_name);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
                                             
                                             // Registrar en canales
                                             if let Some(node) = self.graph.node(folder_id) {
@@ -2736,6 +2947,34 @@ impl NodeGraphApp {
         self.hda_import_dialog_ui(ctx);
         
         // ═══════════════════════════════════════════════════════════════
+        // 🆕 DIÁLOGO DE ERRORES (Validación de lenguajes)
+        // ═══════════════════════════════════════════════════════════════
+        if self.show_error_dialog {
+            egui::Window::new("❌ Error")
+                .collapsible(false)
+                .resizable(false)
+                .default_size(egui::vec2(500.0, 200.0))
+                .show(ctx, |ui| {
+                    ui.vertical(|ui| {
+                        ui.add_space(10.0);
+                        ui.label(egui::RichText::new(&self.error_dialog_message)
+                            .size(13.0)
+                            .color(Color32::from_rgb(255, 150, 150)));
+                        ui.add_space(20.0);
+                        
+                        ui.horizontal(|ui| {
+                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                if ui.button("Cerrar").clicked() {
+                                    self.show_error_dialog = false;
+                                    self.error_dialog_message.clear();
+                                }
+                            });
+                        });
+                    });
+                });
+        }
+        
+        // ═══════════════════════════════════════════════════════════════
         // MENÚ F3 - Búsqueda rápida estilo Blender
         // ═══════════════════════════════════════════════════════════════
         if self.show_search_menu {
@@ -2984,7 +3223,7 @@ impl NodeGraphApp {
                     // Solo manejar drag/selección si el modo de corte NO está activo
                     // NO limpiar selected_nodes aquí - permitir selección normal
                     self.draw_box_selection(&painter);
-                    self.handle_node_dragging(&input, rect);
+                    self.handle_node_dragging(&input, rect, ui.ctx());
                 }
 
                 // Request repaint for animations (connectors pulse)
@@ -4331,7 +4570,7 @@ impl NodeGraphApp {
         }
     }
 
-    fn handle_node_dragging(&mut self, input: &PointerSnapshot, rect: Rect) {
+    fn handle_node_dragging(&mut self, input: &PointerSnapshot, rect: Rect, ctx: &egui::Context) {
         // PRIORIDAD ABSOLUTA: Si el modo de corte está activo, no hacer NADA aquí
         // Esto previene cualquier interferencia con la selección
         if self.interaction.cut_tool.active {
@@ -4399,9 +4638,24 @@ impl NodeGraphApp {
                     }
                 } else {
                     // Background clicked -> Start Box Select
-                    if !input.modifiers.ctrl {
+                    // ═══════════════════════════════════════════════════════════════════
+                    // 🆕 MEJORA: Mantener selección cuando hay widgets activos o nodo seleccionado
+                    // Esto permite modificar propiedades sin perder la selección
+                    // ═══════════════════════════════════════════════════════════════════
+                    // Verificar si hay algún widget interactivo activo (sliders, text fields, etc.)
+                    let has_active_widget = ctx.memory(|mem| {
+                        mem.is_anything_being_dragged()
+                    });
+                    
+                    // Solo limpiar selección si:
+                    // 1. No hay widgets activos (no se está interactuando con controles)
+                    // 2. No se está usando Ctrl (para permitir selección múltiple)
+                    // 3. No hay nodos seleccionados (para mantener selección al editar propiedades)
+                    if !has_active_widget && !input.modifiers.ctrl && self.interaction.selected_nodes.is_empty() {
                         self.interaction.selected_nodes.clear();
                     }
+                    // Si hay nodos seleccionados, mantener la selección para facilitar edición de propiedades
+                    
                     self.interaction.box_selection_start = Some(pointer_pos);
                     self.interaction.box_selection_current = Some(pointer_pos);
                     // Limpiar último click si se hace click en el fondo
@@ -4926,10 +5180,38 @@ impl NodeGraphApp {
         // Primero sincronizar el grafo actual al nivel activo
         self.sync_current_level_to_graph();
         
-        // Guardar el grafo del nivel raíz (que contiene todos los subnetworks)
+        // ═══════════════════════════════════════════════════════════════════
+        // 🆕 SINCRONIZAR TODOS LOS NIVELES HACIA ARRIBA (desde el nivel actual hasta root)
+        // Esto asegura que los cambios en nodos dentro de carpetas se propaguen correctamente
+        // ═══════════════════════════════════════════════════════════════════
+        // Si no estamos en root, necesitamos propagar los cambios hacia arriba
+        if !self.is_at_root() && self.network_levels.len() > 1 {
+            // Obtener información antes de hacer borrows mutables
+            let current_level_graph = self.graph.clone();
+            let parent_id_opt = self.network_levels.last()
+                .and_then(|l| l.parent_subnetwork_id);
+            let parent_level_index = self.network_levels.len() - 2;
+            
+            if let Some(parent_id) = parent_id_opt {
+                // Actualizar el nivel padre con el grafo del nivel actual
+                if let Some(parent_level) = self.network_levels.get_mut(parent_level_index) {
+                    // Actualizar el subnetwork_graph del nodo padre con el grafo del nivel actual
+                    if let Some(parent_node) = parent_level.graph.node_mut(parent_id) {
+                        parent_node.subnetwork_graph = Some(current_level_graph);
+                    }
+                }
+            }
+        }
+        
+        // Guardar el grafo del nivel raíz (que contiene todos los subnetworks y carpetas)
         if let Some(root_level) = self.network_levels.first() {
             let mut root_graph = root_level.graph.clone();
+            // ═══════════════════════════════════════════════════════════════════
+            // 🆕 IMPORTANTE: Guardar recursivamente para asegurar que TODOS los nodos
+            // dentro de carpetas se guarden correctamente, incluso los modificados
+            // ═══════════════════════════════════════════════════════════════════
             self.workspace.save_graph(&mut root_graph)?;
+            
             // Actualizar el grafo raíz en network_levels
             if let Some(level) = self.network_levels.first_mut() {
                 level.graph = root_graph;
