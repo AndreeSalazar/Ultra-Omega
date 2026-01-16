@@ -612,14 +612,9 @@ pub fn draw_sidebar(app: &mut NodeGraphApp, ctx: &egui::Context, _open_factor: f
                                             
                                             let (lang_icon, lang_color) = match language {
                                                 crate::core::node_graph::NodeLanguage::Rust => ("🦀", Color32::from_rgb(255, 140, 100)),
-                                                crate::core::node_graph::NodeLanguage::C => ("©", Color32::from_rgb(120, 180, 255)),
-                                                crate::core::node_graph::NodeLanguage::Cpp => ("⊕", Color32::from_rgb(180, 140, 255)),
                                                 crate::core::node_graph::NodeLanguage::Asm => ("⚡", Color32::from_rgb(255, 220, 100)),
-                                                crate::core::node_graph::NodeLanguage::Zig => ("⚡", Color32::from_rgb(240, 170, 0)),
                                                 crate::core::node_graph::NodeLanguage::Java => ("☕", Color32::from_rgb(237, 139, 0)),
                                                 crate::core::node_graph::NodeLanguage::Python => ("🐍", Color32::from_rgb(55, 118, 171)),
-                                                crate::core::node_graph::NodeLanguage::Mojo => ("🔥", Color32::from_rgb(255, 100, 100)),
-                                                crate::core::node_graph::NodeLanguage::MojoAI => ("🤖", Color32::from_rgb(255, 150, 100)),
                                                 crate::core::node_graph::NodeLanguage::Text => ("📄", Color32::from_rgb(200, 200, 150)),
                                                 crate::core::node_graph::NodeLanguage::Auto => ("⚙", Color32::from_rgb(180, 180, 180)),
                                             };
@@ -1123,11 +1118,8 @@ pub fn draw_sidebar(app: &mut NodeGraphApp, ctx: &egui::Context, _open_factor: f
                                         for lang in [
                                             NodeLanguage::Auto,
                                             NodeLanguage::Rust,
-                                            NodeLanguage::C,
-                                            NodeLanguage::Cpp,
                                             NodeLanguage::Python,
                                             NodeLanguage::Java,
-                                            NodeLanguage::Zig,
                                             NodeLanguage::Asm,
                                             NodeLanguage::Text,
                                         ].iter() {

@@ -229,10 +229,9 @@ impl HDAManager {
             if !node.code.is_empty() {
                 let extension = match node.language {
                     crate::core::node_graph::NodeLanguage::Rust => "rs",
-                    crate::core::node_graph::NodeLanguage::C => "c",
-                    crate::core::node_graph::NodeLanguage::Cpp => "cpp",
                     crate::core::node_graph::NodeLanguage::Asm => "asm",
-                    crate::core::node_graph::NodeLanguage::Zig => "zig",
+                    crate::core::node_graph::NodeLanguage::Java => "java",
+                    crate::core::node_graph::NodeLanguage::Python => "py",
                     _ => "txt",
                 };
                 
@@ -272,10 +271,9 @@ impl HDAManager {
             if !node.code.is_empty() {
                 let extension = match node.language {
                     crate::core::node_graph::NodeLanguage::Rust => "rs",
-                    crate::core::node_graph::NodeLanguage::C => "c",
-                    crate::core::node_graph::NodeLanguage::Cpp => "cpp",
                     crate::core::node_graph::NodeLanguage::Asm => "asm",
-                    crate::core::node_graph::NodeLanguage::Zig => "zig",
+                    crate::core::node_graph::NodeLanguage::Java => "java",
+                    crate::core::node_graph::NodeLanguage::Python => "py",
                     _ => "txt",
                 };
                 

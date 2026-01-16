@@ -943,16 +943,11 @@ impl NodeGraphApp {
         fn language_display_name(lang: crate::core::node_graph::NodeLanguage) -> String {
             match lang {
                 crate::core::node_graph::NodeLanguage::Rust => "Rust".to_string(),
-                crate::core::node_graph::NodeLanguage::C => "C".to_string(),
-                crate::core::node_graph::NodeLanguage::Cpp => "C++".to_string(),
                 crate::core::node_graph::NodeLanguage::Python => "Python".to_string(),
                 crate::core::node_graph::NodeLanguage::Java => "Java".to_string(),
-                crate::core::node_graph::NodeLanguage::Zig => "Zig".to_string(),
                 crate::core::node_graph::NodeLanguage::Asm => "Assembly".to_string(),
                 crate::core::node_graph::NodeLanguage::Text => "Text".to_string(),
                 crate::core::node_graph::NodeLanguage::Auto => "Auto".to_string(),
-                crate::core::node_graph::NodeLanguage::Mojo => "Mojo".to_string(),
-                crate::core::node_graph::NodeLanguage::MojoAI => "MojoAI".to_string(),
             }
         }
         
@@ -988,21 +983,15 @@ impl NodeGraphApp {
                             
                             // Si el lenguaje es Auto o Text, intentar extraer del título
                             if matches!(folder_language, crate::core::node_graph::NodeLanguage::Auto | crate::core::node_graph::NodeLanguage::Text) {
-                                // Intentar extraer el lenguaje del título (ej: "[C++]")
-                                if parent_node.title.contains("[C++]") {
-                                    folder_language = crate::core::node_graph::NodeLanguage::Cpp;
-                                } else if parent_node.title.contains("[Rust]") {
+                                // Intentar extraer el lenguaje del título
+                                if parent_node.title.contains("[Rust]") {
                                     folder_language = crate::core::node_graph::NodeLanguage::Rust;
                                 } else if parent_node.title.contains("[Python]") {
                                     folder_language = crate::core::node_graph::NodeLanguage::Python;
                                 } else if parent_node.title.contains("[Java]") {
                                     folder_language = crate::core::node_graph::NodeLanguage::Java;
-                                } else if parent_node.title.contains("[C]") && !parent_node.title.contains("[C++]") {
-                                    folder_language = crate::core::node_graph::NodeLanguage::C;
                                 } else if parent_node.title.contains("[Assembly]") || parent_node.title.contains("[ASM]") {
                                     folder_language = crate::core::node_graph::NodeLanguage::Asm;
-                                } else if parent_node.title.contains("[Zig]") {
-                                    folder_language = crate::core::node_graph::NodeLanguage::Zig;
                                 }
                             }
                             
@@ -1100,15 +1089,10 @@ impl NodeGraphApp {
     fn language_to_terminal(language: NodeLanguage, node_title: &str) -> crate::compilation::terminal::Language {
         match language {
             NodeLanguage::Asm => crate::compilation::terminal::Language::Nasm,
-            NodeLanguage::C => crate::compilation::terminal::Language::C,
-            NodeLanguage::Cpp => crate::compilation::terminal::Language::Cpp,
             NodeLanguage::Rust => crate::compilation::terminal::Language::Rust,
-            NodeLanguage::Zig => crate::compilation::terminal::Language::Zig,
             NodeLanguage::Java => crate::compilation::terminal::Language::Java,
             NodeLanguage::Python => crate::compilation::terminal::Language::Python,
-            NodeLanguage::Text => crate::compilation::terminal::Language::C, // Text no se compila realmente
-            NodeLanguage::Mojo => crate::compilation::terminal::Language::Mojo,
-            NodeLanguage::MojoAI => crate::compilation::terminal::Language::Mojo, // MojoAI también usa Mojo
+            NodeLanguage::Text => crate::compilation::terminal::Language::Rust, // Text no se compila realmente
             NodeLanguage::Auto => {
                 let lower = node_title.to_lowercase();
                 if lower.contains("asm") {
@@ -1117,16 +1101,10 @@ impl NodeGraphApp {
                     crate::compilation::terminal::Language::Java
                 } else if lower.contains("python") {
                     crate::compilation::terminal::Language::Python
-                } else if lower.contains("zig") {
-                    crate::compilation::terminal::Language::Zig
-                } else if lower.contains("cpp") || lower.contains("c++") {
-                    crate::compilation::terminal::Language::Cpp
                 } else if lower.contains("rust") {
                     crate::compilation::terminal::Language::Rust
-                } else if lower.contains("c ") || lower.ends_with('c') {
-                    crate::compilation::terminal::Language::C
                 } else {
-                    crate::compilation::terminal::Language::C
+                    crate::compilation::terminal::Language::Rust
                 }
             }
         }
@@ -1721,12 +1699,9 @@ impl NodeGraphApp {
                                                 .selected_text(format!("{:?}", self.folder_node_language))
                                                 .show_ui(ui, |ui| {
                                                     ui.selectable_value(&mut self.folder_node_language, crate::core::node_graph::NodeLanguage::Rust, "🦀 Rust");
-                                                    ui.selectable_value(&mut self.folder_node_language, crate::core::node_graph::NodeLanguage::C, "© C");
-                                                    ui.selectable_value(&mut self.folder_node_language, crate::core::node_graph::NodeLanguage::Cpp, "⊕ C++");
                                                     ui.selectable_value(&mut self.folder_node_language, crate::core::node_graph::NodeLanguage::Python, "🐍 Python");
                                                     ui.selectable_value(&mut self.folder_node_language, crate::core::node_graph::NodeLanguage::Java, "☕ Java");
-                                                    ui.selectable_value(&mut self.folder_node_language, crate::core::node_graph::NodeLanguage::Zig, "⚡ Zig");
-                                                    ui.selectable_value(&mut self.folder_node_language, crate::core::node_graph::NodeLanguage::Asm, "⚡ Assembly");
+                                                    ui.selectable_value(&mut self.folder_node_language, crate::core::node_graph::NodeLanguage::Asm, "⚙️ Assembly");
                                                     ui.selectable_value(&mut self.folder_node_language, crate::core::node_graph::NodeLanguage::Text, "📄 Text");
                                                 });
                                             
@@ -1772,8 +1747,8 @@ impl NodeGraphApp {
                                                 // Asegurar que el lenguaje no sea Auto o Text para carpetas heredables
                                                 let lang = self.folder_node_language;
                                                 if matches!(lang, crate::core::node_graph::NodeLanguage::Auto | crate::core::node_graph::NodeLanguage::Text) {
-                                                    // Si es Auto o Text, usar C++ por defecto para carpetas heredables
-                                                    Some(crate::core::node_graph::NodeLanguage::Cpp)
+                                                    // Si es Auto o Text, usar Rust por defecto para carpetas heredables
+                                                    Some(crate::core::node_graph::NodeLanguage::Rust)
                                                 } else {
                                                     Some(lang)
                                                 }
@@ -1800,11 +1775,8 @@ impl NodeGraphApp {
                                                         // Actualizar el título para incluir el lenguaje si no está ya
                                                         let lang_name = match lang {
                                                             crate::core::node_graph::NodeLanguage::Rust => "Rust",
-                                                            crate::core::node_graph::NodeLanguage::C => "C",
-                                                            crate::core::node_graph::NodeLanguage::Cpp => "C++",
                                                             crate::core::node_graph::NodeLanguage::Python => "Python",
                                                             crate::core::node_graph::NodeLanguage::Java => "Java",
-                                                            crate::core::node_graph::NodeLanguage::Zig => "Zig",
                                                             crate::core::node_graph::NodeLanguage::Asm => "Assembly",
                                                             _ => "",
                                                         };
@@ -2030,8 +2002,8 @@ impl NodeGraphApp {
                                         }
                                         
                                         if create_project_response.clicked() {
-                                            // Crear el proyecto Vulkan con todos los nodos
-                                            self.graph = NodeGraph::create_vulkan_project();
+                                            // Crear el proyecto de ejemplo con Rust
+                                            self.graph = NodeGraph::create_example_project();
                                             self.viewport.pan = Vec2::new(0.0, 0.0);
                                             self.viewport.zoom = 0.4; // Zoom out para ver todo
                                             
@@ -4058,28 +4030,18 @@ impl NodeGraphApp {
                                                                     for (node_id, title, language, color, code_preview) in &available_nodes {
                                                                         let (lang_str, lang_icon, lang_bg) = match language {
                                                                             NodeLanguage::Asm => ("ASM", "🔧", Color32::from_rgb(80, 50, 40)),
-                                                                            NodeLanguage::C => ("C", "©", Color32::from_rgb(40, 60, 80)),
-                                                                            NodeLanguage::Cpp => ("C++", "⊕", Color32::from_rgb(50, 40, 80)),
                                                                             NodeLanguage::Rust => ("Rust", "🦀", Color32::from_rgb(80, 40, 40)),
-                                                                            NodeLanguage::Zig => ("Zig", "⚡", Color32::from_rgb(240, 170, 0)),
                                                                             NodeLanguage::Java => ("Java", "☕", Color32::from_rgb(237, 139, 0)),
-                                                                            NodeLanguage::Python => ("Python", "🐍", Color32::from_rgb(55, 118, 171)), // Python blue oficial
+                                                                            NodeLanguage::Python => ("Python", "🐍", Color32::from_rgb(55, 118, 171)),
                                                                             NodeLanguage::Text => ("Doc", "📄", Color32::from_rgb(60, 60, 40)),
-                                                                            NodeLanguage::Mojo => ("Mojo", "🔥", Color32::from_rgb(200, 50, 50)),
-                                                                            NodeLanguage::MojoAI => ("MojoAI", "🤖", Color32::from_rgb(200, 100, 50)),
                                                                             NodeLanguage::Auto => ("Auto", "⚙", Color32::from_rgb(50, 50, 50)),
                                                                         };
                                                                         let lang_color = match *language {
                                                                             NodeLanguage::Asm => Color32::from_rgb(255, 170, 120),
-                                                                            NodeLanguage::C => Color32::from_rgb(120, 200, 255),
-                                                                            NodeLanguage::Cpp => Color32::from_rgb(180, 140, 255),
                                                                             NodeLanguage::Rust => Color32::from_rgb(255, 130, 100),
-                                                                            NodeLanguage::Zig => Color32::from_rgb(240, 170, 0), // Amarillo/naranja para Zig
-                                                                            NodeLanguage::Java => Color32::from_rgb(237, 139, 0), // Naranja Java
-                                                                            NodeLanguage::Python => Color32::from_rgb(55, 118, 171), // Azul Python oficial
+                                                                            NodeLanguage::Java => Color32::from_rgb(237, 139, 0),
+                                                                            NodeLanguage::Python => Color32::from_rgb(55, 118, 171),
                                                                             NodeLanguage::Text => Color32::from_rgb(200, 200, 150),
-                                                                            NodeLanguage::Mojo => Color32::from_rgb(255, 100, 100), // Rojo para Mojo
-                                                                            NodeLanguage::MojoAI => Color32::from_rgb(255, 150, 100), // Naranja para MojoAI
                                                                             NodeLanguage::Auto => Color32::from_gray(180),
                                                                         };
                                                                         

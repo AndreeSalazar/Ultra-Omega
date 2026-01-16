@@ -7,8 +7,6 @@ mod templates;
 mod config;
 mod expressions;
 mod inheritance;
-#[cfg(feature = "mojo")]
-mod mojo;
 
 use crate::core::NodeGraphApp;
 use crate::config::AppConfig;

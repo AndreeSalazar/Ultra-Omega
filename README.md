@@ -10,7 +10,9 @@
 Desarrollado por **Eddi Andreé Salazar Matos** 🇵🇪
 
 [![Rust](https://img.shields.io/badge/Rust-1.70+-orange.svg)](https://www.rust-lang.org/)
-[![Java](https://img.shields.io/badge/Java-25-red.svg)](https://www.java.com/)
+[![ASM](https://img.shields.io/badge/ASM-NASM%20x64-red.svg)](https://www.nasm.us/)
+[![Java](https://img.shields.io/badge/Java-25-orange.svg)](https://www.java.com/)
+[![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS-lightgrey)]()
 
@@ -134,11 +136,10 @@ $variable
 - **Rust**: Versión 1.70 o superior
 - **Cargo**: Gestor de paquetes de Rust (incluido con Rust)
 - **Compiladores** (opcionales, según los lenguajes que uses):
-  - **NASM** (para Assembly)
-  - **GCC/Clang** (para C/C++)
+  - **NASM** (para Assembly x64)
   - **Rustc** (para Rust)
-  - **Zig** (para Zig)
   - **JDK 25** (para Java 25) - Ver [Instalación de Java 25](#instalación-de-java-25)
+  - **Python 3.12** (para Python)
 - **Dependencias del Sistema**:
   - Linux: `libxcb`, `libx11`, `libxrandr`, `libasound2`
   - Windows: No requiere dependencias adicionales

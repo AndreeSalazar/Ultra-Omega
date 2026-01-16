@@ -91,15 +91,10 @@ impl NodeStorage {
         match language {
             NodeLanguage::Rust => "rs",
             NodeLanguage::Asm => "asm",
-            NodeLanguage::C => "c",
-            NodeLanguage::Cpp => "cpp",
-            NodeLanguage::Zig => "zig",
             NodeLanguage::Java => "java",
             NodeLanguage::Python => "py",
-            NodeLanguage::Mojo => "mojo",
-            NodeLanguage::MojoAI => "mojo",
             NodeLanguage::Text => "txt",
-            NodeLanguage::Auto => "txt", // Por defecto
+            NodeLanguage::Auto => "txt",
         }
     }
 

@@ -354,11 +354,8 @@ fn draw_folder_node_custom(
     if is_inheritable && !matches!(node.language, crate::core::node_graph::NodeLanguage::Auto | crate::core::node_graph::NodeLanguage::Text) {
         let lang_name = match node.language {
             crate::core::node_graph::NodeLanguage::Rust => "Rust",
-            crate::core::node_graph::NodeLanguage::C => "C",
-            crate::core::node_graph::NodeLanguage::Cpp => "C++",
             crate::core::node_graph::NodeLanguage::Python => "Python",
             crate::core::node_graph::NodeLanguage::Java => "Java",
-            crate::core::node_graph::NodeLanguage::Zig => "Zig",
             crate::core::node_graph::NodeLanguage::Asm => "Assembly",
             _ => "",
         };
