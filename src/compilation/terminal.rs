@@ -37,13 +37,9 @@ pub struct TerminalManager {
 pub enum TerminalTab {
     #[default]
     Nasm,
-    C,
-    Cpp,
     Rust,
-    Zig,
     Java,
     Python,
-    Mojo,
 }
 
 impl Default for TerminalManager {
@@ -68,13 +64,9 @@ impl Default for TerminalManager {
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum Language {
     Nasm,
-    C,
-    Cpp,
     Rust,
-    Zig,
     Java,
     Python,
-    Mojo,
 }
 
 impl TerminalManager {
@@ -134,16 +126,9 @@ impl TerminalManager {
         
         let (output_buffer, tab) = match lang {
             Language::Nasm => (&mut self.asm_output, TerminalTab::Nasm),
-            Language::C => (&mut self.c_output, TerminalTab::C),
-            Language::Cpp => (&mut self.cpp_output, TerminalTab::Cpp),
             Language::Rust => (&mut self.rust_output, TerminalTab::Rust),
-            Language::Zig => (&mut self.zig_output, TerminalTab::Zig),
             Language::Java => (&mut self.java_output, TerminalTab::Java),
             Language::Python => (&mut self.python_output, TerminalTab::Python),
-            Language::Mojo => {
-                // Mojo usa el buffer de Rust por ahora (o se puede crear uno específico)
-                (&mut self.rust_output, TerminalTab::Mojo)
-            },
         };
         
         self.active_tab = tab;
@@ -157,13 +142,9 @@ impl TerminalManager {
         // Información del lenguaje
         let lang_name = match lang {
             Language::Nasm => "NASM (Assembly)",
-            Language::C => "C",
-            Language::Cpp => "C++",
             Language::Rust => "Rust",
-            Language::Zig => "Zig",
             Language::Java => "Java 25",
             Language::Python => "Python 3.12",
-            Language::Mojo => "Mojo",
         };
         output_buffer.push_str(&format!("📝 Lenguaje: {}\n", lang_name));
         
@@ -180,10 +161,7 @@ impl TerminalManager {
 
         match lang {
             Language::Nasm => Self::compile_nasm(code, &work_dir, exe_file_str, output_buffer),
-            Language::C => Self::compile_c(code, &work_dir, exe_file_str, output_buffer),
-            Language::Cpp => Self::compile_cpp(code, &work_dir, exe_file_str, output_buffer),
             Language::Rust => Self::compile_rust(code, &work_dir, exe_file_str, output_buffer),
-            Language::Zig => Self::compile_zig(code, &work_dir, exe_file_str, output_buffer),
             Language::Java => {
                 if let Some(main_class) = Self::compile_java(code, &work_dir, output_buffer) {
                     self.java_main_class = Some(main_class.clone());
@@ -311,7 +289,6 @@ impl TerminalManager {
                 Self::run_python(code, &work_dir, output_buffer);
                 return;
             }
-            Language::Mojo => Self::compile_mojo(code, &work_dir, exe_file_str, output_buffer),
         }
 
         // Run if compiled (para Java se maneja por separado)
