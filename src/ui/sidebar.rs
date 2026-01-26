@@ -682,7 +682,26 @@ pub fn draw_sidebar(app: &mut NodeGraphApp, ctx: &egui::Context, _open_factor: f
                         for (folder_id, folder_title, folder_color, children) in &folder_with_children {
                             let is_folder_selected = app.interaction.selected_nodes.contains(folder_id);
                             
-                            // Header de carpeta
+                            // Calcular estadísticas de lenguajes en esta carpeta
+                            let mut cpp_count = 0;
+                            let mut java_count = 0;
+                            let mut asm_count = 0;
+                            let mut python_count = 0;
+                            let mut rust_count = 0;
+                            let mut other_count = 0;
+                            
+                            for (_, _, lang, _) in children {
+                                match lang {
+                                    crate::core::node_graph::NodeLanguage::Cpp => cpp_count += 1,
+                                    crate::core::node_graph::NodeLanguage::Java => java_count += 1,
+                                    crate::core::node_graph::NodeLanguage::Asm => asm_count += 1,
+                                    crate::core::node_graph::NodeLanguage::Python => python_count += 1,
+                                    crate::core::node_graph::NodeLanguage::Rust => rust_count += 1,
+                                    _ => other_count += 1,
+                                }
+                            }
+                            
+                            // Header de carpeta con estadísticas
                             let folder_bg = if is_folder_selected {
                                 Color32::from_rgba_unmultiplied(255, 180, 80, 200)
                             } else {
@@ -695,23 +714,60 @@ pub fn draw_sidebar(app: &mut NodeGraphApp, ctx: &egui::Context, _open_factor: f
                                 .rounding(egui::Rounding::same(8.0))
                                 .inner_margin(egui::Margin::symmetric(10.0, 8.0))
                                 .show(ui, |ui| {
-                                    ui.horizontal(|ui| {
-                                        ui.label(egui::RichText::new("📁")
-                                            .size(16.0)
-                                            .color(Color32::from_rgb(255, 210, 100)));
-                                        ui.add_space(6.0);
-                                        
-                                        let display_title = folder_title.trim_start_matches("📁 ");
-                                        ui.label(egui::RichText::new(display_title)
-                                            .size(12.0)
-                                            .strong()
-                                            .color(Color32::WHITE));
-                                        
-                                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                            ui.label(egui::RichText::new(format!("({} archivos)", children.len()))
-                                                .size(10.0)
-                                                .color(Color32::from_rgb(200, 180, 140)));
+                                    ui.vertical(|ui| {
+                                        // Primera fila: icono + nombre + contador
+                                        ui.horizontal(|ui| {
+                                            ui.label(egui::RichText::new("📁")
+                                                .size(16.0)
+                                                .color(Color32::from_rgb(255, 210, 100)));
+                                            ui.add_space(6.0);
+                                            
+                                            let display_title = folder_title.trim_start_matches("📁 ");
+                                            ui.label(egui::RichText::new(display_title)
+                                                .size(12.0)
+                                                .strong()
+                                                .color(Color32::WHITE));
+                                            
+                                            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                                ui.label(egui::RichText::new(format!("{}", children.len()))
+                                                    .size(11.0)
+                                                    .strong()
+                                                    .color(Color32::from_rgb(255, 220, 150)));
+                                            });
                                         });
+                                        
+                                        // Segunda fila: mini-estadísticas de lenguajes
+                                        if !children.is_empty() {
+                                            ui.add_space(4.0);
+                                            ui.horizontal_wrapped(|ui| {
+                                                ui.spacing_mut().item_spacing.x = 4.0;
+                                                if cpp_count > 0 {
+                                                    ui.label(egui::RichText::new(format!("©{}", cpp_count))
+                                                        .size(9.0)
+                                                        .color(Color32::from_rgb(100, 150, 255)));
+                                                }
+                                                if java_count > 0 {
+                                                    ui.label(egui::RichText::new(format!("☕{}", java_count))
+                                                        .size(9.0)
+                                                        .color(Color32::from_rgb(237, 139, 0)));
+                                                }
+                                                if asm_count > 0 {
+                                                    ui.label(egui::RichText::new(format!("⚡{}", asm_count))
+                                                        .size(9.0)
+                                                        .color(Color32::from_rgb(255, 220, 100)));
+                                                }
+                                                if python_count > 0 {
+                                                    ui.label(egui::RichText::new(format!("🐍{}", python_count))
+                                                        .size(9.0)
+                                                        .color(Color32::from_rgb(55, 118, 171)));
+                                                }
+                                                if rust_count > 0 {
+                                                    ui.label(egui::RichText::new(format!("🦀{}", rust_count))
+                                                        .size(9.0)
+                                                        .color(Color32::from_rgb(255, 140, 100)));
+                                                }
+                                            });
+                                        }
                                     });
                                 }).response;
                             

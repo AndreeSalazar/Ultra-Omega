@@ -77,6 +77,11 @@ pub struct NodeGraphApp {
     // ═══════════════════════════════════════════════════════════════════
     pub file_watcher: crate::storage::file_watcher::FileWatcherState,
     pub show_import_files_dialog: bool,
+    // ═══════════════════════════════════════════════════════════════════
+    // 🆕 ÁRBOL DE NAVEGACIÓN (Ctrl+T)
+    // ═══════════════════════════════════════════════════════════════════
+    pub show_tree_navigator: bool,
+    pub tree_navigator_search: String,
 }
 
 /// Representa un nivel de red en la jerarquía de subnetworks
@@ -243,6 +248,8 @@ impl NodeGraphApp {
             error_dialog_message: String::new(),
             file_watcher: crate::storage::file_watcher::FileWatcherState::new(),
             show_import_files_dialog: false,
+            show_tree_navigator: false,
+            tree_navigator_search: String::new(),
         };
         
         // Load workspace if configured
@@ -889,6 +896,14 @@ impl eframe::App for NodeGraphApp {
             self.layout_config = crate::ui::layout::LayoutConfig::semantic_map();
             self.apply_auto_layout();
         }
+        
+        // ═══════════════════════════════════════════════════════════════════
+        // 🆕 CTRL+T - ÁRBOL DE NAVEGACIÓN (Tree Navigator)
+        // ═══════════════════════════════════════════════════════════════════
+        if ctx.input(|i| i.key_pressed(egui::Key::T) && i.modifiers.ctrl) {
+            self.show_tree_navigator = !self.show_tree_navigator;
+            self.tree_navigator_search.clear();
+        }
 
         // Auto-save and file change detection
         self.check_and_auto_save();
@@ -919,6 +934,7 @@ impl eframe::App for NodeGraphApp {
             self.inheritance_view_ui(ctx);
             self.draw_compiler_status(ctx);
             self.draw_migration_dialog(ctx);
+            self.draw_tree_navigator(ctx);
         }
 }
 
@@ -3776,16 +3792,22 @@ impl NodeGraphApp {
                 continue;
             };
 
+            // ═══════════════════════════════════════════════════════════════════
+            // 🆕 COLORES INTELIGENTES DE CONEXIONES
+            // - Carpetas → Blanco (conexión base)
+            // - Archivos → Color único por lenguaje
+            // ═══════════════════════════════════════════════════════════════════
+            let smart_color = self.get_smart_link_color(link);
+
             // Usar el estilo de conector según el layout
             match self.layout_config.style {
                 crate::ui::layout::LayoutStyle::SemanticMap => {
                     // Conectores verticales para mapa semántico
-                    // Usar blanco para todas las conexiones (ignorar link.color)
                     crate::ui::nodes_semantic::draw_semantic_connector(
                         painter,
                         start,
                         end,
-                        Color32::WHITE, // Siempre blanco sobre fondo negro
+                        smart_color,
                         self.viewport.zoom,
                         false, // is_highlighted
                     );
@@ -3796,13 +3818,40 @@ impl NodeGraphApp {
                         painter,
                         start,
                         end,
-                        link.color,
+                        smart_color,
                         self.viewport.zoom,
                         time,
                     );
                 }
             }
         }
+    }
+    
+    /// Obtener color inteligente para un link basado en los nodos conectados
+    fn get_smart_link_color(&self, link: &crate::core::node_graph::Link) -> Color32 {
+        // Buscar el nodo origen (from)
+        if let Some(from_addr) = self.graph.locate_pin(link.from) {
+            if let Some(from_node) = self.graph.nodes().get(from_addr.node_index) {
+                // Si el origen es una carpeta, usar blanco
+                if from_node.title.starts_with("📁") {
+                    return Color32::from_rgb(255, 255, 255); // Blanco para carpetas
+                }
+                
+                // Si es un archivo, usar color por lenguaje
+                return match from_node.language {
+                    NodeLanguage::Cpp => Color32::from_rgb(100, 150, 255),    // Azul
+                    NodeLanguage::Java => Color32::from_rgb(237, 139, 0),     // Naranja
+                    NodeLanguage::Asm => Color32::from_rgb(255, 220, 100),    // Amarillo
+                    NodeLanguage::Python => Color32::from_rgb(55, 118, 171),  // Azul oscuro
+                    NodeLanguage::Rust => Color32::from_rgb(255, 140, 100),   // Naranja rojizo
+                    NodeLanguage::Text => Color32::from_rgb(180, 180, 180),   // Gris
+                    NodeLanguage::Auto => Color32::from_rgb(200, 200, 200),   // Gris claro
+                };
+            }
+        }
+        
+        // Fallback al color original del link
+        link.color
     }
 
     fn paint_nodes(&self, painter: &egui::Painter, rect: Rect, visuals: &Visuals) {
@@ -6140,6 +6189,235 @@ impl NodeGraphApp {
         
         if self.workspace.has_root() {
             let _ = self.save_current_graph();
+        }
+    }
+    
+    /// Dibujar el árbol de navegación (Ctrl+T)
+    fn draw_tree_navigator(&mut self, ctx: &egui::Context) {
+        use std::collections::{HashMap, HashSet};
+        
+        if !self.show_tree_navigator {
+            return;
+        }
+        
+        let screen_rect = ctx.screen_rect();
+        let window_width = 450.0;
+        let window_height = 500.0;
+        let window_pos = pos2(
+            (screen_rect.width() - window_width) / 2.0,
+            (screen_rect.height() - window_height) / 2.0
+        );
+        
+        egui::Window::new("🌳 Árbol de Navegación")
+            .fixed_pos(window_pos)
+            .fixed_size(egui::vec2(window_width, window_height))
+            .collapsible(false)
+            .resizable(false)
+            .frame(egui::Frame::window(&ctx.style())
+                .fill(Color32::from_rgb(30, 35, 45))
+                .stroke(egui::Stroke::new(2.0, Color32::from_rgb(100, 150, 255)))
+                .rounding(egui::Rounding::same(12.0))
+                .shadow(egui::epaint::Shadow {
+                    offset: egui::vec2(0.0, 4.0),
+                    blur: 20.0,
+                    spread: 0.0,
+                    color: Color32::from_black_alpha(120),
+                }))
+            .show(ctx, |ui| {
+                // Header con búsqueda
+                ui.horizontal(|ui| {
+                    ui.label(egui::RichText::new("🔍").size(16.0));
+                    let response = ui.add_sized(
+                        egui::vec2(ui.available_width() - 60.0, 28.0),
+                        egui::TextEdit::singleline(&mut self.tree_navigator_search)
+                            .hint_text("Buscar nodo o carpeta...")
+                    );
+                    response.request_focus();
+                    
+                    if ui.button("✕").clicked() {
+                        self.show_tree_navigator = false;
+                    }
+                });
+                
+                ui.add_space(10.0);
+                ui.separator();
+                ui.add_space(10.0);
+                
+                // Construir árbol de carpetas y nodos
+                let nodes = self.graph.nodes();
+                let links = self.graph.links();
+                let search_query = self.tree_navigator_search.to_lowercase();
+                
+                // Identificar carpetas y sus hijos
+                let mut folder_children: HashMap<NodeId, Vec<NodeId>> = HashMap::new();
+                let mut assigned: HashSet<NodeId> = HashSet::new();
+                
+                for node in nodes.iter() {
+                    if node.title.starts_with("📁") {
+                        let mut children = Vec::new();
+                        for output_pin in &node.outputs {
+                            for link in links {
+                                if link.from == output_pin.id {
+                                    if let Some(to_addr) = self.graph.locate_pin(link.to) {
+                                        if let Some(child) = nodes.get(to_addr.node_index) {
+                                            if !child.title.starts_with("📁") {
+                                                children.push(child.id);
+                                                assigned.insert(child.id);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        folder_children.insert(node.id, children);
+                    }
+                }
+                
+                // Scroll area para el árbol
+                egui::ScrollArea::vertical()
+                    .max_height(380.0)
+                    .show(ui, |ui| {
+                        let mut node_to_select: Option<NodeId> = None;
+                        
+                        // Mostrar carpetas con sus hijos
+                        for node in nodes.iter() {
+                            if node.title.starts_with("📁") {
+                                let folder_name = node.title.trim_start_matches("📁 ");
+                                
+                                // Filtrar por búsqueda
+                                let children = folder_children.get(&node.id).cloned().unwrap_or_default();
+                                let matches_search = search_query.is_empty() || 
+                                    folder_name.to_lowercase().contains(&search_query) ||
+                                    children.iter().any(|&cid| {
+                                        nodes.iter().find(|n| n.id == cid)
+                                            .map(|n| n.title.to_lowercase().contains(&search_query))
+                                            .unwrap_or(false)
+                                    });
+                                
+                                if !matches_search {
+                                    continue;
+                                }
+                                
+                                // Carpeta header
+                                let folder_response = ui.horizontal(|ui| {
+                                    ui.label(egui::RichText::new("📁")
+                                        .size(16.0)
+                                        .color(Color32::from_rgb(255, 200, 80)));
+                                    ui.label(egui::RichText::new(folder_name)
+                                        .size(13.0)
+                                        .strong()
+                                        .color(Color32::from_rgb(255, 230, 180)));
+                                    ui.label(egui::RichText::new(format!("({} archivos)", children.len()))
+                                        .size(10.0)
+                                        .color(Color32::from_rgb(150, 150, 150)));
+                                }).response;
+                                
+                                if folder_response.clicked() {
+                                    node_to_select = Some(node.id);
+                                }
+                                
+                                // Hijos de la carpeta
+                                for &child_id in &children {
+                                    if let Some(child) = nodes.iter().find(|n| n.id == child_id) {
+                                        if !search_query.is_empty() && !child.title.to_lowercase().contains(&search_query) {
+                                            continue;
+                                        }
+                                        
+                                        let (icon, color) = match child.language {
+                                            NodeLanguage::Cpp => ("©", Color32::from_rgb(100, 150, 255)),
+                                            NodeLanguage::Java => ("☕", Color32::from_rgb(237, 139, 0)),
+                                            NodeLanguage::Asm => ("⚡", Color32::from_rgb(255, 220, 100)),
+                                            NodeLanguage::Python => ("🐍", Color32::from_rgb(55, 118, 171)),
+                                            NodeLanguage::Rust => ("🦀", Color32::from_rgb(255, 140, 100)),
+                                            NodeLanguage::Text => ("📄", Color32::from_rgb(180, 180, 180)),
+                                            NodeLanguage::Auto => ("⚙", Color32::from_rgb(150, 150, 150)),
+                                        };
+                                        
+                                        let child_response = ui.horizontal(|ui| {
+                                            ui.add_space(24.0); // Indentación
+                                            ui.label(egui::RichText::new("├─").size(10.0).color(Color32::from_rgb(80, 80, 80)));
+                                            ui.label(egui::RichText::new(icon).size(12.0).color(color));
+                                            ui.label(egui::RichText::new(&child.title)
+                                                .size(11.0)
+                                                .color(Color32::from_rgb(200, 200, 210)));
+                                        }).response;
+                                        
+                                        if child_response.clicked() {
+                                            node_to_select = Some(child.id);
+                                        }
+                                    }
+                                }
+                                
+                                ui.add_space(4.0);
+                            }
+                        }
+                        
+                        // Nodos sin carpeta
+                        let orphans: Vec<_> = nodes.iter()
+                            .filter(|n| !n.title.starts_with("📁") && !assigned.contains(&n.id))
+                            .collect();
+                        
+                        if !orphans.is_empty() {
+                            ui.add_space(10.0);
+                            ui.label(egui::RichText::new("📄 Otros nodos")
+                                .size(12.0)
+                                .strong()
+                                .color(Color32::from_rgb(150, 180, 220)));
+                            
+                            for node in orphans {
+                                if !search_query.is_empty() && !node.title.to_lowercase().contains(&search_query) {
+                                    continue;
+                                }
+                                
+                                let (icon, color) = match node.language {
+                                    NodeLanguage::Cpp => ("©", Color32::from_rgb(100, 150, 255)),
+                                    NodeLanguage::Java => ("☕", Color32::from_rgb(237, 139, 0)),
+                                    NodeLanguage::Asm => ("⚡", Color32::from_rgb(255, 220, 100)),
+                                    NodeLanguage::Python => ("🐍", Color32::from_rgb(55, 118, 171)),
+                                    NodeLanguage::Rust => ("🦀", Color32::from_rgb(255, 140, 100)),
+                                    NodeLanguage::Text => ("📄", Color32::from_rgb(180, 180, 180)),
+                                    NodeLanguage::Auto => ("⚙", Color32::from_rgb(150, 150, 150)),
+                                };
+                                
+                                let response = ui.horizontal(|ui| {
+                                    ui.add_space(8.0);
+                                    ui.label(egui::RichText::new(icon).size(12.0).color(color));
+                                    ui.label(egui::RichText::new(&node.title)
+                                        .size(11.0)
+                                        .color(Color32::from_rgb(200, 200, 210)));
+                                }).response;
+                                
+                                if response.clicked() {
+                                    node_to_select = Some(node.id);
+                                }
+                            }
+                        }
+                        
+                        // Navegar al nodo seleccionado
+                        if let Some(id) = node_to_select {
+                            self.interaction.selected_nodes.clear();
+                            self.interaction.selected_nodes.insert(id);
+                            if let Some(node) = self.graph.node(id) {
+                                let node_rect = Rect::from_center_size(node.position, egui::vec2(150.0, 80.0));
+                                self.viewport.focus_on(node_rect, ctx.screen_rect());
+                            }
+                            self.show_tree_navigator = false;
+                        }
+                    });
+                
+                // Tip de teclas
+                ui.add_space(10.0);
+                ui.separator();
+                ui.horizontal(|ui| {
+                    ui.label(egui::RichText::new("💡 Haz clic en un nodo para navegar | ESC para cerrar")
+                        .size(10.0)
+                        .color(Color32::from_rgb(120, 140, 160)));
+                });
+            });
+        
+        // ESC para cerrar
+        if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+            self.show_tree_navigator = false;
         }
     }
 }
