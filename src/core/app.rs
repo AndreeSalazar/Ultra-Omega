@@ -871,6 +871,25 @@ impl eframe::App for NodeGraphApp {
             }
         }
 
+        // ═══════════════════════════════════════════════════════════════════
+        // 🆕 TECLA L - AUTO-LAYOUT (Organizar nodos automáticamente)
+        // ═══════════════════════════════════════════════════════════════════
+        if ctx.input(|i| i.key_pressed(egui::Key::L) && !i.modifiers.ctrl && !i.modifiers.shift) {
+            self.apply_auto_layout();
+        }
+        
+        // Ctrl+L - Layout horizontal
+        if ctx.input(|i| i.key_pressed(egui::Key::L) && i.modifiers.ctrl && !i.modifiers.shift) {
+            self.layout_config = crate::ui::layout::LayoutConfig::horizontal();
+            self.apply_auto_layout();
+        }
+        
+        // Ctrl+Shift+L - Layout semántico (árbol)
+        if ctx.input(|i| i.key_pressed(egui::Key::L) && i.modifiers.ctrl && i.modifiers.shift) {
+            self.layout_config = crate::ui::layout::LayoutConfig::semantic_map();
+            self.apply_auto_layout();
+        }
+
         // Auto-save and file change detection
         self.check_and_auto_save();
         self.check_file_changes();
@@ -4776,6 +4795,217 @@ impl NodeGraphApp {
         }
         
         Some(folder_node_id)
+    }
+
+    /// Aplicar Auto-Layout INTELIGENTE a todos los nodos del grafo
+    /// Agrupa nodos de carpeta con sus archivos hijos conectados
+    pub fn apply_auto_layout(&mut self) {
+        use std::collections::{HashMap, HashSet};
+        use eframe::egui::pos2;
+        
+        let node_count = self.graph.nodes().len();
+        if node_count == 0 { return; }
+        
+        // ═══════════════════════════════════════════════════════════════════
+        // PASO 1: Identificar nodos carpeta (📁) y sus hijos conectados
+        // ═══════════════════════════════════════════════════════════════════
+        let nodes = self.graph.nodes();
+        let links = self.graph.links();
+        
+        // Encontrar nodos carpeta (títulos que empiezan con 📁)
+        let mut folder_nodes: Vec<(NodeId, usize)> = Vec::new(); // (id, index)
+        let mut file_nodes: Vec<(NodeId, usize)> = Vec::new();
+        
+        for (idx, node) in nodes.iter().enumerate() {
+            if node.title.starts_with("📁") {
+                folder_nodes.push((node.id, idx));
+            } else {
+                file_nodes.push((node.id, idx));
+            }
+        }
+        
+        // ═══════════════════════════════════════════════════════════════════
+        // PASO 2: Mapear qué archivos pertenecen a qué carpeta (por conexiones)
+        // ═══════════════════════════════════════════════════════════════════
+        let mut folder_children: HashMap<NodeId, Vec<NodeId>> = HashMap::new();
+        let mut assigned_files: HashSet<NodeId> = HashSet::new();
+        
+        for &(folder_id, folder_idx) in &folder_nodes {
+            folder_children.insert(folder_id, Vec::new());
+            
+            // Buscar archivos conectados a esta carpeta
+            if let Some(folder_node) = nodes.get(folder_idx) {
+                for output_pin in &folder_node.outputs {
+                    for link in links {
+                        if link.from == output_pin.id {
+                            if let Some(to_addr) = self.graph.locate_pin(link.to) {
+                                if let Some(child_node) = nodes.get(to_addr.node_index) {
+                                    if !child_node.title.starts_with("📁") {
+                                        folder_children.get_mut(&folder_id).unwrap().push(child_node.id);
+                                        assigned_files.insert(child_node.id);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Archivos sin carpeta asignada
+        let unassigned_files: Vec<NodeId> = file_nodes.iter()
+            .filter(|(id, _)| !assigned_files.contains(id))
+            .map(|(id, _)| *id)
+            .collect();
+        
+        // ═══════════════════════════════════════════════════════════════════
+        // PASO 3: Calcular posiciones organizadas por grupos
+        // ═══════════════════════════════════════════════════════════════════
+        let start_x = 100.0;
+        let start_y = 100.0;
+        let folder_spacing_x = 400.0;  // Espacio entre grupos de carpetas
+        let folder_spacing_y = 350.0;  // Espacio vertical entre filas de carpetas
+        let file_spacing_x = 180.0;    // Espacio entre archivos dentro de un grupo
+        let file_spacing_y = 80.0;     // Espacio vertical entre archivos
+        let files_per_row = 3;         // Archivos por fila dentro de un grupo
+        let folders_per_row = 3;       // Carpetas por fila
+        
+        let mut current_folder_x = start_x;
+        let mut current_folder_y = start_y;
+        let mut folder_count_in_row = 0;
+        
+        // Posicionar carpetas y sus hijos
+        for &(folder_id, _) in &folder_nodes {
+            // Posicionar la carpeta
+            if let Some(folder_node) = self.graph.node_mut(folder_id) {
+                folder_node.position = pos2(current_folder_x, current_folder_y);
+            }
+            
+            // Posicionar archivos hijos debajo de la carpeta
+            if let Some(children) = folder_children.get(&folder_id) {
+                let mut file_x = current_folder_x;
+                let mut file_y = current_folder_y + 100.0; // Debajo de la carpeta
+                let mut file_count_in_row = 0;
+                
+                for &child_id in children {
+                    if let Some(file_node) = self.graph.node_mut(child_id) {
+                        file_node.position = pos2(file_x, file_y);
+                    }
+                    
+                    file_count_in_row += 1;
+                    if file_count_in_row >= files_per_row {
+                        file_count_in_row = 0;
+                        file_x = current_folder_x;
+                        file_y += file_spacing_y;
+                    } else {
+                        file_x += file_spacing_x;
+                    }
+                }
+            }
+            
+            // Mover a la siguiente posición de carpeta
+            folder_count_in_row += 1;
+            if folder_count_in_row >= folders_per_row {
+                folder_count_in_row = 0;
+                current_folder_x = start_x;
+                current_folder_y += folder_spacing_y;
+            } else {
+                current_folder_x += folder_spacing_x;
+            }
+        }
+        
+        // ═══════════════════════════════════════════════════════════════════
+        // PASO 4: Posicionar archivos sin carpeta asignada
+        // ═══════════════════════════════════════════════════════════════════
+        if !unassigned_files.is_empty() {
+            let unassigned_start_y = current_folder_y + 150.0;
+            let mut unassigned_x = start_x;
+            let mut unassigned_y = unassigned_start_y;
+            let mut count_in_row = 0;
+            
+            for file_id in unassigned_files {
+                if let Some(file_node) = self.graph.node_mut(file_id) {
+                    file_node.position = pos2(unassigned_x, unassigned_y);
+                }
+                
+                count_in_row += 1;
+                if count_in_row >= 5 {
+                    count_in_row = 0;
+                    unassigned_x = start_x;
+                    unassigned_y += file_spacing_y;
+                } else {
+                    unassigned_x += file_spacing_x;
+                }
+            }
+        }
+        
+        // Guardar cambios
+        self.check_and_auto_save();
+    }
+    
+    /// Calcular niveles de nodos basados en conexiones (para mapa semántico)
+    fn calculate_node_levels(&self) -> Vec<usize> {
+        use std::collections::{HashMap, HashSet};
+        
+        let node_count = self.graph.nodes().len();
+        if node_count == 0 { return vec![]; }
+        
+        let nodes = self.graph.nodes();
+        let links = self.graph.links();
+        
+        // Construir mapa de conexiones
+        let mut has_input: HashSet<usize> = HashSet::new();
+        
+        for link in links {
+            if let Some(to_addr) = self.graph.locate_pin(link.to) {
+                has_input.insert(to_addr.node_index);
+            }
+        }
+        
+        // Nodos raíz (sin inputs)
+        let roots: Vec<usize> = (0..nodes.len())
+            .filter(|i| !has_input.contains(i))
+            .collect();
+        
+        // Calcular profundidad de cada nodo
+        let mut depths: HashMap<usize, usize> = HashMap::new();
+        let mut stack: Vec<(usize, usize)> = roots.iter().map(|&i| (i, 0)).collect();
+        
+        while let Some((node_idx, depth)) = stack.pop() {
+            if depths.get(&node_idx).map(|&d| d >= depth).unwrap_or(false) {
+                continue;
+            }
+            depths.insert(node_idx, depth);
+            
+            // Buscar hijos
+            if let Some(node) = nodes.get(node_idx) {
+                for output_pin in &node.outputs {
+                    for link in links {
+                        if link.from == output_pin.id {
+                            if let Some(to_addr) = self.graph.locate_pin(link.to) {
+                                stack.push((to_addr.node_index, depth + 1));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Contar nodos por nivel
+        let max_depth = depths.values().max().copied().unwrap_or(0);
+        let mut levels = vec![0; max_depth + 1];
+        
+        for &depth in depths.values() {
+            levels[depth] += 1;
+        }
+        
+        // Si hay nodos sin clasificar, agregarlos al primer nivel
+        let classified = depths.len();
+        if classified < node_count {
+            levels[0] += node_count - classified;
+        }
+        
+        levels
     }
 
     fn handle_cut_tool(&mut self, painter: &egui::Painter, input: &PointerSnapshot, rect: Rect) {
