@@ -72,6 +72,11 @@ pub struct NodeGraphApp {
     // ═══════════════════════════════════════════════════════════════════
     pub show_error_dialog: bool,
     pub error_dialog_message: String,
+    // ═══════════════════════════════════════════════════════════════════
+    // 🆕 SISTEMA DE FILE WATCHER (Detección en tiempo real)
+    // ═══════════════════════════════════════════════════════════════════
+    pub file_watcher: crate::storage::file_watcher::FileWatcherState,
+    pub show_import_files_dialog: bool,
 }
 
 /// Representa un nivel de red en la jerarquía de subnetworks
@@ -236,6 +241,8 @@ impl NodeGraphApp {
             folder_node_language: crate::core::node_graph::NodeLanguage::Auto, // Por defecto Auto
             show_error_dialog: false,
             error_dialog_message: String::new(),
+            file_watcher: crate::storage::file_watcher::FileWatcherState::new(),
+            show_import_files_dialog: false,
         };
         
         // Load workspace if configured
@@ -867,6 +874,9 @@ impl eframe::App for NodeGraphApp {
         // Auto-save and file change detection
         self.check_and_auto_save();
         self.check_file_changes();
+        
+        // Sincronizar FileWatcher con el workspace
+        self.sync_file_watcher();
         
         // Save config periodically (every 5 seconds or on close)
         // This will be handled on close via save_config
@@ -4614,6 +4624,158 @@ impl NodeGraphApp {
                 }
             }
         }
+    }
+
+    /// Sincronizar el FileWatcher con el workspace y crear nodos automáticamente
+    pub fn sync_file_watcher(&mut self) {
+        // Solo sincronizar si hay un workspace configurado
+        if !self.workspace.has_root() {
+            return;
+        }
+        
+        // Sincronizar la ruta del FileWatcher con el workspace
+        if let Some(ref root_path) = self.workspace.root_path {
+            if self.file_watcher.root_path.as_ref() != Some(root_path) {
+                self.file_watcher.set_root(root_path.clone());
+            }
+        }
+        
+        // Escanear si es necesario
+        if self.file_watcher.needs_scan() {
+            if let Err(e) = self.file_watcher.scan() {
+                eprintln!("FileWatcher scan error: {}", e);
+            }
+        }
+    }
+    
+    /// Importar archivos detectados como nodos en el grafo
+    pub fn import_detected_files_as_nodes(&mut self) {
+        use eframe::egui::Color32;
+        
+        if let Some(ref structure) = self.file_watcher.detected_structure.clone() {
+            let start_pos = eframe::egui::pos2(100.0, 100.0);
+            let spacing = 200.0;
+            
+            // Crear nodos para la estructura de carpetas
+            self.create_folder_nodes_recursive(structure, start_pos, spacing, 0);
+            
+            // Guardar cambios
+            self.check_and_auto_save();
+        }
+    }
+    
+    /// Crear nodos recursivamente para carpetas y archivos
+    fn create_folder_nodes_recursive(
+        &mut self,
+        folder: &crate::storage::file_watcher::DetectedFolder,
+        start_pos: eframe::egui::Pos2,
+        spacing: f32,
+        depth: usize,
+    ) -> Option<NodeId> {
+        use eframe::egui::Color32;
+        use crate::storage::file_watcher::detect_language_from_extension;
+        
+        // Color para carpeta
+        let folder_color = Color32::from_rgb(255, 200, 100);
+        let folder_language = folder.dominant_language.unwrap_or(NodeLanguage::Cpp);
+        
+        // Crear nodo para la carpeta
+        let folder_code = format!(
+            "// 📁 Carpeta: {}\n// Archivos: {}\n// Subcarpetas: {}\n// Lenguaje dominante: {:?}",
+            folder.name,
+            folder.file_count,
+            folder.folder_count,
+            folder.dominant_language
+        );
+        
+        let folder_node_id = self.graph.add_node(
+            format!("📁 {}", folder.name),
+            start_pos,
+            folder_color,
+            &["in"],
+            &["out", "files"],
+            folder_language,
+        );
+        
+        // Establecer código del nodo carpeta
+        if let Some(node) = self.graph.node_mut(folder_node_id) {
+            node.code = folder_code;
+        }
+        
+        // Crear nodos para archivos de código en esta carpeta
+        let mut file_pos = eframe::egui::pos2(
+            start_pos.x + spacing,
+            start_pos.y,
+        );
+        
+        for file in &folder.files {
+            // Solo archivos de código
+            match file.extension.as_str() {
+                "cpp" | "cc" | "cxx" | "c++" | "c" | "h" | "hpp" | "hxx" |
+                "java" | "asm" | "s" | "nasm" | "py" | "pyw" | "rs" => {
+                    let code = std::fs::read_to_string(&file.path).unwrap_or_default();
+                    
+                    // Color basado en lenguaje
+                    let color = match file.language {
+                        NodeLanguage::Cpp => Color32::from_rgb(100, 150, 255),
+                        NodeLanguage::Java => Color32::from_rgb(237, 139, 0),
+                        NodeLanguage::Asm => Color32::from_rgb(255, 220, 100),
+                        NodeLanguage::Python => Color32::from_rgb(55, 118, 171),
+                        NodeLanguage::Rust => Color32::from_rgb(255, 140, 100),
+                        NodeLanguage::Text => Color32::from_rgb(180, 180, 180),
+                        NodeLanguage::Auto => Color32::from_rgb(150, 150, 150),
+                    };
+                    
+                    let file_node_id = self.graph.add_node(
+                        file.name.clone(),
+                        file_pos,
+                        color,
+                        &["in"],
+                        &["out"],
+                        file.language,
+                    );
+                    
+                    // Establecer código del nodo
+                    if let Some(node) = self.graph.node_mut(file_node_id) {
+                        node.code = code;
+                        node.code_path = Some(file.path.to_string_lossy().to_string());
+                    }
+                    
+                    // Conectar archivo al nodo carpeta
+                    if let Some(folder_node) = self.graph.node(folder_node_id) {
+                        if let Some(folder_output) = folder_node.outputs.get(1) {
+                            if let Some(file_node) = self.graph.node(file_node_id) {
+                                if let Some(file_input) = file_node.inputs.first() {
+                                    self.graph.add_link(folder_output.id, file_input.id, Color32::from_rgb(100, 200, 150));
+                                }
+                            }
+                        }
+                    }
+                    
+                    file_pos.y += spacing * 0.5;
+                }
+                _ => {}
+            }
+        }
+        
+        // Procesar subcarpetas recursivamente
+        let mut subfolder_pos = eframe::egui::pos2(
+            start_pos.x,
+            start_pos.y + spacing * (1.0 + folder.files.len() as f32 * 0.3),
+        );
+        
+        for subfolder in &folder.subfolders {
+            if let Some(_subfolder_node_id) = self.create_folder_nodes_recursive(
+                subfolder,
+                subfolder_pos,
+                spacing,
+                depth + 1,
+            ) {
+                subfolder_pos.y += spacing * 1.5;
+            }
+        }
+        
+        Some(folder_node_id)
     }
 
     fn handle_cut_tool(&mut self, painter: &egui::Painter, input: &PointerSnapshot, rect: Rect) {

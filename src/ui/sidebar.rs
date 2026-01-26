@@ -185,6 +185,42 @@ pub fn draw_sidebar(app: &mut NodeGraphApp, ctx: &egui::Context, _open_factor: f
                                 });
                             ui.add_space(10.0);
                             
+                            // Botón para importar archivos como nodos
+                            if app.file_watcher.detected_structure.is_some() {
+                                let stats = app.file_watcher.get_stats();
+                                let total_code_files = stats.cpp_files + stats.java_files + stats.asm_files + stats.python_files + stats.rust_files;
+                                
+                                if total_code_files > 0 {
+                                    egui::Frame::none()
+                                        .fill(Color32::from_rgba_unmultiplied(40, 80, 60, 180))
+                                        .stroke(Stroke::new(1.0, Color32::from_rgb(100, 200, 150)))
+                                        .rounding(egui::Rounding::same(6.0))
+                                        .inner_margin(egui::Margin::symmetric(10.0, 8.0))
+                                        .show(ui, |ui| {
+                                            ui.horizontal(|ui| {
+                                                ui.label(egui::RichText::new("🔄")
+                                                    .size(14.0)
+                                                    .color(Color32::from_rgb(100, 255, 150)));
+                                                ui.label(egui::RichText::new(format!("{} archivos detectados", total_code_files))
+                                                    .size(11.0)
+                                                    .color(Color32::from_rgb(200, 255, 220)));
+                                            });
+                                            
+                                            ui.add_space(4.0);
+                                            
+                                            if ui.add(egui::Button::new(egui::RichText::new("📥 Importar como Nodos")
+                                                    .size(11.0)
+                                                    .color(Color32::WHITE))
+                                                .fill(Color32::from_rgb(60, 140, 100))
+                                                .min_size(egui::vec2(ui.available_width(), 24.0)))
+                                                .clicked() {
+                                                app.import_detected_files_as_nodes();
+                                            }
+                                        });
+                                    ui.add_space(6.0);
+                                }
+                            }
+                            
                             // Información del proyecto mejorada con estilo profesional
                             egui::Frame::none()
                                 .fill(Color32::from_rgba_unmultiplied(38, 45, 58, 140))
