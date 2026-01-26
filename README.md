@@ -61,6 +61,10 @@ El sistema permite crear proyectos complejos conectando nodos visuales, donde ca
 - **Zoom y Pan**: Navegación fluida por el viewport con scroll y arrastre
 - **Selección Múltiple**: Selecciona múltiples nodos con box selection (arrastrar con Shift)
 - **Herencia Visual**: Visualiza la cadena de herencia de código con `Ctrl+I`
+- **🆕 Gestión de Carpetas Inteligente**: Sistema avanzado de organización por carpetas
+- **🆕 Colores de Conexiones por Lenguaje**: Conexiones codificadas por color para fácil identificación
+- **🆕 Árbol de Navegación**: Navegación rápida con `Ctrl+T` y búsqueda en tiempo real
+- **🆕 Auto-Layout Inteligente**: Organización automática de nodos por carpetas/grupos
 
 ### 💻 Editor de Código Integrado
 
@@ -119,6 +123,54 @@ $variable
 - **Auto-guardado**: Guarda automáticamente el estado del grafo
 - **Persistencia**: Guarda posición de ventana, tamaño, y configuración
 - **Exportación**: Exporta el grafo completo a JSON
+- **🆕 File Watcher**: Detección en tiempo real de cambios en archivos
+- **🆕 Importación Automática**: Importa carpetas como nodos organizados
+- **🆕 Sidebar Jerárquico**: Vista de carpetas con estadísticas de lenguajes
+
+### 🌳 Sistema de Gestión de Carpetas
+
+**Ultra-Omega incluye un sistema avanzado de gestión de carpetas inspirado en Houdini:**
+
+#### 📁 Detección y Organización
+- **File Watcher en Tiempo Real**: Detecta automáticamente archivos nuevos, modificados o eliminados
+- **Importación Inteligente**: Convierte carpetas en nodos contenedores con sus archivos como hijos
+- **Organización por Lenguaje**: Identifica automáticamente el lenguaje de cada archivo
+
+#### 🎨 Visualización Mejorada
+- **Sidebar Jerárquico**: Muestra carpetas con sus archivos hijos indentados
+- **Estadísticas por Carpeta**: `📁 cpp (3) ©2 ☕1` - contador y distribución de lenguajes
+- **Iconos por Lenguaje**: © C++, ☕ Java, ⚡ ASM, 🐍 Python, 🦀 Rust
+- **Colores Únicos**: Cada tipo de archivo tiene su color distintivo
+
+#### 🔗 Conexiones Inteligentes
+| Tipo de Conexión | Color | Significado |
+|-----------------|-------|------------|
+| **📁 Carpeta → Archivo** | **Blanco** | Conexión base/estructura |
+| **© C++** | Azul | Archivos C++ |
+| **☕ Java** | Naranja | Archivos Java |
+| **⚡ ASM** | Amarillo | Archivos Assembly |
+| **🐍 Python** | Azul Oscuro | Archivos Python |
+| **🦀 Rust** | Naranja Rojizo | Archivos Rust |
+
+#### ⌨️ Atajos de Carpeta
+| Atajo | Acción |
+|-------|--------|
+| **Ctrl+T** | Abrir árbol de navegación |
+| **L** | Auto-Layout inteligente (agrupa carpetas) |
+| **Ctrl+L** | Layout horizontal |
+| **Ctrl+Shift+L** | Layout semántico/árbol |
+
+#### 🌲 Árbol de Navegación (Ctrl+T)
+- **Búsqueda en Tiempo Real**: Encuentra nodos y carpetas instantáneamente
+- **Navegación Rápida**: Haz clic para saltar directamente a cualquier nodo
+- **Vista Jerárquica**: Muestra estructura de carpetas y archivos en árbol
+- **Filtros Inteligentes**: Filtra por nombre o tipo de archivo
+
+#### 📐 Auto-Layout Inteligente
+- **Organización por Grupos**: Las carpetas se posicionan en cuadrícula 3x3
+- **Archivos Agrupados**: Los archivos hijos se colocan debajo de su carpeta
+- **Espaciado Automático**: Distribución óptima para evitar superposiciones
+- **Layouts Múltiples**: Horizontal, semántico, o personalizado
 
 ### 🖥️ Terminal Integrado
 
@@ -331,6 +383,89 @@ fn main() {
     println!("App specific");
 }
 ```
+
+### 🆕 Ejemplo: Sistema de Carpetas Inteligente
+
+#### 1. Importar Carpeta Existente
+```
+📁 TEST para Ultra O/
+├── cpp/
+│   ├── main.cpp
+│   └── utils.cpp
+├── java/
+│   ├── Main.java
+│   └── Utils.java
+└── asm/
+    └── hello.asm
+```
+
+**Resultado en Ultra-Omega:**
+```
+📁 cpp                    2
+   ©2
+   ├── © main.cpp
+   └── © utils.cpp
+
+📁 java                  2
+   ☕2
+   ├── ☕ Main.java
+   └── ☕ Utils.java
+
+📁 asm                   1
+   ⚡1
+   └── ⚡ hello.asm
+```
+
+#### 2. Navegación Rápida con Ctrl+T
+```
+🌳 Árbol de Navegación
+├── 🔍 [Buscar...]
+├── 📁 cpp (2 archivos)
+│   ├── └── © main.cpp
+│   └── └── © utils.cpp
+├── 📁 java (2 archivos)
+│   ├── └── ☕ Main.java
+│   └── └── ☕ Utils.java
+└── 📁 asm (1 archivo)
+    └── └── ⚡ hello.asm
+```
+
+#### 3. Auto-Layout con Tecla L
+**Antes:** Nodos desorganizados
+```
+[main.cpp]   [Utils.java]   [hello.asm]
+    ↓              ↓              ↓
+[utils.cpp]   [Main.java]   [extra.cpp]
+```
+
+**Después (presionando L):**
+```
+📁 cpp (2)          📁 java (2)          📁 asm (1)
+   ↓                    ↓                    ↓
+© main.cpp          ☕ Main.java          ⚡ hello.asm
+© utils.cpp         ☕ Utils.java
+```
+
+#### 4. Conexiones por Color
+- **📁 → ©**: Conexión blanca (carpeta a archivo C++)
+- **📁 → ☕**: Conexión blanca (carpeta a archivo Java)
+- **📁 → ⚡**: Conexión blanca (carpeta a archivo ASM)
+
+#### 5. Estadísticas en Tiempo Real
+```
+📁 cpp                    3
+   ©2 ☕1
+   ├── © main.cpp
+   ├── © utils.cpp
+   └── ☕ Main.java
+```
+
+**Beneficios:**
+- **Organización Automática**: Las carpetas mantienen sus archivos agrupados
+- **Identificación Visual**: Colores únicos por lenguaje para fácil reconocimiento
+- **Navegación Rápida**: Salta a cualquier nodo con Ctrl+T
+- **Layout Inteligente**: Organización automática con tecla L
+- **Estadísticas Instantáneas**: Conteo y distribución de lenguajes por carpeta
 
 ---
 
@@ -773,6 +908,7 @@ let code = format!(
 | `F` | Enfocar viewport en los nodos |
 | `Ctrl + Scroll` | Zoom in/out |
 | `Middle Click + Drag` | Pan del viewport |
+| `Ctrl + T` | 🆕 Abrir árbol de navegación de nodos |
 
 ### Edición
 
@@ -786,6 +922,15 @@ let code = format!(
 | `Ctrl + R` | Exportar selección a parámetros |
 | `Ctrl + Shift + P` | Modo múltiples parámetros |
 | `Ctrl + I` | Ver cadena de herencia |
+
+### 🆕 Gestión de Carpetas y Layout
+
+| Atajo | Acción |
+|-------|--------|
+| `L` | Auto-Layout inteligente (agrupa carpetas con hijos) |
+| `Ctrl + L` | Layout horizontal (flujo izquierda → derecha) |
+| `Ctrl + Shift + L` | Layout semántico/árbol (flujo arriba → abajo) |
+| `Ctrl + T` | Árbol de navegación con búsqueda |
 
 ### Archivos
 
@@ -926,6 +1071,26 @@ Crea tus propios templates:
 
 ## 🔮 Roadmap
 
+### ✅ Características Implementadas (v1.0)
+
+- [x] **Sistema de Gestión de Carpetas Inteligente**
+  - [x] File Watcher en tiempo real
+  - [x] Importación automática de carpetas como nodos
+  - [x] Sidebar jerárquico con estadísticas
+  - [x] Colores de conexiones por lenguaje
+  - [x] Árbol de navegación (Ctrl+T)
+  - [x] Auto-Layout inteligente (tecla L)
+
+- [x] **Sistema de Expresiones Houdini-style**
+  - [x] Parser y evaluador de expresiones
+  - [x] Sistema de canales para comunicación
+  - [x] Referencias entre nodos con `ch()`
+
+- [x] **Templates Multi-lenguaje**
+  - [x] 91+ templates pre-construidos
+  - [x] Soporte para Rust, Assembly, Java, Python, C++
+  - [x] Detección automática de versión C++
+
 ### Próximas Características
 
 - [ ] Validación de referencias circulares en expresiones
@@ -937,14 +1102,14 @@ Crea tus propios templates:
 - [ ] Sistema de debugging visual
 - [ ] Mejores templates de migración C++ → Rust
 - [ ] Colaboración en tiempo real (multiusuario)
-- [ ] Minimap/Navigator del grafo
+- [ ] Minimap/Navigator del grafo mejorado
 
 ### Prioridades 2026
 
-1. **Q1**: Sistema de expresiones robusto
-2. **Q2**: Templates de migración C++
-3. **Q3**: Subnetworks y navegación jerárquica
-4. **Q4**: Sistema de plugins base
+1. **Q1**: Sistema de expresiones robusto y cache
+2. **Q2**: Templates de migración C++ y plugins base
+3. **Q3**: Subnetworks y navegación jerárquica avanzada
+4. **Q4**: Sistema de debugging visual y colaboración
 
 ---
 
