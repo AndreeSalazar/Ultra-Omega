@@ -9,3 +9,4 @@ pub mod layout;
 pub mod theme;
 pub mod language_manager;
 pub mod simple_renderer;
+pub mod cpp_selector;
