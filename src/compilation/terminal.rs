@@ -1,3 +1,4 @@
+use crate::compilation::cpp_linker::{CppLinkerManager, compile_cpp_auto};
 use std::process::Command;
 use std::path::{Path, PathBuf};
 use crate::expressions::channels::ChannelValue;
@@ -469,38 +470,19 @@ impl TerminalManager {
             return;
         }
 
-        let exe_path = work_dir.join(exe_file);
+        // Usar el nuevo sistema de linkers C++
+        output.push_str("🔷 Usando sistema avanzado de linkers C++...\n");
         
-        // Buscar compilador C++ disponible
-        let cpp_commands = if cfg!(target_os = "windows") {
-            vec!["g++", "mingw32-g++", "x86_64-w64-mingw32-g++", "clang++", "cl"]
-        } else {
-            vec!["g++", "clang++"]
-        };
-        
-        let mut compiler_found = None;
-        for cmd in &cpp_commands {
-            if let Some(path) = Self::find_compiler_cmd(cmd, output) {
-                compiler_found = Some((path, cmd));
-                break;
+        match compile_cpp_auto(&temp_file, exe_file, work_dir, output) {
+            Ok(exe_path) => {
+                output.push_str(&format!("✅ Compilación exitosa: {}\n", exe_path.display()));
+                output.push_str("🚀 Ejecutable listo para correr\n");
+            }
+            Err(e) => {
+                output.push_str(&format!("❌ Error de compilación: {}\n", e));
+                output.push_str("💡 Verifica que tengas un compilador C++ instalado\n");
             }
         }
-        
-        if compiler_found.is_none() {
-            output.push_str(">>> Error: No se encontró compilador C++.\n");
-            output.push_str(">>> Instala MinGW-w64 (Windows) o g++/clang++ (Linux/Mac)\n");
-            return;
-        }
-        
-        let (compiler_path, compiler_name) = compiler_found.unwrap();
-        output.push_str(&format!(">>> Usando compilador: {} ({})\n", compiler_name, compiler_path));
-        
-        let cmd_output = Command::new(&compiler_path)
-            .current_dir(work_dir)
-            .args(&[temp_file.file_name().unwrap().to_str().unwrap(), "-o", exe_file])
-            .output();
-
-        Self::handle_compile_output(cmd_output, compiler_name, &exe_path, output);
     }
 
     fn compile_rust(code: &str, work_dir: &Path, exe_file: &str, output: &mut String) {

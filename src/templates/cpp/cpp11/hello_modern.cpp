@@ -2,7 +2,12 @@
 // Ultra-Omega C++11 Template - Hello Modern C++11
 // ═══════════════════════════════════════════════════════════════════════════
 
-#include "cpp_version_detection.hpp"
+#include <iostream>
+#include <vector>
+#include <string>
+#include <memory>
+#include <chrono>
+#include <utility>
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DEMOSTRACIÓN DE CARACTERÍSTICAS C++11
@@ -45,9 +50,6 @@ public:
 };
 
 int main() {
-    // Inicialización con detección de versión
-    ULTRA_OMEGA_CPP_INIT();
-    
     std::cout << "\n🎯 Demostración de Características C++11:" << std::endl;
     std::cout << "======================================" << std::endl;
     
@@ -80,35 +82,36 @@ int main() {
     // Demostrar características específicas de C++11
     std::cout << "\n🔍 Verificación de características C++11:" << std::endl;
     
-#if HAS_AUTO_KEYWORD
+    // Auto keyword (C++11)
     std::cout << "   ✓ Auto keyword disponible" << std::endl;
-#else
-    std::cout << "   ✗ Auto keyword NO disponible" << std::endl;
-#endif
-
-#if HAS_LAMBDA_EXPRESSIONS
+    
+    // Lambda expressions (C++11)
+    auto lambda_test = [](int x) { return x * 2; };
     std::cout << "   ✓ Lambda expressions disponibles" << std::endl;
-#else
-    std::cout << "   ✗ Lambda expressions NO disponibles" << std::endl;
-#endif
-
-#if HAS_SMART_POINTERS
+    
+    // Smart pointers (C++11)
+    auto smart_ptr = std::make_unique<int>(42);
     std::cout << "   ✓ Smart pointers disponibles" << std::endl;
-#else
-    std::cout << "   ✗ Smart pointers NO disponibles" << std::endl;
-#endif
-
-#if HAS_STD_THREAD
-    std::cout << "   ✓ std::thread disponible" << std::endl;
-#else
-    std::cout << "   ✗ std::thread NO disponible" << std::endl;
-#endif
-
-#if HAS_CONSTEXPR_BASIC
+    
+    // nullptr (C++11)
+    int* ptr = nullptr;
+    std::cout << "   ✓ nullptr disponible" << std::endl;
+    
+    // constexpr básico (C++11)
+    constexpr int multiplier = 2;
     std::cout << "   ✓ constexpr básico disponible" << std::endl;
-#else
-    std::cout << "   ✗ constexpr básico NO disponible" << std::endl;
-#endif
+    
+    // Range-based for loop (C++11)
+    std::vector<int> test_vec = {1, 2, 3};
+    for (const auto& item : test_vec) {
+        (void)item; // Evitar warning de unused variable
+    }
+    std::cout << "   ✓ Range-based for loop disponible" << std::endl;
+    
+    // Move semantics (C++11)
+    std::string str1 = "Hola";
+    std::string str2 = std::move(str1);
+    std::cout << "   ✓ Move semantics disponibles" << std::endl;
     
     std::cout << "\n✅ Programa C++11 completado exitosamente!" << std::endl;
     
