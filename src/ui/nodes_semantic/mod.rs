@@ -7,6 +7,7 @@
 use eframe::egui::{self, Align2, Color32, FontId, Painter, Pos2, Rect, Stroke, Vec2, Visuals};
 use eframe::egui::epaint::{RectShape, Shape, TextureId};
 use crate::core::node_graph::{Node, Pin, PinId};
+use crate::ui::theme::THEME;
 use std::collections::HashSet;
 
 /// Verificar si un nodo es un nodo carpeta
@@ -40,14 +41,18 @@ pub const PIN_OFFSET: f32 = 0.0;
 pub const NODE_ROUNDING: f32 = 14.0;
 
 // ══════════════════════════════════════════
-// COLORES PERSONALIZADOS
+// COLORES PERSONALIZADOS (FUNCIONES DINÁMICAS)
 // ══════════════════════════════════════════
 
-/// Color de fondo del body (oscuro profesional)
-const BODY_BG_COLOR: Color32 = Color32::from_rgb(22, 22, 28);
+/// Color de fondo del body (usando tema)
+fn get_body_bg_color() -> Color32 {
+    THEME.surface_primary
+}
 
-/// Color del borde del body
-const BODY_BORDER_COLOR: Color32 = Color32::from_rgb(45, 45, 55);
+/// Color del borde del body (usando tema)
+fn get_body_border_color() -> Color32 {
+    THEME.border_secondary
+}
 
 /// Color de texto principal
 const TEXT_PRIMARY: Color32 = Color32::from_rgb(240, 240, 245);
@@ -56,16 +61,30 @@ const TEXT_PRIMARY: Color32 = Color32::from_rgb(240, 240, 245);
 const TEXT_SECONDARY: Color32 = Color32::from_rgb(180, 180, 190);
 
 /// Color de pin conectado
-const PIN_CONNECTED_COLOR: Color32 = Color32::from_rgb(80, 200, 255);
+fn get_pin_connected_color() -> Color32 {
+    THEME.accent_primary
+}
 
 /// Color de pin conectado (highlight)
-const PIN_CONNECTED_HIGHLIGHT: Color32 = Color32::from_rgb(140, 220, 255);
+fn get_pin_connected_highlight_color() -> Color32 {
+    THEME.accent_secondary
+}
 
 /// Color de pin desconectado
 const PIN_DISCONNECTED_COLOR: Color32 = Color32::from_rgb(140, 140, 150);
 
 /// Color del hueco del pin
 const PIN_HOLE_COLOR: Color32 = Color32::from_rgb(25, 25, 32);
+
+/// Color del header del nodo (usando tema)
+fn get_header_bg_color() -> Color32 {
+    THEME.background_secondary
+}
+
+/// Color del borde del header (usando tema)
+fn get_header_border_color() -> Color32 {
+    THEME.border_primary
+}
 
 // ══════════════════════════════════════════
 // CÁLCULO DE DIMENSIONES
@@ -291,7 +310,7 @@ pub fn draw_semantic_node(
     painter.add(Shape::Rect(RectShape {
         rect: body_rect,
         rounding: body_rounding,
-        fill: BODY_BG_COLOR,
+        fill: get_body_bg_color(),
         stroke: Stroke::NONE,
         fill_texture_id: TextureId::default(),
         uv: Rect::ZERO,
@@ -301,7 +320,7 @@ pub fn draw_semantic_node(
     painter.rect_stroke(
         rect,
         rounding,
-        Stroke::new(1.2 * zoom, BODY_BORDER_COLOR),
+        Stroke::new(1.2 * zoom, get_body_border_color()),
     );
 
     // ═══════════════════════════════════════════════════════════════════
@@ -392,9 +411,9 @@ fn draw_premium_pin(
             center, 
             radius * 2.5, 
             Color32::from_rgba_unmultiplied(
-                PIN_CONNECTED_COLOR.r(), 
-                PIN_CONNECTED_COLOR.g(), 
-                PIN_CONNECTED_COLOR.b(), 
+                get_pin_connected_color().r(), 
+                get_pin_connected_color().g(), 
+                get_pin_connected_color().b(), 
                 20
             )
         );
@@ -404,9 +423,9 @@ fn draw_premium_pin(
             center, 
             radius * 1.9, 
             Color32::from_rgba_unmultiplied(
-                PIN_CONNECTED_COLOR.r(), 
-                PIN_CONNECTED_COLOR.g(), 
-                PIN_CONNECTED_COLOR.b(), 
+                get_pin_connected_color().r(), 
+                get_pin_connected_color().g(), 
+                get_pin_connected_color().b(), 
                 40
             )
         );
@@ -415,25 +434,25 @@ fn draw_premium_pin(
         painter.circle_stroke(
             center, 
             radius * 1.4, 
-            Stroke::new(2.0 * zoom, PIN_CONNECTED_COLOR)
+            Stroke::new(2.0 * zoom, get_pin_connected_color())
         );
         
         // Pin principal lleno
-        painter.circle_filled(center, radius * 1.1, PIN_CONNECTED_COLOR);
+        painter.circle_filled(center, radius * 1.1, get_pin_connected_color());
         
         // Highlight superior (efecto 3D)
         let highlight_pos = center + Vec2::new(0.0, -radius * 0.3);
         painter.circle_filled(
             highlight_pos, 
             radius * 0.45, 
-            PIN_CONNECTED_HIGHLIGHT
+            get_pin_connected_highlight_color()
         );
         
         // Borde definido
         painter.circle_stroke(
             center, 
             radius * 1.1, 
-            Stroke::new(1.0 * zoom, PIN_CONNECTED_HIGHLIGHT)
+            Stroke::new(1.0 * zoom, get_pin_connected_highlight_color())
         );
     } 
     // ═══════════════════════════════════════════════════════════════════
@@ -495,7 +514,7 @@ fn draw_premium_pin(
     
     // Color del label según estado
     let label_color = if is_connected {
-        PIN_CONNECTED_HIGHLIGHT
+        get_pin_connected_highlight_color()
     } else {
         TEXT_SECONDARY
     };

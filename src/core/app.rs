@@ -4,6 +4,7 @@ use super::node_graph::{self, Link, Node, NodeGraph, NodeId, NodeLanguage, PinId
 use crate::compilation::terminal::{TerminalManager, TerminalTab};
 use crate::ui::viewport::Viewport2D;
 use crate::ui::layout::LayoutConfig;
+use crate::ui::theme::THEME;
 use crate::storage::{Workspace, migration::{needs_migration, migrate_project, create_backup, MigrationResult}};
 use crate::config::AppConfig;
 use crate::compilation::compiler_detector::{CompilerStatus, detect_all_compilers};
@@ -503,6 +504,12 @@ impl NodeGraphApp {
                 let text_color = Color32::from_rgb(240, 240, 240); // Texto casi blanco para mejor contraste
                 (bg_color, text_color)
             },
+            NodeLanguage::Cpp => {
+                // Colores inspirados en C++: fondo azul oscuro con texto claro
+                let bg_color = Color32::from_rgb(25, 35, 45); // Fondo azul oscuro
+                let text_color = Color32::from_rgb(220, 220, 240); // Texto ligeramente azulado
+                (bg_color, text_color)
+            },
             _ => {
                 // Colores por defecto (tema oscuro)
                 let bg_color = Color32::from_rgb(0, 0, 0);
@@ -946,6 +953,7 @@ impl NodeGraphApp {
                 crate::core::node_graph::NodeLanguage::Python => "Python".to_string(),
                 crate::core::node_graph::NodeLanguage::Java => "Java".to_string(),
                 crate::core::node_graph::NodeLanguage::Asm => "Assembly".to_string(),
+                crate::core::node_graph::NodeLanguage::Cpp => "C++".to_string(),
                 crate::core::node_graph::NodeLanguage::Text => "Text".to_string(),
                 crate::core::node_graph::NodeLanguage::Auto => "Auto".to_string(),
             }
@@ -1092,6 +1100,7 @@ impl NodeGraphApp {
             NodeLanguage::Rust => crate::compilation::terminal::Language::Rust,
             NodeLanguage::Java => crate::compilation::terminal::Language::Java,
             NodeLanguage::Python => crate::compilation::terminal::Language::Python,
+            NodeLanguage::Cpp => crate::compilation::terminal::Language::Cpp,
             NodeLanguage::Text => crate::compilation::terminal::Language::Rust, // Text no se compila realmente
             NodeLanguage::Auto => {
                 let lower = node_title.to_lowercase();
@@ -1101,6 +1110,8 @@ impl NodeGraphApp {
                     crate::compilation::terminal::Language::Java
                 } else if lower.contains("python") {
                     crate::compilation::terminal::Language::Python
+                } else if lower.contains("cpp") || lower.contains("c++") {
+                    crate::compilation::terminal::Language::Cpp
                 } else if lower.contains("rust") {
                     crate::compilation::terminal::Language::Rust
                 } else {
@@ -1263,36 +1274,75 @@ impl NodeGraphApp {
         egui::TopBottomPanel::bottom("terminal_panel")
             .resizable(false)
             .exact_height(height)
+            .frame(egui::Frame::none()
+                .fill(THEME.background_secondary)
+                .inner_margin(egui::Margin::symmetric(16.0, 8.0))
+                .stroke(egui::Stroke::new(1.0, THEME.border_primary)))
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
-                    ui.selectable_value(&mut self.terminal.active_tab, TerminalTab::Rust, "🦀 Rust");
-                    ui.selectable_value(&mut self.terminal.active_tab, TerminalTab::Nasm, "⚙️ ASM");
-                    ui.selectable_value(&mut self.terminal.active_tab, TerminalTab::Java, "☕ Java");
-                    ui.selectable_value(&mut self.terminal.active_tab, TerminalTab::Python, "🐍 Python");
+                    ui.add_space(8.0);
+                    
+                    // Pestañas con estilo mejorado - Optimizado para wgpu
+                    // Evitar .clone() para mejor rendimiento
+                    let active_tab = self.terminal.active_tab;
+                    let tab_style = |active: bool, text: &str| {
+                        if active {
+                            egui::RichText::new(text)
+                                .size(14.0)
+                                .color(THEME.text_primary)
+                                .strong()
+                        } else {
+                            egui::RichText::new(text)
+                                .size(13.0)
+                                .color(THEME.text_secondary)
+                        }
+                    };
+                    
+                    // Optimización: usar referencias en lugar de clones
+                    ui.selectable_value(&mut self.terminal.active_tab, TerminalTab::Rust, tab_style(active_tab == TerminalTab::Rust, "🦀 Rust"));
+                    ui.selectable_value(&mut self.terminal.active_tab, TerminalTab::Nasm, tab_style(active_tab == TerminalTab::Nasm, "⚙️ ASM"));
+                    ui.selectable_value(&mut self.terminal.active_tab, TerminalTab::Java, tab_style(active_tab == TerminalTab::Java, "☕ Java"));
+                    ui.selectable_value(&mut self.terminal.active_tab, TerminalTab::Python, tab_style(active_tab == TerminalTab::Python, "🐍 Python"));
+                    ui.selectable_value(&mut self.terminal.active_tab, TerminalTab::Cpp, tab_style(active_tab == TerminalTab::Cpp, "🔷 C++"));
                     
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        // Pin button
+                        ui.add_space(12.0);
+                        
+                        // Botón de pin con estilo mejorado
                         let pin_text = if self.terminal.pinned { "📌 Anclado" } else { "⚓ Anclar" };
-                        if ui.button(pin_text).clicked() {
+                        let pin_color = if self.terminal.pinned { THEME.accent_primary } else { THEME.text_secondary };
+                        if ui.add(egui::Button::new(
+                            egui::RichText::new(pin_text)
+                                .size(13.0)
+                                .color(pin_color)
+                        )).clicked() {
                             self.terminal.pinned = !self.terminal.pinned;
-                            // Reset timer if unpinning to give user a chance
                             if !self.terminal.pinned {
                                 self.terminal.hide_timer = 10.0;
                             }
                         }
-                        // Close button
-                        if ui.button("❌").clicked() {
+                        
+                        ui.add_space(8.0);
+                        
+                        // Botón de cerrar con estilo mejorado
+                        if ui.add(egui::Button::new(
+                            egui::RichText::new("❌")
+                                .size(14.0)
+                                .color(THEME.text_muted)
+                        )).clicked() {
                             self.terminal.visible = false;
                         }
                     });
                 });
+                // Separador sutil
                 ui.separator();
 
-                // Panel con fondo oscuro mejorado para el terminal
+                // Panel de contenido del terminal con tema mejorado
                 egui::Frame::none()
-                    .fill(Color32::from_rgb(12, 12, 16)) // Fondo más oscuro para mejor contraste
-                    .inner_margin(egui::Margin::same(16.0)) // Más margen interno
-                    .stroke(egui::Stroke::new(1.0, Color32::from_rgb(40, 40, 50))) // Borde sutil
+                    .fill(THEME.terminal_bg) // Fondo de terminal usando tema
+                    .inner_margin(egui::Margin::same(12.0)) // Padding interno
+                    .stroke(egui::Stroke::new(1.0, THEME.border_secondary)) // Borde sutil
+                    .rounding(egui::Rounding::same(6.0)) // Esquinas redondeadas
                     .show(ui, |ui| {
                         egui::ScrollArea::vertical()
                             .auto_shrink([false, false])
@@ -1302,6 +1352,7 @@ impl NodeGraphApp {
                                     TerminalTab::Rust => &self.terminal.rust_output,
                                     TerminalTab::Java => &self.terminal.java_output,
                                     TerminalTab::Python => &self.terminal.python_output,
+                                    TerminalTab::Cpp => &self.terminal.cpp_output,
                                 };
                                 
                                 // Crear fuente monoespaciada más grande y legible
@@ -1496,10 +1547,11 @@ impl NodeGraphApp {
                                 }
                                 
                                 // Categorías de templates - Solo lenguajes soportados
-                                let categories = ["Rust", "Assembler (Windows)", "Assembler (Linux)", "Java", "Python"];
-                                let category_icons = ["🦀", "🔧", "🐧", "☕", "🐍"];
+                                let categories = ["Rust", "C++", "Assembler (Windows)", "Assembler (Linux)", "Java", "Python"];
+                                let category_icons = ["🦀", "🔷", "🔧", "🐧", "☕", "🐍"];
                                 let category_colors = [
                                     Color32::from_rgb(0xde, 0x39, 0x00), // Rust orange
+                                    Color32::from_rgb(0x00, 0x73, 0xCC), // C++ blue
                                     Color32::from_rgb(0xff, 0x47, 0x00), // ASM Windows naranja
                                     Color32::from_rgb(0x00, 0xaa, 0xff), // ASM Linux cyan
                                     Color32::from_rgb(0xed, 0x8b, 0x00), // Java orange
@@ -1686,6 +1738,7 @@ impl NodeGraphApp {
                                                 .selected_text(format!("{:?}", self.folder_node_language))
                                                 .show_ui(ui, |ui| {
                                                     ui.selectable_value(&mut self.folder_node_language, crate::core::node_graph::NodeLanguage::Rust, "🦀 Rust");
+                                                    ui.selectable_value(&mut self.folder_node_language, crate::core::node_graph::NodeLanguage::Cpp, "🔷 C++");
                                                     ui.selectable_value(&mut self.folder_node_language, crate::core::node_graph::NodeLanguage::Python, "🐍 Python");
                                                     ui.selectable_value(&mut self.folder_node_language, crate::core::node_graph::NodeLanguage::Java, "☕ Java");
                                                     ui.selectable_value(&mut self.folder_node_language, crate::core::node_graph::NodeLanguage::Asm, "⚙️ Assembly");
@@ -1762,6 +1815,7 @@ impl NodeGraphApp {
                                                         // Actualizar el título para incluir el lenguaje si no está ya
                                                         let lang_name = match lang {
                                                             crate::core::node_graph::NodeLanguage::Rust => "Rust",
+                                                            crate::core::node_graph::NodeLanguage::Cpp => "C++",
                                                             crate::core::node_graph::NodeLanguage::Python => "Python",
                                                             crate::core::node_graph::NodeLanguage::Java => "Java",
                                                             crate::core::node_graph::NodeLanguage::Asm => "Assembly",
@@ -3258,6 +3312,7 @@ impl NodeGraphApp {
                                                                             NodeLanguage::Rust => ("Rust", "🦀", Color32::from_rgb(80, 40, 40)),
                                                                             NodeLanguage::Java => ("Java", "☕", Color32::from_rgb(237, 139, 0)),
                                                                             NodeLanguage::Python => ("Python", "🐍", Color32::from_rgb(55, 118, 171)),
+                                                                            NodeLanguage::Cpp => ("C++", "🔷", Color32::from_rgb(0, 89, 153)),
                                                                             NodeLanguage::Text => ("Doc", "📄", Color32::from_rgb(60, 60, 40)),
                                                                             NodeLanguage::Auto => ("Auto", "⚙", Color32::from_rgb(50, 50, 50)),
                                                                         };
@@ -3266,6 +3321,7 @@ impl NodeGraphApp {
                                                                             NodeLanguage::Rust => Color32::from_rgb(255, 130, 100),
                                                                             NodeLanguage::Java => Color32::from_rgb(237, 139, 0),
                                                                             NodeLanguage::Python => Color32::from_rgb(55, 118, 171),
+                                                                            NodeLanguage::Cpp => Color32::from_rgb(0, 89, 153),
                                                                             NodeLanguage::Text => Color32::from_rgb(200, 200, 150),
                                                                             NodeLanguage::Auto => Color32::from_gray(180),
                                                                         };

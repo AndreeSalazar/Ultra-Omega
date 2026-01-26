@@ -6,3 +6,6 @@ pub mod menu;
 pub mod sidebar;
 pub mod cut;
 pub mod layout;
+pub mod theme;
+pub mod language_manager;
+pub mod simple_renderer;

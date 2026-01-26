@@ -93,6 +93,7 @@ impl NodeStorage {
             NodeLanguage::Asm => "asm",
             NodeLanguage::Java => "java",
             NodeLanguage::Python => "py",
+            NodeLanguage::Cpp => "cpp",
             NodeLanguage::Text => "txt",
             NodeLanguage::Auto => "txt",
         }

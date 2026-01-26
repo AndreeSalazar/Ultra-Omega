@@ -24,6 +24,8 @@ pub enum NodeLanguage {
     Java,
     /// Python 3.12 - Lenguaje de programación interpretado
     Python,
+    /// C++ (11, 14, 17) - Lenguaje de programación de sistemas
+    Cpp,
     /// Texto/Documentación - NO se compila, solo visualización
     Text,
 }

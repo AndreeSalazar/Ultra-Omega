@@ -40,6 +40,7 @@ pub enum TerminalTab {
     Rust,
     Java,
     Python,
+    Cpp,
 }
 
 impl Default for TerminalManager {
@@ -67,6 +68,7 @@ pub enum Language {
     Rust,
     Java,
     Python,
+    Cpp,
 }
 
 impl TerminalManager {
@@ -129,6 +131,7 @@ impl TerminalManager {
             Language::Rust => (&mut self.rust_output, TerminalTab::Rust),
             Language::Java => (&mut self.java_output, TerminalTab::Java),
             Language::Python => (&mut self.python_output, TerminalTab::Python),
+            Language::Cpp => (&mut self.cpp_output, TerminalTab::Cpp),
         };
         
         self.active_tab = tab;
@@ -145,6 +148,7 @@ impl TerminalManager {
             Language::Rust => "Rust",
             Language::Java => "Java 25",
             Language::Python => "Python 3.12",
+            Language::Cpp => "C++ (11/14/17)",
         };
         output_buffer.push_str(&format!("📝 Lenguaje: {}\n", lang_name));
         
@@ -287,6 +291,10 @@ impl TerminalManager {
                 // Por ahora ejecutar sin contexto (sin ChannelManager)
                 // En el futuro, se puede pasar contexto desde app.rs
                 Self::run_python(code, &work_dir, output_buffer);
+                return;
+            }
+            Language::Cpp => {
+                Self::compile_cpp(code, &work_dir, exe_file_str, output_buffer);
                 return;
             }
         }

@@ -1,5 +1,6 @@
 use eframe::egui::{self, ScrollArea, Color32, Stroke};
 use crate::core::NodeGraphApp;
+use crate::ui::theme::THEME;
 
 pub fn draw_sidebar(app: &mut NodeGraphApp, ctx: &egui::Context, _open_factor: f32) {
     egui::SidePanel::left("sidebar")
@@ -8,13 +9,13 @@ pub fn draw_sidebar(app: &mut NodeGraphApp, ctx: &egui::Context, _open_factor: f
         .min_width(240.0)
         .max_width(480.0)
         .frame(egui::Frame::side_top_panel(&ctx.style())
-            .fill(Color32::from_rgb(22, 24, 28)) // Fondo más oscuro y profesional
-            .inner_margin(egui::Margin::same(14.0))
+            .fill(THEME.background_secondary) // Fondo usando tema
+            .inner_margin(egui::Margin::same(16.0)) // Más padding
             .shadow(egui::epaint::Shadow {
                 offset: egui::vec2(2.0, 0.0),
-                blur: 8.0,
+                blur: 12.0, // Sombra más suave
                 spread: 0.0,
-                color: Color32::from_black_alpha(100),
+                color: THEME.shadow_medium,
             }))
         .show(ctx, |ui| {
             // Header mejorado con estilo profesional
@@ -22,12 +23,12 @@ pub fn draw_sidebar(app: &mut NodeGraphApp, ctx: &egui::Context, _open_factor: f
                 ui.add_space(6.0);
                 ui.horizontal(|ui| {
                     ui.label(egui::RichText::new("📂")
-                        .size(22.0)
-                        .color(Color32::from_rgb(110, 160, 255)));
+                        .size(24.0) // Icono más grande
+                        .color(THEME.accent_primary));
                     ui.heading(egui::RichText::new("Explorador")
                         .strong()
-                        .size(19.0)
-                        .color(Color32::from_rgb(240, 242, 245)));
+                        .size(20.0) // Título más grande
+                        .color(THEME.text_primary));
                     
                     // Botón de búsqueda discreto
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -40,10 +41,10 @@ pub fn draw_sidebar(app: &mut NodeGraphApp, ctx: &egui::Context, _open_factor: f
                         if app.sidebar_search_visible {
                             // Botón para cerrar
                             if ui.add(egui::Button::new(egui::RichText::new("✕")
-                                    .size(11.0)
-                                    .color(Color32::from_rgb(180, 180, 200)))
+                                    .size(12.0) // Botón más grande
+                                    .color(THEME.text_muted))
                                 .frame(false)
-                                .min_size(egui::vec2(20.0, 20.0)))
+                                .min_size(egui::vec2(24.0, 24.0))) // Área de clic más grande
                                 .clicked() {
                                 app.sidebar_search_query.clear();
                                 app.sidebar_search_visible = false;
@@ -615,6 +616,7 @@ pub fn draw_sidebar(app: &mut NodeGraphApp, ctx: &egui::Context, _open_factor: f
                                                 crate::core::node_graph::NodeLanguage::Asm => ("⚡", Color32::from_rgb(255, 220, 100)),
                                                 crate::core::node_graph::NodeLanguage::Java => ("☕", Color32::from_rgb(237, 139, 0)),
                                                 crate::core::node_graph::NodeLanguage::Python => ("🐍", Color32::from_rgb(55, 118, 171)),
+                                                crate::core::node_graph::NodeLanguage::Cpp => ("🔷", Color32::from_rgb(0, 89, 153)),
                                                 crate::core::node_graph::NodeLanguage::Text => ("📄", Color32::from_rgb(200, 200, 150)),
                                                 crate::core::node_graph::NodeLanguage::Auto => ("⚙", Color32::from_rgb(180, 180, 180)),
                                             };

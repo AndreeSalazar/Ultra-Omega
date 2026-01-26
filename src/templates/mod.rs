@@ -131,6 +131,48 @@ pub mod python {
 }
 
 // ══════════════════════════════════════════
+// C++ (11, 14, 17)
+// ══════════════════════════════════════════
+pub mod cpp {
+    // Templates C++ Básicos
+    pub const HELLO_WORLD: &str = include_str!("cpp/hello_world.cpp");
+    pub const VARIABLES_TIPOS: &str = include_str!("cpp/variables_tipos.cpp");
+    pub const ESTRUCTURAS_CONTROL: &str = include_str!("cpp/estructuras_control.cpp");
+    pub const FUNCIONES: &str = include_str!("cpp/funciones.cpp");
+    pub const CLASES_POO: &str = include_str!("cpp/clases_poo.cpp");
+    pub const STL_CONTAINERS: &str = include_str!("cpp/stl_containers.cpp");
+    pub const MANEJO_ARCHIVOS: &str = include_str!("cpp/manejo_archivos.cpp");
+    pub const PUNTEROS_MEMORIA: &str = include_str!("cpp/punteros_memoria.cpp");
+    pub const EXCEPCIONES_ERRORES: &str = include_str!("cpp/excepciones_errores.cpp");
+    pub const TEMPLATES_GENERICOS: &str = include_str!("cpp/templates_genericos.cpp");
+    pub const PROYECTO_CALCULADORA: &str = include_str!("cpp/proyecto_calculadora.cpp");
+    
+    // C++11 Templates
+    pub mod cpp11 {
+        pub const HELLO_MODERN: &str = include_str!("cpp/cpp11/hello_modern.cpp");
+        pub const HELLO_MODERN_UPDATED: &str = include_str!("cpp/cpp11/hello_modern.cpp");
+        pub const THREADING_DEMO: &str = include_str!("cpp/cpp11/threading_demo.cpp");
+        pub const STL_FEATURES: &str = include_str!("cpp/cpp11/stl_features.cpp");
+    }
+    
+    // C++14 Templates
+    pub mod cpp14 {
+        pub const GENERIC_FEATURES: &str = include_str!("cpp/cpp14/generic_features.cpp");
+        pub const GENERIC_FEATURES_UPDATED: &str = include_str!("cpp/cpp14/generic_features_updated.cpp");
+        pub const STL_IMPROVEMENTS: &str = include_str!("cpp/cpp14/stl_improvements.cpp");
+        pub const TEMPLATE_META: &str = include_str!("cpp/cpp14/template_meta.cpp");
+    }
+    
+    // C++17 Templates
+    pub mod cpp17 {
+        pub const CORE_FEATURES: &str = include_str!("cpp/cpp17/core_features.cpp");
+        pub const CORE_FEATURES_UPDATED: &str = include_str!("cpp/cpp17/core_features_updated.cpp");
+        pub const PARALLEL_FILESYSTEM: &str = include_str!("cpp/cpp17/parallel_filesystem.cpp");
+        pub const ADVANCED_FEATURES: &str = include_str!("cpp/cpp17/advanced_features.cpp");
+    }
+}
+
+// ══════════════════════════════════════════
 // Estructura de Template para el menú
 // ══════════════════════════════════════════
 #[derive(Clone)]
@@ -208,6 +250,36 @@ pub fn all_templates() -> Vec<Template> {
         Template { name: "📚 Error (Manejo de Errores)", code: rust::LIB_ERROR, category: "Rust", subcategory: "Librerías", color: (0x80, 0x40, 0x00), icon: "⚠️", language: NodeLanguage::Rust },
         
         // ══════════════════════════════════════════════════════════════
+        // C++
+        // ══════════════════════════════════════════════════════════════
+        Template { name: "🔷 Hello World", code: cpp::HELLO_WORLD, category: "C++", subcategory: "Básico", color: (0x00, 0x73, 0xCC), icon: "🔷", language: NodeLanguage::Cpp },
+        Template { name: "🔷 Variables y Tipos", code: cpp::VARIABLES_TIPOS, category: "C++", subcategory: "Básico", color: (0x00, 0x73, 0xCC), icon: "📦", language: NodeLanguage::Cpp },
+        Template { name: "🔷 Estructuras de Control", code: cpp::ESTRUCTURAS_CONTROL, category: "C++", subcategory: "Básico", color: (0x00, 0x73, 0xCC), icon: "🔄", language: NodeLanguage::Cpp },
+        Template { name: "🔷 Funciones", code: cpp::FUNCIONES, category: "C++", subcategory: "Básico", color: (0x00, 0x73, 0xCC), icon: "⚡", language: NodeLanguage::Cpp },
+        Template { name: "🔷 Clases y POO", code: cpp::CLASES_POO, category: "C++", subcategory: "Intermedio", color: (0x00, 0x73, 0xCC), icon: "🏛️", language: NodeLanguage::Cpp },
+        Template { name: "🔷 STL Containers", code: cpp::STL_CONTAINERS, category: "C++", subcategory: "Intermedio", color: (0x00, 0x73, 0xCC), icon: "📚", language: NodeLanguage::Cpp },
+        Template { name: "🔷 Manejo de Archivos", code: cpp::MANEJO_ARCHIVOS, category: "C++", subcategory: "Intermedio", color: (0x00, 0x73, 0xCC), icon: "📂", language: NodeLanguage::Cpp },
+        Template { name: "🔷 Punteros y Memoria", code: cpp::PUNTEROS_MEMORIA, category: "C++", subcategory: "Avanzado", color: (0x00, 0x73, 0xCC), icon: "📍", language: NodeLanguage::Cpp },
+        Template { name: "🔷 Excepciones y Errores", code: cpp::EXCEPCIONES_ERRORES, category: "C++", subcategory: "Avanzado", color: (0x00, 0x73, 0xCC), icon: "⚠️", language: NodeLanguage::Cpp },
+        Template { name: "🔷 Templates Genéricos", code: cpp::TEMPLATES_GENERICOS, category: "C++", subcategory: "Avanzado", color: (0x00, 0x73, 0xCC), icon: "🔧", language: NodeLanguage::Cpp },
+        Template { name: "🔷 Proyecto: Calculadora", code: cpp::PROYECTO_CALCULADORA, category: "C++", subcategory: "Proyectos", color: (0x00, 0x73, 0xCC), icon: "🎯", language: NodeLanguage::Cpp },
+        
+        // C++11 Templates
+        Template { name: "🔷 C++11: Hello Modern", code: cpp::cpp11::HELLO_MODERN, category: "C++", subcategory: "C++11", color: (0x00, 0x60, 0xAA), icon: "🔷", language: NodeLanguage::Cpp },
+        Template { name: "🔷 C++11: Threading Demo", code: cpp::cpp11::THREADING_DEMO, category: "C++", subcategory: "C++11", color: (0x00, 0x60, 0xAA), icon: "🧵", language: NodeLanguage::Cpp },
+        Template { name: "🔷 C++11: STL Features", code: cpp::cpp11::STL_FEATURES, category: "C++", subcategory: "C++11", color: (0x00, 0x60, 0xAA), icon: "📚", language: NodeLanguage::Cpp },
+        
+        // C++14 Templates
+        Template { name: "🔷 C++14: Generic Features", code: cpp::cpp14::GENERIC_FEATURES, category: "C++", subcategory: "C++14", color: (0x00, 0x50, 0x99), icon: "🔷", language: NodeLanguage::Cpp },
+        Template { name: "🔷 C++14: STL Improvements", code: cpp::cpp14::STL_IMPROVEMENTS, category: "C++", subcategory: "C++14", color: (0x00, 0x50, 0x99), icon: "📚", language: NodeLanguage::Cpp },
+        Template { name: "🔷 C++14: Template Meta", code: cpp::cpp14::TEMPLATE_META, category: "C++", subcategory: "C++14", color: (0x00, 0x50, 0x99), icon: "🔧", language: NodeLanguage::Cpp },
+        
+        // C++17 Templates
+        Template { name: "🔷 C++17: Core Features", code: cpp::cpp17::CORE_FEATURES, category: "C++", subcategory: "C++17", color: (0x00, 0x40, 0x88), icon: "🔷", language: NodeLanguage::Cpp },
+        Template { name: "🔷 C++17: Parallel Filesystem", code: cpp::cpp17::PARALLEL_FILESYSTEM, category: "C++", subcategory: "C++17", color: (0x00, 0x40, 0x88), icon: "📂", language: NodeLanguage::Cpp },
+        Template { name: "🔷 C++17: Advanced Features", code: cpp::cpp17::ADVANCED_FEATURES, category: "C++", subcategory: "C++17", color: (0x00, 0x40, 0x88), icon: "⚡", language: NodeLanguage::Cpp },
+        
+        // ══════════════════════════════════════════════════════════════
         // JAVA 25
         // ══════════════════════════════════════════════════════════════
         Template { name: "Hola Mundo", code: java::HELLO, category: "Java", subcategory: "Básico", color: (0xed, 0x8b, 0x00), icon: "☕", language: NodeLanguage::Java },
@@ -247,6 +319,27 @@ pub fn all_templates() -> Vec<Template> {
         Template { name: "Bucles", code: python::LOOPS, category: "Python", subcategory: "Básico", color: (0x37, 0x76, 0xAB), icon: "↻", language: NodeLanguage::Python },
         Template { name: "Funciones", code: python::FUNCTIONS, category: "Python", subcategory: "Básico", color: (0x37, 0x76, 0xAB), icon: "⚡", language: NodeLanguage::Python },
         Template { name: "Listas y Diccionarios", code: python::LISTS_DICTS, category: "Python", subcategory: "Básico", color: (0x37, 0x76, 0xAB), icon: "📚", language: NodeLanguage::Python },
+        
+        // ══════════════════════════════════════════════════════════════
+        // C++11
+        // ══════════════════════════════════════════════════════════════
+        Template { name: "Hello Modern C++11", code: cpp::cpp11::HELLO_MODERN, category: "C++11", subcategory: "Básico", color: (0x00, 0x59, 0x99), icon: "🔷", language: NodeLanguage::Cpp },
+        Template { name: "Threading Demo", code: cpp::cpp11::THREADING_DEMO, category: "C++11", subcategory: "Intermedio", color: (0x00, 0x59, 0x99), icon: "🧵", language: NodeLanguage::Cpp },
+        Template { name: "STL Features", code: cpp::cpp11::STL_FEATURES, category: "C++11", subcategory: "Avanzado", color: (0x00, 0x59, 0x99), icon: "📚", language: NodeLanguage::Cpp },
+        
+        // ══════════════════════════════════════════════════════════════
+        // C++14
+        // ══════════════════════════════════════════════════════════════
+        Template { name: "Generic Features", code: cpp::cpp14::GENERIC_FEATURES, category: "C++14", subcategory: "Básico", color: (0x00, 0x80, 0x80), icon: "🔶", language: NodeLanguage::Cpp },
+        Template { name: "STL Improvements", code: cpp::cpp14::STL_IMPROVEMENTS, category: "C++14", subcategory: "Intermedio", color: (0x00, 0x80, 0x80), icon: "📈", language: NodeLanguage::Cpp },
+        Template { name: "Template Metaprogramming", code: cpp::cpp14::TEMPLATE_META, category: "C++14", subcategory: "Avanzado", color: (0x00, 0x80, 0x80), icon: "🎯", language: NodeLanguage::Cpp },
+        
+        // ══════════════════════════════════════════════════════════════
+        // C++17
+        // ══════════════════════════════════════════════════════════════
+        Template { name: "Core Features", code: cpp::cpp17::CORE_FEATURES, category: "C++17", subcategory: "Básico", color: (0x00, 0x40, 0x80), icon: "🔹", language: NodeLanguage::Cpp },
+        Template { name: "Parallel & Filesystem", code: cpp::cpp17::PARALLEL_FILESYSTEM, category: "C++17", subcategory: "Intermedio", color: (0x00, 0x40, 0x80), icon: "⚡", language: NodeLanguage::Cpp },
+        Template { name: "Advanced Features", code: cpp::cpp17::ADVANCED_FEATURES, category: "C++17", subcategory: "Avanzado", color: (0x00, 0x40, 0x80), icon: "🚀", language: NodeLanguage::Cpp },
     ]
 }
 
