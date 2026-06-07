@@ -1,32 +1,40 @@
 [package]
 name = "ultra-omega"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 
 [features]
-default = []
+default = ["vulkan"]
+vulkan = ["ash", "ash-window", "raw-window-handle"]
 
 [dependencies]
-# Core wgpu con solo características esenciales
-wgpu = { version = "0.19", features = ["spirv", "naga", "glsl"] }
-eframe = { version = "0.27", default-features = false, features = ["default_fonts", "glow"] }
+# Vulkan API bindings (ash) for total control over rendering
+ash = "0.37"
+ash-window = "0.12"
+raw-window-handle = "0.5"
+
 # Window handling
 winit = "0.28"
-# Serialización optimizada
+
+# Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-# UI esenciales
+
+# UI essentials (native file dialogs)
 rfd = "0.14"
-# Sistema de archivos
+
+# File system
 dirs = "5.0"
-# Utilidades esenciales
+
+# Utilities
 which = "6.0"
 glob = "0.3"
 chrono = { version = "0.4", features = ["serde"] }
-# Renderizado de alto rendimiento
+
+# High-performance rendering math
 bytemuck = { version = "1.24", features = ["derive"] }
-# Matemáticas optimizadas
 glam = { version = "0.24", features = ["bytemuck"] }
-# Logging para depuración
+
+# Logging
 log = "0.4"
 env_logger = "0.10"
