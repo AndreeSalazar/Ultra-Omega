@@ -3,10 +3,6 @@ name = "ultra-omega"
 version = "0.2.0"
 edition = "2021"
 
-[features]
-default = ["vulkan"]
-vulkan = ["ash", "ash-window", "raw-window-handle"]
-
 [dependencies]
 # Vulkan API bindings (ash) for total control over rendering
 ash = "0.37"

@@ -1,12 +1,5 @@
-pub mod connectors;
-pub mod nodes;
-pub mod nodes_semantic;
-pub mod viewport;
-pub mod menu;
-pub mod sidebar;
-pub mod cut;
-pub mod layout;
+// UI Module - Vulkan Backend
+// Este módulo será reescrito para usar Vulkan directamente en lugar de egui/eframe.
+// Por ahora, está vacío mientras se implementa el nuevo sistema de renderizado.
+
 pub mod theme;
-pub mod language_manager;
-pub mod simple_renderer;
-pub mod cpp_selector;
