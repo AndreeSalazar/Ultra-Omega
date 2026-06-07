@@ -1,53 +1,9 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// Templates de código para Ultra Omega
-// Lenguajes soportados: Rust, ASM, Java, Python
+// Templates de código para Ultra Omega v2.0
+// Enfoque 100% en Rust
 // ═══════════════════════════════════════════════════════════════════════════
 
 use crate::core::node_graph::NodeLanguage;
-
-// ══════════════════════════════════════════
-// ASSEMBLER (NASM x64) - WINDOWS
-// ══════════════════════════════════════════
-pub mod asm_windows {
-    pub const HELLO: &str = include_str!("asm-windows/hello_world.asm");
-    pub const SUM: &str = include_str!("asm-windows/sum.asm");
-    pub const LOOP: &str = include_str!("asm-windows/loop.asm");
-    pub const CONDITIONAL: &str = include_str!("asm-windows/conditional.asm");
-    pub const VARIABLES: &str = include_str!("asm-windows/variables.asm");
-    pub const FUNCTIONS: &str = include_str!("asm-windows/functions.asm");
-    pub const STRINGS: &str = include_str!("asm-windows/strings.asm");
-    pub const ARRAYS: &str = include_str!("asm-windows/arrays.asm");
-    pub const LIB_PRINT: &str = include_str!("asm-windows/lib_print.asm");
-    pub const LIB_MATH: &str = include_str!("asm-windows/lib_math.asm");
-    pub const LIB_STRING: &str = include_str!("asm-windows/lib_string.asm");
-    pub const LIB_MEMORY: &str = include_str!("asm-windows/lib_memory.asm");
-    pub const LIB_IO: &str = include_str!("asm-windows/lib_io.asm");
-}
-
-// ══════════════════════════════════════════
-// ASSEMBLER (NASM x64) - LINUX
-// ══════════════════════════════════════════
-pub mod asm_linux {
-    pub const HELLO: &str = include_str!("asm-linux/hello_world.asm");
-    pub const SUM: &str = include_str!("asm-linux/sum.asm");
-    pub const LOOP: &str = include_str!("asm-linux/loop.asm");
-    pub const CONDITIONAL: &str = include_str!("asm-linux/conditional.asm");
-    pub const VARIABLES: &str = include_str!("asm-linux/variables.asm");
-    pub const FUNCTIONS: &str = include_str!("asm-linux/functions.asm");
-    pub const STRINGS: &str = include_str!("asm-linux/strings.asm");
-    pub const ARRAYS: &str = include_str!("asm-linux/arrays.asm");
-    pub const LIB_PRINT: &str = include_str!("asm-linux/lib_print.asm");
-    pub const LIB_MATH: &str = include_str!("asm-linux/lib_math.asm");
-    pub const LIB_STRING: &str = include_str!("asm-linux/lib_string.asm");
-    pub const LIB_MEMORY: &str = include_str!("asm-linux/lib_memory.asm");
-    pub const LIB_IO: &str = include_str!("asm-linux/lib_io.asm");
-}
-
-// Compatibilidad: asm apunta a asm_windows por defecto
-#[allow(deprecated)]
-pub mod asm {
-    pub use super::asm_windows::*;
-}
 
 // ══════════════════════════════════════════
 // RUST
@@ -82,97 +38,6 @@ pub mod rust {
 }
 
 // ══════════════════════════════════════════
-// JAVA 25
-// ══════════════════════════════════════════
-pub mod java {
-    // Básico
-    pub const HELLO: &str = include_str!("java/hello_world.java");
-    pub const VARIABLES: &str = include_str!("java/variables.java");
-    pub const CLASSES: &str = include_str!("java/classes.java");
-    pub const METHODS: &str = include_str!("java/methods.java");
-    // Intermedio
-    pub const COLLECTIONS: &str = include_str!("java/collections.java");
-    pub const GENERICS: &str = include_str!("java/generics.java");
-    pub const EXCEPTIONS: &str = include_str!("java/exceptions.java");
-    pub const INTERFACES: &str = include_str!("java/interfaces.java");
-    pub const INHERITANCE: &str = include_str!("java/inheritance.java");
-    // Avanzado
-    pub const STREAMS: &str = include_str!("java/streams.java");
-    pub const LAMBDAS: &str = include_str!("java/lambdas.java");
-    pub const CONCURRENCY: &str = include_str!("java/concurrency.java");
-    pub const REFLECTION: &str = include_str!("java/reflection.java");
-    pub const ANNOTATIONS: &str = include_str!("java/annotations.java");
-    pub const RECORDS: &str = include_str!("java/records.java");
-    pub const SEALED_CLASSES: &str = include_str!("java/sealed_classes.java");
-    pub const PATTERN_MATCHING: &str = include_str!("java/pattern_matching.java");
-    pub const TEXT_BLOCKS: &str = include_str!("java/text_blocks.java");
-    pub const VIRTUAL_THREADS: &str = include_str!("java/virtual_threads.java");
-    pub const SWITCH_EXPRESSIONS: &str = include_str!("java/switch_expressions.java");
-    pub const RECORD_PATTERNS: &str = include_str!("java/record_patterns.java");
-    pub const FOREIGN_MEMORY: &str = include_str!("java/foreign_memory.java");
-    pub const STRUCTURED_CONCURRENCY: &str = include_str!("java/structured_concurrency.java");
-    // Librerías
-    pub const LIB_UTILS: &str = include_str!("java/lib_utils.java");
-    pub const LIB_COLLECTIONS: &str = include_str!("java/lib_collections.java");
-    pub const LIB_IO: &str = include_str!("java/lib_io.java");
-    pub const LIB_ASYNC: &str = include_str!("java/lib_async.java");
-}
-
-// ══════════════════════════════════════════
-// PYTHON 3.12
-// ══════════════════════════════════════════
-pub mod python {
-    pub const HELLO_WORLD: &str = include_str!("python/hello_world.py");
-    pub const VARIABLES: &str = include_str!("python/variables.py");
-    pub const CONDITIONALS: &str = include_str!("python/conditionals.py");
-    pub const LOOPS: &str = include_str!("python/loops.py");
-    pub const FUNCTIONS: &str = include_str!("python/functions.py");
-    pub const LISTS_DICTS: &str = include_str!("python/lists_dicts.py");
-}
-
-// ══════════════════════════════════════════
-// C++ (11, 14, 17)
-// ══════════════════════════════════════════
-pub mod cpp {
-    // Templates C++ Básicos
-    pub const HELLO_WORLD: &str = include_str!("cpp/hello_world.cpp");
-    pub const VARIABLES_TIPOS: &str = include_str!("cpp/variables_tipos.cpp");
-    pub const ESTRUCTURAS_CONTROL: &str = include_str!("cpp/estructuras_control.cpp");
-    pub const FUNCIONES: &str = include_str!("cpp/funciones.cpp");
-    pub const CLASES_POO: &str = include_str!("cpp/clases_poo.cpp");
-    pub const STL_CONTAINERS: &str = include_str!("cpp/stl_containers.cpp");
-    pub const MANEJO_ARCHIVOS: &str = include_str!("cpp/manejo_archivos.cpp");
-    pub const PUNTEROS_MEMORIA: &str = include_str!("cpp/punteros_memoria.cpp");
-    pub const EXCEPCIONES_ERRORES: &str = include_str!("cpp/excepciones_errores.cpp");
-    pub const TEMPLATES_GENERICOS: &str = include_str!("cpp/templates_genericos.cpp");
-    pub const PROYECTO_CALCULADORA: &str = include_str!("cpp/proyecto_calculadora.cpp");
-    
-    // C++11 Templates
-    pub mod cpp11 {
-        pub const HELLO_MODERN: &str = include_str!("cpp/cpp11/hello_modern.cpp");
-        pub const HELLO_MODERN_UPDATED: &str = include_str!("cpp/cpp11/hello_modern.cpp");
-        pub const THREADING_DEMO: &str = include_str!("cpp/cpp11/threading_demo.cpp");
-        pub const STL_FEATURES: &str = include_str!("cpp/cpp11/stl_features.cpp");
-    }
-    
-    // C++14 Templates
-    pub mod cpp14 {
-        pub const GENERIC_FEATURES: &str = include_str!("cpp/cpp14/generic_features.cpp");
-        pub const GENERIC_FEATURES_UPDATED: &str = include_str!("cpp/cpp14/generic_features_updated.cpp");
-        pub const STL_IMPROVEMENTS: &str = include_str!("cpp/cpp14/stl_improvements.cpp");
-        pub const TEMPLATE_META: &str = include_str!("cpp/cpp14/template_meta.cpp");
-    }
-    
-    // C++17 Templates
-    pub mod cpp17 {
-        pub const CORE_FEATURES: &str = include_str!("cpp/cpp17/core_features.cpp");
-        pub const CORE_FEATURES_UPDATED: &str = include_str!("cpp/cpp17/core_features_updated.cpp");
-        pub const PARALLEL_FILESYSTEM: &str = include_str!("cpp/cpp17/parallel_filesystem.cpp");
-        pub const ADVANCED_FEATURES: &str = include_str!("cpp/cpp17/advanced_features.cpp");
-    }
-}
-
-// ══════════════════════════════════════════
 // Estructura de Template para el menú
 // ══════════════════════════════════════════
 #[derive(Clone)]
@@ -189,40 +54,6 @@ pub struct Template {
 // Todos los templates disponibles
 pub fn all_templates() -> Vec<Template> {
     vec![
-        // ══════════════════════════════════════════════════════════════
-        // ASM/NASM - WINDOWS
-        // ══════════════════════════════════════════════════════════════
-        Template { name: "Hola Mundo", code: asm_windows::HELLO, category: "Assembler (Windows)", subcategory: "Básico", color: (0xff, 0x47, 0x00), icon: "⏵", language: NodeLanguage::Asm },
-        Template { name: "Suma Básica", code: asm_windows::SUM, category: "Assembler (Windows)", subcategory: "Básico", color: (0xff, 0x47, 0x00), icon: "➕", language: NodeLanguage::Asm },
-        Template { name: "Bucle Simple", code: asm_windows::LOOP, category: "Assembler (Windows)", subcategory: "Básico", color: (0xff, 0x47, 0x00), icon: "↻", language: NodeLanguage::Asm },
-        Template { name: "Condicional If/Else", code: asm_windows::CONDITIONAL, category: "Assembler (Windows)", subcategory: "Básico", color: (0xff, 0x47, 0x00), icon: "🔀", language: NodeLanguage::Asm },
-        Template { name: "Variables y Datos", code: asm_windows::VARIABLES, category: "Assembler (Windows)", subcategory: "Intermedio", color: (0xff, 0x47, 0x00), icon: "📦", language: NodeLanguage::Asm },
-        Template { name: "Funciones y Llamadas", code: asm_windows::FUNCTIONS, category: "Assembler (Windows)", subcategory: "Intermedio", color: (0xff, 0x47, 0x00), icon: "⚡", language: NodeLanguage::Asm },
-        Template { name: "Manejo de Strings", code: asm_windows::STRINGS, category: "Assembler (Windows)", subcategory: "Intermedio", color: (0xff, 0x47, 0x00), icon: "📝", language: NodeLanguage::Asm },
-        Template { name: "Arrays y Memoria", code: asm_windows::ARRAYS, category: "Assembler (Windows)", subcategory: "Intermedio", color: (0xff, 0x47, 0x00), icon: "📊", language: NodeLanguage::Asm },
-        Template { name: "📚 Lib: Impresión", code: asm_windows::LIB_PRINT, category: "Assembler (Windows)", subcategory: "Librerías", color: (0x80, 0x40, 0x00), icon: "🖨️", language: NodeLanguage::Asm },
-        Template { name: "📚 Lib: Matemáticas", code: asm_windows::LIB_MATH, category: "Assembler (Windows)", subcategory: "Librerías", color: (0x80, 0x40, 0x00), icon: "🔢", language: NodeLanguage::Asm },
-        Template { name: "📚 Lib: Strings", code: asm_windows::LIB_STRING, category: "Assembler (Windows)", subcategory: "Librerías", color: (0x80, 0x40, 0x00), icon: "📝", language: NodeLanguage::Asm },
-        Template { name: "📚 Lib: Memoria", code: asm_windows::LIB_MEMORY, category: "Assembler (Windows)", subcategory: "Librerías", color: (0x80, 0x40, 0x00), icon: "💾", language: NodeLanguage::Asm },
-        Template { name: "📚 Lib: Entrada/Salida", code: asm_windows::LIB_IO, category: "Assembler (Windows)", subcategory: "Librerías", color: (0x80, 0x40, 0x00), icon: "⌨️", language: NodeLanguage::Asm },
-        
-        // ══════════════════════════════════════════════════════════════
-        // ASM/NASM - LINUX
-        // ══════════════════════════════════════════════════════════════
-        Template { name: "Hola Mundo", code: asm_linux::HELLO, category: "Assembler (Linux)", subcategory: "Básico", color: (0x00, 0xaa, 0xff), icon: "⏵", language: NodeLanguage::Asm },
-        Template { name: "Suma Básica", code: asm_linux::SUM, category: "Assembler (Linux)", subcategory: "Básico", color: (0x00, 0xaa, 0xff), icon: "➕", language: NodeLanguage::Asm },
-        Template { name: "Bucle Simple", code: asm_linux::LOOP, category: "Assembler (Linux)", subcategory: "Básico", color: (0x00, 0xaa, 0xff), icon: "↻", language: NodeLanguage::Asm },
-        Template { name: "Condicional If/Else", code: asm_linux::CONDITIONAL, category: "Assembler (Linux)", subcategory: "Básico", color: (0x00, 0xaa, 0xff), icon: "🔀", language: NodeLanguage::Asm },
-        Template { name: "Variables y Datos", code: asm_linux::VARIABLES, category: "Assembler (Linux)", subcategory: "Intermedio", color: (0x00, 0xaa, 0xff), icon: "📦", language: NodeLanguage::Asm },
-        Template { name: "Funciones y Llamadas", code: asm_linux::FUNCTIONS, category: "Assembler (Linux)", subcategory: "Intermedio", color: (0x00, 0xaa, 0xff), icon: "⚡", language: NodeLanguage::Asm },
-        Template { name: "Manejo de Strings", code: asm_linux::STRINGS, category: "Assembler (Linux)", subcategory: "Intermedio", color: (0x00, 0xaa, 0xff), icon: "📝", language: NodeLanguage::Asm },
-        Template { name: "Arrays y Memoria", code: asm_linux::ARRAYS, category: "Assembler (Linux)", subcategory: "Intermedio", color: (0x00, 0xaa, 0xff), icon: "📊", language: NodeLanguage::Asm },
-        Template { name: "📚 Lib: Impresión", code: asm_linux::LIB_PRINT, category: "Assembler (Linux)", subcategory: "Librerías", color: (0x00, 0x80, 0xcc), icon: "🖨️", language: NodeLanguage::Asm },
-        Template { name: "📚 Lib: Matemáticas", code: asm_linux::LIB_MATH, category: "Assembler (Linux)", subcategory: "Librerías", color: (0x00, 0x80, 0xcc), icon: "🔢", language: NodeLanguage::Asm },
-        Template { name: "📚 Lib: Strings", code: asm_linux::LIB_STRING, category: "Assembler (Linux)", subcategory: "Librerías", color: (0x00, 0x80, 0xcc), icon: "📝", language: NodeLanguage::Asm },
-        Template { name: "📚 Lib: Memoria", code: asm_linux::LIB_MEMORY, category: "Assembler (Linux)", subcategory: "Librerías", color: (0x00, 0x80, 0xcc), icon: "💾", language: NodeLanguage::Asm },
-        Template { name: "📚 Lib: Entrada/Salida", code: asm_linux::LIB_IO, category: "Assembler (Linux)", subcategory: "Librerías", color: (0x00, 0x80, 0xcc), icon: "⌨️", language: NodeLanguage::Asm },
-        
         // ══════════════════════════════════════════════════════════════
         // RUST
         // ══════════════════════════════════════════════════════════════
@@ -248,109 +79,9 @@ pub fn all_templates() -> Vec<Template> {
         Template { name: "📚 Math (Matemáticas)", code: rust::LIB_MATH, category: "Rust", subcategory: "Librerías", color: (0x80, 0x40, 0x00), icon: "🔢", language: NodeLanguage::Rust },
         Template { name: "📚 IO (Entrada/Salida)", code: rust::LIB_IO, category: "Rust", subcategory: "Librerías", color: (0x80, 0x40, 0x00), icon: "📂", language: NodeLanguage::Rust },
         Template { name: "📚 Error (Manejo de Errores)", code: rust::LIB_ERROR, category: "Rust", subcategory: "Librerías", color: (0x80, 0x40, 0x00), icon: "⚠️", language: NodeLanguage::Rust },
-        
-        // ══════════════════════════════════════════════════════════════
-        // C++
-        // ══════════════════════════════════════════════════════════════
-        Template { name: "🔷 Hello World", code: cpp::HELLO_WORLD, category: "C++", subcategory: "Básico", color: (0x00, 0x73, 0xCC), icon: "🔷", language: NodeLanguage::Cpp },
-        Template { name: "🔷 Variables y Tipos", code: cpp::VARIABLES_TIPOS, category: "C++", subcategory: "Básico", color: (0x00, 0x73, 0xCC), icon: "📦", language: NodeLanguage::Cpp },
-        Template { name: "🔷 Estructuras de Control", code: cpp::ESTRUCTURAS_CONTROL, category: "C++", subcategory: "Básico", color: (0x00, 0x73, 0xCC), icon: "🔄", language: NodeLanguage::Cpp },
-        Template { name: "🔷 Funciones", code: cpp::FUNCIONES, category: "C++", subcategory: "Básico", color: (0x00, 0x73, 0xCC), icon: "⚡", language: NodeLanguage::Cpp },
-        Template { name: "🔷 Clases y POO", code: cpp::CLASES_POO, category: "C++", subcategory: "Intermedio", color: (0x00, 0x73, 0xCC), icon: "🏛️", language: NodeLanguage::Cpp },
-        Template { name: "🔷 STL Containers", code: cpp::STL_CONTAINERS, category: "C++", subcategory: "Intermedio", color: (0x00, 0x73, 0xCC), icon: "📚", language: NodeLanguage::Cpp },
-        Template { name: "🔷 Manejo de Archivos", code: cpp::MANEJO_ARCHIVOS, category: "C++", subcategory: "Intermedio", color: (0x00, 0x73, 0xCC), icon: "📂", language: NodeLanguage::Cpp },
-        Template { name: "🔷 Punteros y Memoria", code: cpp::PUNTEROS_MEMORIA, category: "C++", subcategory: "Avanzado", color: (0x00, 0x73, 0xCC), icon: "📍", language: NodeLanguage::Cpp },
-        Template { name: "🔷 Excepciones y Errores", code: cpp::EXCEPCIONES_ERRORES, category: "C++", subcategory: "Avanzado", color: (0x00, 0x73, 0xCC), icon: "⚠️", language: NodeLanguage::Cpp },
-        Template { name: "🔷 Templates Genéricos", code: cpp::TEMPLATES_GENERICOS, category: "C++", subcategory: "Avanzado", color: (0x00, 0x73, 0xCC), icon: "🔧", language: NodeLanguage::Cpp },
-        Template { name: "🔷 Proyecto: Calculadora", code: cpp::PROYECTO_CALCULADORA, category: "C++", subcategory: "Proyectos", color: (0x00, 0x73, 0xCC), icon: "🎯", language: NodeLanguage::Cpp },
-        
-        // C++11 Templates
-        Template { name: "🔷 C++11: Hello Modern", code: cpp::cpp11::HELLO_MODERN, category: "C++", subcategory: "C++11", color: (0x00, 0x60, 0xAA), icon: "🔷", language: NodeLanguage::Cpp },
-        Template { name: "🔷 C++11: Threading Demo", code: cpp::cpp11::THREADING_DEMO, category: "C++", subcategory: "C++11", color: (0x00, 0x60, 0xAA), icon: "🧵", language: NodeLanguage::Cpp },
-        Template { name: "🔷 C++11: STL Features", code: cpp::cpp11::STL_FEATURES, category: "C++", subcategory: "C++11", color: (0x00, 0x60, 0xAA), icon: "📚", language: NodeLanguage::Cpp },
-        
-        // C++14 Templates
-        Template { name: "🔷 C++14: Generic Features", code: cpp::cpp14::GENERIC_FEATURES, category: "C++", subcategory: "C++14", color: (0x00, 0x50, 0x99), icon: "🔷", language: NodeLanguage::Cpp },
-        Template { name: "🔷 C++14: STL Improvements", code: cpp::cpp14::STL_IMPROVEMENTS, category: "C++", subcategory: "C++14", color: (0x00, 0x50, 0x99), icon: "📚", language: NodeLanguage::Cpp },
-        Template { name: "🔷 C++14: Template Meta", code: cpp::cpp14::TEMPLATE_META, category: "C++", subcategory: "C++14", color: (0x00, 0x50, 0x99), icon: "🔧", language: NodeLanguage::Cpp },
-        
-        // C++17 Templates
-        Template { name: "🔷 C++17: Core Features", code: cpp::cpp17::CORE_FEATURES, category: "C++", subcategory: "C++17", color: (0x00, 0x40, 0x88), icon: "🔷", language: NodeLanguage::Cpp },
-        Template { name: "🔷 C++17: Parallel Filesystem", code: cpp::cpp17::PARALLEL_FILESYSTEM, category: "C++", subcategory: "C++17", color: (0x00, 0x40, 0x88), icon: "📂", language: NodeLanguage::Cpp },
-        Template { name: "🔷 C++17: Advanced Features", code: cpp::cpp17::ADVANCED_FEATURES, category: "C++", subcategory: "C++17", color: (0x00, 0x40, 0x88), icon: "⚡", language: NodeLanguage::Cpp },
-        
-        // ══════════════════════════════════════════════════════════════
-        // JAVA 25
-        // ══════════════════════════════════════════════════════════════
-        Template { name: "Hola Mundo", code: java::HELLO, category: "Java", subcategory: "Básico", color: (0xed, 0x8b, 0x00), icon: "☕", language: NodeLanguage::Java },
-        Template { name: "Variables y Tipos", code: java::VARIABLES, category: "Java", subcategory: "Básico", color: (0xed, 0x8b, 0x00), icon: "📦", language: NodeLanguage::Java },
-        Template { name: "Clases y Objetos", code: java::CLASSES, category: "Java", subcategory: "Básico", color: (0xed, 0x8b, 0x00), icon: "🏛️", language: NodeLanguage::Java },
-        Template { name: "Métodos y Funciones", code: java::METHODS, category: "Java", subcategory: "Básico", color: (0xed, 0x8b, 0x00), icon: "⚡", language: NodeLanguage::Java },
-        Template { name: "Colecciones", code: java::COLLECTIONS, category: "Java", subcategory: "Intermedio", color: (0xed, 0x8b, 0x00), icon: "📚", language: NodeLanguage::Java },
-        Template { name: "Genéricos", code: java::GENERICS, category: "Java", subcategory: "Intermedio", color: (0xed, 0x8b, 0x00), icon: "🔀", language: NodeLanguage::Java },
-        Template { name: "Excepciones", code: java::EXCEPTIONS, category: "Java", subcategory: "Intermedio", color: (0xed, 0x8b, 0x00), icon: "⚠️", language: NodeLanguage::Java },
-        Template { name: "Interfaces", code: java::INTERFACES, category: "Java", subcategory: "Intermedio", color: (0xed, 0x8b, 0x00), icon: "🔌", language: NodeLanguage::Java },
-        Template { name: "Herencia", code: java::INHERITANCE, category: "Java", subcategory: "Intermedio", color: (0xed, 0x8b, 0x00), icon: "🔗", language: NodeLanguage::Java },
-        Template { name: "Streams API", code: java::STREAMS, category: "Java", subcategory: "Avanzado", color: (0xed, 0x8b, 0x00), icon: "🌊", language: NodeLanguage::Java },
-        Template { name: "Lambdas", code: java::LAMBDAS, category: "Java", subcategory: "Avanzado", color: (0xed, 0x8b, 0x00), icon: "λ", language: NodeLanguage::Java },
-        Template { name: "Concurrencia", code: java::CONCURRENCY, category: "Java", subcategory: "Avanzado", color: (0xed, 0x8b, 0x00), icon: "⚙️", language: NodeLanguage::Java },
-        Template { name: "Reflection", code: java::REFLECTION, category: "Java", subcategory: "Avanzado", color: (0xed, 0x8b, 0x00), icon: "🔮", language: NodeLanguage::Java },
-        Template { name: "Anotaciones", code: java::ANNOTATIONS, category: "Java", subcategory: "Avanzado", color: (0xed, 0x8b, 0x00), icon: "🏷️", language: NodeLanguage::Java },
-        Template { name: "Records", code: java::RECORDS, category: "Java", subcategory: "Avanzado", color: (0xed, 0x8b, 0x00), icon: "📋", language: NodeLanguage::Java },
-        Template { name: "Sealed Classes", code: java::SEALED_CLASSES, category: "Java", subcategory: "Avanzado", color: (0xed, 0x8b, 0x00), icon: "🔒", language: NodeLanguage::Java },
-        Template { name: "Pattern Matching", code: java::PATTERN_MATCHING, category: "Java", subcategory: "Avanzado", color: (0xed, 0x8b, 0x00), icon: "🔍", language: NodeLanguage::Java },
-        Template { name: "Text Blocks", code: java::TEXT_BLOCKS, category: "Java", subcategory: "Avanzado", color: (0xed, 0x8b, 0x00), icon: "📄", language: NodeLanguage::Java },
-        Template { name: "Virtual Threads", code: java::VIRTUAL_THREADS, category: "Java", subcategory: "Avanzado", color: (0xed, 0x8b, 0x00), icon: "🧵", language: NodeLanguage::Java },
-        Template { name: "Switch Expressions", code: java::SWITCH_EXPRESSIONS, category: "Java", subcategory: "Avanzado", color: (0xed, 0x8b, 0x00), icon: "🔀", language: NodeLanguage::Java },
-        Template { name: "Record Patterns", code: java::RECORD_PATTERNS, category: "Java", subcategory: "Avanzado", color: (0xed, 0x8b, 0x00), icon: "🎯", language: NodeLanguage::Java },
-        Template { name: "Foreign Memory API", code: java::FOREIGN_MEMORY, category: "Java", subcategory: "Avanzado", color: (0xed, 0x8b, 0x00), icon: "💾", language: NodeLanguage::Java },
-        Template { name: "Structured Concurrency", code: java::STRUCTURED_CONCURRENCY, category: "Java", subcategory: "Avanzado", color: (0xed, 0x8b, 0x00), icon: "🔗", language: NodeLanguage::Java },
-        Template { name: "📚 Utils (Utilidades)", code: java::LIB_UTILS, category: "Java", subcategory: "Librerías", color: (0x80, 0x40, 0x00), icon: "🛠️", language: NodeLanguage::Java },
-        Template { name: "📚 Collections (Colecciones)", code: java::LIB_COLLECTIONS, category: "Java", subcategory: "Librerías", color: (0x80, 0x40, 0x00), icon: "📚", language: NodeLanguage::Java },
-        Template { name: "📚 I/O (Entrada/Salida)", code: java::LIB_IO, category: "Java", subcategory: "Librerías", color: (0x80, 0x40, 0x00), icon: "📁", language: NodeLanguage::Java },
-        Template { name: "📚 Async (Asíncrono)", code: java::LIB_ASYNC, category: "Java", subcategory: "Librerías", color: (0x80, 0x40, 0x00), icon: "⚡", language: NodeLanguage::Java },
-        
-        // ══════════════════════════════════════════════════════════════
-        // PYTHON 3.12
-        // ══════════════════════════════════════════════════════════════
-        Template { name: "Hola Mundo", code: python::HELLO_WORLD, category: "Python", subcategory: "Básico", color: (0x37, 0x76, 0xAB), icon: "🐍", language: NodeLanguage::Python },
-        Template { name: "Variables y Tipos", code: python::VARIABLES, category: "Python", subcategory: "Básico", color: (0x37, 0x76, 0xAB), icon: "📦", language: NodeLanguage::Python },
-        Template { name: "Condicionales", code: python::CONDITIONALS, category: "Python", subcategory: "Básico", color: (0x37, 0x76, 0xAB), icon: "🔀", language: NodeLanguage::Python },
-        Template { name: "Bucles", code: python::LOOPS, category: "Python", subcategory: "Básico", color: (0x37, 0x76, 0xAB), icon: "↻", language: NodeLanguage::Python },
-        Template { name: "Funciones", code: python::FUNCTIONS, category: "Python", subcategory: "Básico", color: (0x37, 0x76, 0xAB), icon: "⚡", language: NodeLanguage::Python },
-        Template { name: "Listas y Diccionarios", code: python::LISTS_DICTS, category: "Python", subcategory: "Básico", color: (0x37, 0x76, 0xAB), icon: "📚", language: NodeLanguage::Python },
-        
-        // ══════════════════════════════════════════════════════════════
-        // C++11
-        // ══════════════════════════════════════════════════════════════
-        Template { name: "Hello Modern C++11", code: cpp::cpp11::HELLO_MODERN, category: "C++11", subcategory: "Básico", color: (0x00, 0x59, 0x99), icon: "🔷", language: NodeLanguage::Cpp },
-        Template { name: "Threading Demo", code: cpp::cpp11::THREADING_DEMO, category: "C++11", subcategory: "Intermedio", color: (0x00, 0x59, 0x99), icon: "🧵", language: NodeLanguage::Cpp },
-        Template { name: "STL Features", code: cpp::cpp11::STL_FEATURES, category: "C++11", subcategory: "Avanzado", color: (0x00, 0x59, 0x99), icon: "📚", language: NodeLanguage::Cpp },
-        
-        // ══════════════════════════════════════════════════════════════
-        // C++14
-        // ══════════════════════════════════════════════════════════════
-        Template { name: "Generic Features", code: cpp::cpp14::GENERIC_FEATURES, category: "C++14", subcategory: "Básico", color: (0x00, 0x80, 0x80), icon: "🔶", language: NodeLanguage::Cpp },
-        Template { name: "STL Improvements", code: cpp::cpp14::STL_IMPROVEMENTS, category: "C++14", subcategory: "Intermedio", color: (0x00, 0x80, 0x80), icon: "📈", language: NodeLanguage::Cpp },
-        Template { name: "Template Metaprogramming", code: cpp::cpp14::TEMPLATE_META, category: "C++14", subcategory: "Avanzado", color: (0x00, 0x80, 0x80), icon: "🎯", language: NodeLanguage::Cpp },
-        
-        // ══════════════════════════════════════════════════════════════
-        // C++17
-        // ══════════════════════════════════════════════════════════════
-        Template { name: "Core Features", code: cpp::cpp17::CORE_FEATURES, category: "C++17", subcategory: "Básico", color: (0x00, 0x40, 0x80), icon: "🔹", language: NodeLanguage::Cpp },
-        Template { name: "Parallel & Filesystem", code: cpp::cpp17::PARALLEL_FILESYSTEM, category: "C++17", subcategory: "Intermedio", color: (0x00, 0x40, 0x80), icon: "⚡", language: NodeLanguage::Cpp },
-        Template { name: "Advanced Features", code: cpp::cpp17::ADVANCED_FEATURES, category: "C++17", subcategory: "Avanzado", color: (0x00, 0x40, 0x80), icon: "🚀", language: NodeLanguage::Cpp },
     ]
 }
 
 // Compatibilidad con código anterior
-#[allow(unused_imports)]
-pub use asm_windows::HELLO as ASM_HELLO;
-#[allow(unused_imports)]
-pub use asm_windows::SUM as ASM_SUM;
-#[allow(unused_imports)]
-pub use asm_windows::LOOP as ASM_LOOP;
-#[allow(unused_imports)]
-pub use asm_windows::CONDITIONAL as ASM_CONDITIONAL;
 #[allow(unused_imports)]
 pub use rust::HELLO as RUST_HELLO;

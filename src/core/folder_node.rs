@@ -4,7 +4,7 @@
 // ═══════════════════════════════════════════════════════════════════
 
 use crate::core::node_graph::{Node, NodeGraph, NodeId, NodeLanguage, PinId, PinAddress};
-use eframe::egui::{Color32, Pos2, pos2};
+use crate::core::types::{Color32, Pos2, pos2};
 
 /// Tipo de nodo carpeta
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

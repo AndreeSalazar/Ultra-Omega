@@ -409,10 +409,10 @@ fn count_stats(folder: &DetectedFolder, stats: &mut FileWatcherStats) {
 pub fn create_nodes_from_files(
     files: &[&DetectedFile],
     graph: &mut crate::core::node_graph::NodeGraph,
-    start_position: eframe::egui::Pos2,
+    start_position: crate::core::types::Pos2,
     spacing: f32,
 ) -> Vec<NodeId> {
-    use eframe::egui::Color32;
+    use crate::core::types::Color32;
     
     let mut created_nodes = Vec::new();
     let mut current_pos = start_position;
@@ -470,11 +470,11 @@ pub fn create_nodes_from_files(
 pub fn create_folder_structure_as_nodes(
     folder: &DetectedFolder,
     graph: &mut crate::core::node_graph::NodeGraph,
-    start_position: eframe::egui::Pos2,
+    start_position: crate::core::types::Pos2,
     spacing: f32,
     depth: usize,
 ) -> Vec<NodeId> {
-    use eframe::egui::Color32;
+    use crate::core::types::Color32;
     
     let mut created_nodes = Vec::new();
     let mut current_pos = start_position;
@@ -510,7 +510,7 @@ pub fn create_folder_structure_as_nodes(
     created_nodes.push(folder_node_id);
     
     // Crear nodos para archivos de código en esta carpeta
-    let mut file_pos = eframe::egui::pos2(
+    let mut file_pos = crate::core::types::pos2(
         current_pos.x + spacing,
         current_pos.y + spacing * 0.5,
     );
@@ -556,7 +556,7 @@ pub fn create_folder_structure_as_nodes(
     }
     
     // Procesar subcarpetas recursivamente
-    let mut subfolder_pos = eframe::egui::pos2(
+    let mut subfolder_pos = crate::core::types::pos2(
         current_pos.x,
         current_pos.y + spacing * (1.0 + folder.files.len() as f32 * 0.3),
     );

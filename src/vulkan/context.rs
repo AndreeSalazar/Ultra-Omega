@@ -1,6 +1,6 @@
 use ash::vk;
 use ash::{Entry, Instance, Device};
-use std::ffi::{CStr, CString};
+use std::ffi::CString;
 use std::os::raw::c_char;
 use raw_window_handle::{HasRawWindowHandle, HasRawDisplayHandle};
 use ash_window;
@@ -10,6 +10,7 @@ use ash_window;
 pub struct VulkanContext {
     pub entry: Entry,
     pub instance: Instance,
+    pub surface_loader: ash::extensions::khr::Surface,
     pub surface: vk::SurfaceKHR,
     pub physical_device: vk::PhysicalDevice,
     pub device: Device,
@@ -19,9 +20,9 @@ pub struct VulkanContext {
 
 impl VulkanContext {
     /// Inicializa el contexto completo de Vulkan: Instance, Surface, Device y Colas.
-    pub fn new(window: &impl HasRawWindowHandle + HasRawDisplayHandle) -> Self {
+    pub fn new(window: &(impl HasRawWindowHandle + HasRawDisplayHandle)) -> Self {
         unsafe {
-            let entry = Entry::linked();
+            let entry = Entry::load().expect("Failed to load Vulkan entry");
 
             // 1. Crear Instancia de Vulkan
             let app_name = CString::new("Ultra-Omega Node Editor").unwrap();
@@ -36,13 +37,12 @@ impl VulkanContext {
 
             // Extensiones requeridas para la ventana (Winit -> Surface)
             let surface_extensions = ash_window::enumerate_required_extensions(
-                window.raw_display_handle(),
-                window.raw_window_handle(),
+                &window.raw_display_handle(),
             ).expect("Failed to enumerate surface extensions");
 
             let extension_names: Vec<*const c_char> = surface_extensions
                 .iter()
-                .map(|ext| ext.as_ptr())
+                .map(|ext| *ext)
                 .collect();
 
             // Capas de validación (opcional, útil para debug)
@@ -58,11 +58,12 @@ impl VulkanContext {
                 .expect("Failed to create Vulkan instance");
 
             // 2. Crear Surface (Ventana)
+            let surface_loader = ash::extensions::khr::Surface::new(&entry, &instance);
             let surface = ash_window::create_surface(
                 &entry,
                 &instance,
-                window.raw_display_handle(),
-                window.raw_window_handle(),
+                &window.raw_display_handle(),
+                &window.raw_window_handle(),
                 None,
             ).expect("Failed to create Vulkan surface");
 
@@ -86,7 +87,7 @@ impl VulkanContext {
                     graphics_queue_family = Some(index as u32);
                 }
 
-                let supports_present = instance.get_physical_device_surface_support(
+                let supports_present = surface_loader.get_physical_device_surface_support(
                     physical_device,
                     index as u32,
                     surface,
@@ -142,6 +143,7 @@ impl VulkanContext {
             VulkanContext {
                 entry,
                 instance,
+                surface_loader,
                 surface,
                 physical_device,
                 device,
@@ -156,7 +158,7 @@ impl Drop for VulkanContext {
     fn drop(&mut self) {
         unsafe {
             self.device.destroy_device(None);
-            self.instance.destroy_surface(self.surface, None);
+            self.surface_loader.destroy_surface(self.surface, None);
             self.instance.destroy_instance(None);
         }
     }

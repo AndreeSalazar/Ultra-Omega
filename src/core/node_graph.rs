@@ -1,4 +1,4 @@
-use eframe::egui::{Color32, Pos2, pos2};
+use crate::core::types::{Color32, Pos2, pos2};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -118,7 +118,7 @@ pub struct Link {
 
 // Serialization helpers
 mod pos2_serde {
-    use eframe::egui::Pos2;
+    use crate::core::types::Pos2;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
     pub fn serialize<S>(pos: &Pos2, serializer: S) -> Result<S::Ok, S::Error>
@@ -138,14 +138,14 @@ mod pos2_serde {
 }
 
 mod color32_serde {
-    use eframe::egui::Color32;
+    use crate::core::types::Color32;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
     pub fn serialize<S>(color: &Color32, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        (color.r(), color.g(), color.b(), color.a()).serialize(serializer)
+        (color.r, color.g, color.b, color.a).serialize(serializer)
     }
 
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Color32, D::Error>
@@ -153,7 +153,7 @@ mod color32_serde {
         D: Deserializer<'de>,
     {
         let (r, g, b, a) = <(u8, u8, u8, u8)>::deserialize(deserializer)?;
-        Ok(Color32::from_rgba_unmultiplied(r, g, b, a))
+        Ok(Color32::from_rgba(r, g, b, a))
     }
 }
 
