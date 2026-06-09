@@ -2,6 +2,7 @@
 // Ultra-Omega File Watcher - Sistema de Detección en Tiempo Real
 // ═══════════════════════════════════════════════════════════════════════════
 // Inspirado en Houdini: Detecta archivos y carpetas para crear nodos automáticamente
+// 100% enfocado en Rust
 
 use std::path::{Path, PathBuf};
 use std::collections::HashMap;
@@ -191,10 +192,6 @@ impl FileWatcherState {
 pub struct FileWatcherStats {
     pub total_files: usize,
     pub total_folders: usize,
-    pub cpp_files: usize,
-    pub java_files: usize,
-    pub asm_files: usize,
-    pub python_files: usize,
     pub rust_files: usize,
     pub other_files: usize,
 }
@@ -253,7 +250,7 @@ fn scan_folder(path: &Path, root: &Path) -> Result<DetectedFolder, String> {
             let file = detect_file(&entry_path, metadata.as_ref());
             
             // Solo contar archivos de código
-            if file.language != NodeLanguage::Cpp || !file.extension.is_empty() {
+            if file.language != NodeLanguage::Text || !file.extension.is_empty() {
                 *language_counts.entry(file.language).or_insert(0) += 1;
             }
             
@@ -310,39 +307,25 @@ fn detect_file(path: &Path, metadata: Option<&std::fs::Metadata>) -> DetectedFil
 /// Detectar lenguaje basado en extensión
 pub fn detect_language_from_extension(ext: &str) -> NodeLanguage {
     match ext {
-        "cpp" | "cc" | "cxx" | "c++" | "c" | "h" | "hpp" | "hxx" => NodeLanguage::Cpp,
-        "java" => NodeLanguage::Java,
-        "asm" | "s" | "nasm" => NodeLanguage::Asm,
-        "py" | "pyw" => NodeLanguage::Python,
         "rs" => NodeLanguage::Rust,
-        "js" | "ts" | "jsx" | "tsx" | "txt" | "md" => NodeLanguage::Text,
-        _ => NodeLanguage::Cpp, // Default
+        "txt" | "md" => NodeLanguage::Text,
+        _ => NodeLanguage::Text, // Default to Text for non-Rust files
     }
 }
 
 /// Obtener icono para un lenguaje
 pub fn get_language_icon(language: NodeLanguage) -> &'static str {
     match language {
-        NodeLanguage::Cpp => "©",
-        NodeLanguage::Java => "☕",
-        NodeLanguage::Asm => "⚡",
-        NodeLanguage::Python => "🐍",
         NodeLanguage::Rust => "🦀",
         NodeLanguage::Text => "📄",
-        NodeLanguage::Auto => "�",
+        NodeLanguage::Auto => "📁",
     }
 }
 
 /// Obtener icono para una extensión de archivo
 pub fn get_file_icon(extension: &str) -> &'static str {
     match extension {
-        "cpp" | "cc" | "cxx" | "c++" | "c" => "©",
-        "h" | "hpp" | "hxx" => "📋",
-        "java" => "☕",
-        "asm" | "s" | "nasm" => "⚡",
-        "py" | "pyw" => "🐍",
         "rs" => "🦀",
-        "js" | "ts" => "🟨",
         "json" => "📋",
         "txt" | "md" => "📄",
         "exe" => "⚙️",
@@ -367,13 +350,9 @@ fn collect_file_times(folder: &DetectedFolder, times: &mut HashMap<PathBuf, Syst
 /// Recolectar archivos de código
 fn collect_code_files<'a>(folder: &'a DetectedFolder, files: &mut Vec<&'a DetectedFile>) {
     for file in &folder.files {
-        // Solo archivos de código
-        match file.extension.as_str() {
-            "cpp" | "cc" | "cxx" | "c++" | "c" | "h" | "hpp" | "hxx" |
-            "java" | "asm" | "s" | "nasm" | "py" | "pyw" | "rs" | "js" | "ts" => {
-                files.push(file);
-            }
-            _ => {}
+        // Solo archivos de código Rust
+        if file.extension.as_str() == "rs" {
+            files.push(file);
         }
     }
     
@@ -390,10 +369,6 @@ fn count_stats(folder: &DetectedFolder, stats: &mut FileWatcherStats) {
         stats.total_files += 1;
         
         match file.language {
-            NodeLanguage::Cpp => stats.cpp_files += 1,
-            NodeLanguage::Java => stats.java_files += 1,
-            NodeLanguage::Asm => stats.asm_files += 1,
-            NodeLanguage::Python => stats.python_files += 1,
             NodeLanguage::Rust => stats.rust_files += 1,
             NodeLanguage::Text => stats.other_files += 1,
             NodeLanguage::Auto => stats.other_files += 1,
@@ -425,10 +400,6 @@ pub fn create_nodes_from_files(
         
         // Color basado en lenguaje
         let color = match file.language {
-            NodeLanguage::Cpp => Color32::from_rgb(100, 150, 255),
-            NodeLanguage::Java => Color32::from_rgb(237, 139, 0),
-            NodeLanguage::Asm => Color32::from_rgb(255, 220, 100),
-            NodeLanguage::Python => Color32::from_rgb(55, 118, 171),
             NodeLanguage::Rust => Color32::from_rgb(255, 140, 100),
             NodeLanguage::Text => Color32::from_rgb(180, 180, 180),
             NodeLanguage::Auto => Color32::from_rgb(150, 150, 150),
@@ -488,7 +459,7 @@ pub fn create_folder_structure_as_nodes(
         folder.dominant_language
     );
     
-    let folder_language = folder.dominant_language.unwrap_or(NodeLanguage::Cpp);
+    let folder_language = folder.dominant_language.unwrap_or(NodeLanguage::Text);
     
     // Color para carpeta
     let folder_color = Color32::from_rgb(255, 200, 100);
@@ -516,42 +487,34 @@ pub fn create_folder_structure_as_nodes(
     );
     
     for file in &folder.files {
-        // Solo archivos de código
-        match file.extension.as_str() {
-            "cpp" | "cc" | "cxx" | "c++" | "c" | "h" | "hpp" | "hxx" |
-            "java" | "asm" | "s" | "nasm" | "py" | "pyw" | "rs" | "js" | "ts" => {
-                let code = std::fs::read_to_string(&file.path).unwrap_or_default();
-                
-                // Color basado en lenguaje
-                let color = match file.language {
-                    NodeLanguage::Cpp => Color32::from_rgb(100, 150, 255),
-                    NodeLanguage::Java => Color32::from_rgb(237, 139, 0),
-                    NodeLanguage::Asm => Color32::from_rgb(255, 220, 100),
-                    NodeLanguage::Python => Color32::from_rgb(55, 118, 171),
-                    NodeLanguage::Rust => Color32::from_rgb(255, 140, 100),
-                    NodeLanguage::Text => Color32::from_rgb(180, 180, 180),
-                    NodeLanguage::Auto => Color32::from_rgb(150, 150, 150),
-                };
-                
-                let node_id = graph.add_node(
-                    file.name.clone(),
-                    file_pos,
-                    color,
-                    &["in"],
-                    &["out"],
-                    file.language,
-                );
-                
-                // Establecer código del nodo
-                if let Some(node) = graph.node_mut(node_id) {
-                    node.code = code;
-                    node.code_path = Some(file.path.to_string_lossy().to_string());
-                }
-                
-                created_nodes.push(node_id);
-                file_pos.y += spacing * 0.6;
+        // Solo archivos de código Rust
+        if file.extension.as_str() == "rs" {
+            let code = std::fs::read_to_string(&file.path).unwrap_or_default();
+            
+            // Color basado en lenguaje
+            let color = match file.language {
+                NodeLanguage::Rust => Color32::from_rgb(255, 140, 100),
+                NodeLanguage::Text => Color32::from_rgb(180, 180, 180),
+                NodeLanguage::Auto => Color32::from_rgb(150, 150, 150),
+            };
+            
+            let node_id = graph.add_node(
+                file.name.clone(),
+                file_pos,
+                color,
+                &["in"],
+                &["out"],
+                file.language,
+            );
+            
+            // Establecer código del nodo
+            if let Some(node) = graph.node_mut(node_id) {
+                node.code = code;
+                node.code_path = Some(file.path.to_string_lossy().to_string());
             }
-            _ => {}
+            
+            created_nodes.push(node_id);
+            file_pos.y += spacing * 0.6;
         }
     }
     

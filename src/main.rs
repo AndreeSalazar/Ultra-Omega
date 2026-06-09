@@ -22,7 +22,7 @@ fn main() {
     let config = AppConfig::load();
 
     // 1. Inicializar Event Loop y Ventana con Winit
-    let event_loop = EventLoop::new();
+    let event_loop = EventLoop::new().unwrap();
     let mut window_builder = WindowBuilder::new()
         .with_title("Ultra-Omega Node Lab [Vulkan]")
         .with_inner_size(winit::dpi::LogicalSize::new(1280, 720));
@@ -33,10 +33,11 @@ fn main() {
 
     let window = window_builder.build(&event_loop).expect("Failed to create window");
 
-    // 2. Inicializar Contexto de Vulkan (Instance, Device, Surface)
-    let vulkan_ctx = VulkanContext::new(&window);
+    // 2. Inicializar Contexto de Vulkan (Instance, Device, Surface, Swapchain, Render Pass)
+    let mut vulkan_ctx = VulkanContext::new(&window);
     println!("✅ Vulkan Context initialized successfully!");
     println!("🚀 Ultra-Omega v2.0 - 100% Rust + Vulkan (ash)");
+    println!("🎨 Swapchain and Render Pass ready. Clearing screen with #1E1E1E (VS Code Dark)...");
 
     // 3. Loop Principal de Eventos
     event_loop.run(move |event, _, control_flow| {
@@ -53,10 +54,10 @@ fn main() {
                 window.request_redraw();
             }
             Event::RedrawRequested(_) => {
-                // Aquí irá el renderizado con Vulkan
-                // Por ahora, solo limpiamos la pantalla con un color
+                // Renderizado con Vulkan: Limpiar pantalla y presentar
+                vulkan_ctx.draw_frame();
             }
             _ => {}
         }
-    });
+    }).unwrap();
 }

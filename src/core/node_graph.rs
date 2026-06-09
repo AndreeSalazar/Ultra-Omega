@@ -170,17 +170,17 @@ impl NodeGraph {
     pub fn demo() -> Self {
         let mut graph = Self::default();
 
-        // Node 1: Base ASM (NASM)
-        let asm_node_id = graph.add_node(
-            "Base ASM (NASM)",
+        // Node 1: Base Rust (Sistemas)
+        let sys_node_id = graph.add_node(
+            "Base Rust (Sistemas)",
             pos2(100.0, 100.0),
-            Color32::from_rgb(0xff, 0x47, 0x00), // Orange-Red for low level/danger
+            Color32::from_rgb(0xde, 0x39, 0x00), // Rust Orange
             &[],
             &["Código Fuente"],
-            NodeLanguage::Asm,
+            NodeLanguage::Rust,
         );
-        if let Some(node) = graph.node_mut(asm_node_id) {
-            node.code = "default rel\nsection .text\nglobal main\nextern printf\nextern exit\n\nmain:\n    sub rsp, 40\n    mov rcx, msg\n    xor eax, eax\n    call printf\n    add rsp, 40\n    ret\n\nsection .data\n    msg db 'Hola ASM desde Ultra Omega!', 10, 0".to_string();
+        if let Some(node) = graph.node_mut(sys_node_id) {
+            node.code = "fn main() {\n    println!(\"Hola desde Rust en Ultra Omega!\");\n}".to_string();
         }
 
         // Node 2: Base Rust

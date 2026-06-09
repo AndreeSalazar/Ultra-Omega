@@ -156,10 +156,6 @@ impl UltraOmegaTheme {
         use crate::core::node_graph::NodeLanguage;
         match language {
             NodeLanguage::Rust => self.node_rust,
-            NodeLanguage::Cpp => self.node_cpp,
-            NodeLanguage::Python => self.node_python,
-            NodeLanguage::Java => self.node_java,
-            NodeLanguage::Asm => self.node_asm,
             NodeLanguage::Text => self.node_text,
             NodeLanguage::Auto => self.node_auto,
         }

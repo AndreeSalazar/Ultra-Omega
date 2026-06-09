@@ -10,7 +10,7 @@ ash-window = "0.12"
 raw-window-handle = "0.5"
 
 # Window handling
-winit = "0.28"
+winit = "0.29"
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }

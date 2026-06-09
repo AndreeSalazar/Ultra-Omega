@@ -159,12 +159,6 @@ impl NodeGraph {
                 if matches!(folder_language, NodeLanguage::Auto | NodeLanguage::Text) {
                     if folder_node.title.contains("[Rust]") {
                         folder_language = NodeLanguage::Rust;
-                    } else if folder_node.title.contains("[Python]") {
-                        folder_language = NodeLanguage::Python;
-                    } else if folder_node.title.contains("[Java]") {
-                        folder_language = NodeLanguage::Java;
-                    } else if folder_node.title.contains("[Assembly]") || folder_node.title.contains("[ASM]") {
-                        folder_language = NodeLanguage::Asm;
                     }
                 }
                 
@@ -195,10 +189,6 @@ impl NodeGraph {
     fn language_display_name(lang: NodeLanguage) -> String {
         match lang {
             NodeLanguage::Rust => "Rust".to_string(),
-            NodeLanguage::Python => "Python".to_string(),
-            NodeLanguage::Java => "Java".to_string(),
-            NodeLanguage::Asm => "Assembly".to_string(),
-            NodeLanguage::Cpp => "C++".to_string(),
             NodeLanguage::Text => "Text".to_string(),
             NodeLanguage::Auto => "Auto".to_string(),
         }

@@ -56,10 +56,6 @@ pub fn get_folder_required_language(
 fn language_display_name(lang: NodeLanguage) -> String {
     match lang {
         NodeLanguage::Rust => "Rust".to_string(),
-        NodeLanguage::Python => "Python".to_string(),
-        NodeLanguage::Java => "Java".to_string(),        
-        NodeLanguage::Asm => "Assembly".to_string(),
-        NodeLanguage::Cpp => "C++".to_string(),
         NodeLanguage::Text => "Text".to_string(),
         NodeLanguage::Auto => "Auto".to_string(),
     }

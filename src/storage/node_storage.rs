@@ -90,10 +90,6 @@ impl NodeStorage {
     fn get_file_extension(language: NodeLanguage) -> &'static str {
         match language {
             NodeLanguage::Rust => "rs",
-            NodeLanguage::Asm => "asm",
-            NodeLanguage::Java => "java",
-            NodeLanguage::Python => "py",
-            NodeLanguage::Cpp => "cpp",
             NodeLanguage::Text => "txt",
             NodeLanguage::Auto => "txt",
         }
