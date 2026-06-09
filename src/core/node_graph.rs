@@ -188,12 +188,19 @@ impl NodeGraph {
             "Base Rust",
             pos2(100.0, 280.0),
             Color32::from_rgb(0xde, 0x39, 0x00), // Rust Orange
-            &[],
+            &["Base"],
             &["Código Rust"],
             NodeLanguage::Rust,
         );
         if let Some(node) = graph.node_mut(rust_node_id) {
             node.code = "fn main() {\n    println!(\"Hola desde Rust en Ultra Omega!\");\n}".to_string();
+        }
+
+        if let (Some(from), Some(to)) = (
+            graph.pin_id(sys_node_id, PinKind::Output, 0),
+            graph.pin_id(rust_node_id, PinKind::Input, 0),
+        ) {
+            graph.add_link(from, to, Color32::from_rgb(0xde, 0x39, 0x00));
         }
 
         graph

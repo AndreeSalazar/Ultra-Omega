@@ -369,15 +369,33 @@ Ultra-Omega debería sentirse así:
 
 La ventaja de Ultra-Omega frente a VS Code no debe ser “tener pestañas”. Debe ser poder ver arquitectura, carpetas, código, dependencias y ejecución como un grafo editable de alta precisión.
 
-## 8. Próximo paso más importante
+## 8. Estado de implementación por fases
 
-El siguiente cambio grande recomendado es **conectar `NodeGraphApp` al runtime Vulkan** y reemplazar el rectángulo demo por nodos reales del `NodeGraph::demo()`.
+### Fase P1 iniciada — grafo real conectado al renderer Vulkan
 
-Definición de listo para esa fase:
+Implementado:
 
+- `main.rs` instancia `NodeGraphApp` como estado real de aplicación.
+- `VulkanContext::draw_frame()` recibe `&NodeGraph`.
+- `Renderer` deja de depender de un rectángulo hardcodeado.
+- El renderer genera vértices desde los nodos del grafo:
+  - cuerpo del nodo
+  - header coloreado
+  - borde/sombra
+  - pines de entrada/salida
+- El renderer dibuja conexiones reales entre pines usando los `links` del `NodeGraph`.
+- El runtime tiene cámara 2D básica:
+  - rueda del mouse para zoom
+  - botón central del mouse para pan
+- El primer frame se solicita con `window.request_redraw()`.
 - `cargo check` pasa.
-- La ventana Vulkan abre.
-- Se renderizan varios nodos desde `NodeGraph`.
-- La posición/color/título vienen del modelo real.
-- El renderer deja de depender de vértices hardcodeados.
-- El canvas ya tiene una base para pan/zoom y selección.
+
+Pendiente dentro de P1:
+
+- Añadir selección/hover.
+- Empezar texto GPU para mostrar títulos de nodos.
+- Migrar de vértices reconstruidos por frame a instancing GPU-friendly.
+
+### Próximo paso inmediato
+
+El siguiente cambio recomendado es **añadir selección/hover y texto GPU para títulos de nodos**. Eso convierte los rectángulos actuales en nodos identificables y empieza la transición hacia un editor visual profesional.
