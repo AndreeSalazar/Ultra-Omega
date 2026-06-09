@@ -55,7 +55,7 @@ Prioridad máxima:
 ├────────────────────────────────────────────────────────────┤
 │ Rust Intelligence: Cargo, rust-analyzer, Compiler, Runner  │
 ├────────────────────────────────────────────────────────────┤
-│ Vulkan UI: Canvas, Nodes, Links, Text, Icons, Minimap       │
+│ Vulkan UI: Canvas, Nodes, Links, Text, Icons, Minimap      │
 ├────────────────────────────────────────────────────────────┤
 │ Platform: winit, ash, filesystem, config, logs             │
 ╰────────────────────────────────────────────────────────────╯
@@ -232,7 +232,7 @@ Arquitectura recomendada:
 
 ```text
 ╭──────────────╮    guarda     ╭──────────────╮
-│ Nodo Rust    │──────────────▶│ archivo .rs  │
+│ Nodo Rust    │───────── ────▶│ archivo .rs  │
 ╰──────┬───────╯               ╰──────┬───────╯
        │                              │
        │ consulta                     │ analiza
@@ -356,14 +356,14 @@ Ultra-Omega debería sentirse así:
 ```text
 ╭──────────────────────────────────────────────────────────╮
 │ Explorer visual de carpeta                               │
-│  ╭────────────╮   ╭────────────╮   ╭────────────╮         │
-│  │ Cargo.toml │──▶│ src/main.rs│──▶│ función run│         │
-│  ╰────────────╯   ╰────────────╯   ╰────────────╯         │
-│         │               │                │                │
-│         ▼               ▼                ▼                │
-│  dependencias      módulos Rust      nodos ejecutables    │
+│  ╭────────────╮   ╭────────────╮   ╭────────────╮        │
+│  │ Cargo.toml │──▶│ src/main.rs│──▶│ función run│       │
+│  ╰────────────╯   ╰────────────╯   ╰────────────╯        │
+│         │               │                │               │
+│         ▼               ▼                ▼               │
+│  dependencias      módulos Rust      nodos ejecutables   │
 ├──────────────────────────────────────────────────────────┤
-│ Panel inspector + editor Rust + terminal + errores LSP    │
+│ Panel inspector + editor Rust + terminal + errores LSP   │
 ╰──────────────────────────────────────────────────────────╯
 ```
 
