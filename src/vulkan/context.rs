@@ -5,8 +5,9 @@ use ash::khr::swapchain::{self, Device as SwapchainDevice};
 use winit::raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use crate::core::node_graph::NodeGraph;
 use crate::vulkan::pipeline::GraphicsPipeline;
-use crate::vulkan::renderer::{Renderer, Viewport2D};
+use crate::vulkan::renderer::{Renderer, RenderState, Viewport2D};
 
+#[allow(dead_code)]
 pub struct VulkanContext {
     pub entry: ash::Entry,
     pub instance: ash::Instance,
@@ -275,12 +276,12 @@ impl VulkanContext {
         }
     }
 
-    pub fn draw_frame(&mut self, graph: &NodeGraph, viewport: Viewport2D) {
+    pub fn draw_frame(&mut self, graph: &NodeGraph, viewport: Viewport2D, state: RenderState) {
         unsafe {
             self.device.wait_for_fences(&[self.in_flight_fence], true, u64::MAX).unwrap();
         }
 
-        self.renderer.update_from_graph(&self.device, graph, self.swapchain_extent, viewport);
+        self.renderer.update_from_graph(&self.device, graph, self.swapchain_extent, viewport, state);
 
         let (image_index, _) = unsafe {
             self.swapchain_loader.acquire_next_image(
@@ -327,7 +328,7 @@ impl VulkanContext {
                 vk::SubpassContents::INLINE,
             );
             
-            // ¡Dibujar el rectángulo usando el Renderer!
+            // Dibujar el canvas Vulkan generado desde NodeGraph.
             self.renderer.record_command_buffer(
                 &self.device,
                 self.command_buffers[self.current_frame],

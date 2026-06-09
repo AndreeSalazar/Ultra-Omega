@@ -1,27 +1,28 @@
 mod core;
-mod storage;
-mod templates;
-mod expressions;
-mod inheritance;
-mod utils;
 mod vulkan;
-mod config; // <-- AÑADIDO para resolver el error de importación
 
-use crate::core::NodeGraphApp;
+use crate::core::{NodeGraph, NodeId};
 use vulkan::context::VulkanContext;
-use vulkan::renderer::Viewport2D;
+use vulkan::renderer::{RenderState, Viewport2D, NODE_HEIGHT, NODE_WIDTH};
 use winit::application::ApplicationHandler;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoop};
+use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{Window, WindowId};
+
+use crate::core::node_graph::NodeLanguage;
+use crate::core::types::{pos2, Color32};
 
 struct App {
     window: Option<Window>,
     vulkan_ctx: Option<VulkanContext>,
-    graph_app: NodeGraphApp,
+    graph: NodeGraph,
     viewport: Viewport2D,
     is_panning: bool,
     last_cursor_position: Option<(f32, f32)>,
+    hovered_node: Option<NodeId>,
+    selected_node: Option<NodeId>,
+    created_nodes: u32,
 }
 
 impl ApplicationHandler for App {
@@ -47,7 +48,14 @@ impl ApplicationHandler for App {
             }
             WindowEvent::RedrawRequested => {
                 if let Some(ctx) = &mut self.vulkan_ctx {
-                    ctx.draw_frame(self.graph_app.graph(), self.viewport);
+                    ctx.draw_frame(
+                        &self.graph,
+                        self.viewport,
+                        RenderState {
+                            hovered_node: self.hovered_node,
+                            selected_node: self.selected_node,
+                        },
+                    );
                 }
 
                 if let Some(window) = &self.window {
@@ -64,10 +72,13 @@ impl ApplicationHandler for App {
                 }
 
                 self.last_cursor_position = Some(current);
+                self.hovered_node = self.node_at_screen_position(current);
             }
             WindowEvent::MouseInput { state, button, .. } => {
                 if button == MouseButton::Middle {
                     self.is_panning = state == ElementState::Pressed;
+                } else if button == MouseButton::Left && state == ElementState::Pressed {
+                    self.selected_node = self.hovered_node;
                 }
             }
             WindowEvent::MouseWheel { delta, .. } => {
@@ -77,7 +88,73 @@ impl ApplicationHandler for App {
                 };
                 self.viewport.zoom_by(steps);
             }
+            WindowEvent::KeyboardInput { event, .. } => {
+                if event.state == ElementState::Pressed {
+                    match event.physical_key {
+                        PhysicalKey::Code(KeyCode::KeyN) => self.create_rust_node_at_view_center(),
+                        PhysicalKey::Code(KeyCode::Delete) => self.delete_selected_node(),
+                        PhysicalKey::Code(KeyCode::Escape) => self.selected_node = None,
+                        PhysicalKey::Code(KeyCode::KeyR) => self.viewport = Viewport2D::default(),
+                        _ => {}
+                    }
+                }
+            }
             _ => {}
+        }
+    }
+}
+
+impl App {
+    fn node_at_screen_position(&self, screen: (f32, f32)) -> Option<NodeId> {
+        let world = self.viewport.screen_to_world(screen.0, screen.1);
+
+        self.graph
+            .nodes()
+            .iter()
+            .rev()
+            .find(|node| {
+                world.0 >= node.position.x
+                    && world.0 <= node.position.x + NODE_WIDTH
+                    && world.1 >= node.position.y
+                    && world.1 <= node.position.y + NODE_HEIGHT
+            })
+            .map(|node| node.id)
+    }
+
+    fn create_rust_node_at_view_center(&mut self) {
+        let Some(window) = &self.window else {
+            return;
+        };
+        let size = window.inner_size();
+        let world = self
+            .viewport
+            .screen_to_world(size.width as f32 * 0.5, size.height as f32 * 0.5);
+
+        self.created_nodes += 1;
+        let node_id = self.graph.add_node(
+            format!("Rust Node {}", self.created_nodes),
+            pos2(world.0 - NODE_WIDTH * 0.5, world.1 - NODE_HEIGHT * 0.5),
+            Color32::from_rgb(0xde, 0x39, 0x00),
+            &["in"],
+            &["out"],
+            NodeLanguage::Rust,
+        );
+
+        if let Some(node) = self.graph.node_mut(node_id) {
+            node.code = format!(
+                "pub fn node_{}() {{\n    println!(\"Ultra-Omega Rust node {}\");\n}}",
+                self.created_nodes, self.created_nodes
+            );
+        }
+
+        self.selected_node = Some(node_id);
+        self.hovered_node = Some(node_id);
+    }
+
+    fn delete_selected_node(&mut self) {
+        if let Some(node_id) = self.selected_node.take() {
+            self.graph.remove_node(node_id);
+            self.hovered_node = None;
         }
     }
 }
@@ -90,10 +167,13 @@ fn main() {
     let mut app = App {
         window: None,
         vulkan_ctx: None,
-        graph_app: NodeGraphApp::default(),
+        graph: NodeGraph::demo(),
         viewport: Viewport2D::default(),
         is_panning: false,
         last_cursor_position: None,
+        hovered_node: None,
+        selected_node: None,
+        created_nodes: 0,
     };
 
     event_loop.run_app(&mut app).unwrap();

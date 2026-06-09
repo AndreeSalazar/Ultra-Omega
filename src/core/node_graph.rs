@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::core::types::{Color32, Pos2, pos2};
 use serde::{Deserialize, Serialize};
 
@@ -475,8 +477,6 @@ impl NodeGraph {
 
     /// Crear un proyecto de ejemplo básico con Rust
     pub fn create_example_project() -> Self {
-        use crate::templates::rust;
-        
         let mut graph = Self::default();
         let color_rust = Color32::from_rgb(0xde, 0x39, 0x00);
         
@@ -490,7 +490,7 @@ impl NodeGraph {
             NodeLanguage::Rust,
         );
         if let Some(n) = graph.node_mut(hello) {
-            n.code = rust::HELLO.to_string();
+            n.code = "fn main() {\n    println!(\"Hola desde Ultra-Omega Rust\");\n}".to_string();
         }
         
         // Nodo de variables
@@ -503,7 +503,7 @@ impl NodeGraph {
             NodeLanguage::Rust,
         );
         if let Some(n) = graph.node_mut(vars) {
-            n.code = rust::VARIABLES.to_string();
+            n.code = "let nombre = \"Ultra-Omega\";\nlet version = 0.2;".to_string();
         }
         
         // Conectar nodos

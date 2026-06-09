@@ -1,7 +1,14 @@
 use ash::vk;
 
 use crate::core::node_graph::{Node, NodeGraph, NodeLanguage, PinKind};
+use crate::core::NodeId;
 use crate::vulkan::pipeline::{GraphicsPipeline, Vertex};
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct RenderState {
+    pub hovered_node: Option<NodeId>,
+    pub selected_node: Option<NodeId>,
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct Viewport2D {
@@ -29,7 +36,11 @@ impl Viewport2D {
         self.zoom = (self.zoom * factor.max(0.10)).clamp(0.25, 4.0);
     }
 
-    fn world_to_screen(&self, x: f32, y: f32) -> (f32, f32) {
+    pub fn screen_to_world(&self, x: f32, y: f32) -> (f32, f32) {
+        ((x - self.pan[0]) / self.zoom, (y - self.pan[1]) / self.zoom)
+    }
+
+    pub fn world_to_screen(&self, x: f32, y: f32) -> (f32, f32) {
         (x * self.zoom + self.pan[0], y * self.zoom + self.pan[1])
     }
 
@@ -46,10 +57,11 @@ pub struct Renderer {
 }
 
 const MAX_VERTICES: usize = 65_536;
-const NODE_WIDTH: f32 = 260.0;
-const NODE_HEIGHT: f32 = 120.0;
+pub const NODE_WIDTH: f32 = 260.0;
+pub const NODE_HEIGHT: f32 = 120.0;
 const HEADER_HEIGHT: f32 = 34.0;
 const PIN_SIZE: f32 = 10.0;
+const GRID_SPACING: f32 = 64.0;
 
 impl Renderer {
     pub fn new(
@@ -99,13 +111,15 @@ impl Renderer {
         graph: &NodeGraph,
         extent: vk::Extent2D,
         viewport: Viewport2D,
+        state: RenderState,
     ) {
         let mut vertices = Vec::with_capacity(graph.nodes().len() * 30);
 
+        self.push_grid(&mut vertices, extent, viewport);
         self.push_links(&mut vertices, graph, extent, viewport);
 
         for node in graph.nodes() {
-            self.push_node(&mut vertices, node, extent, viewport);
+            self.push_node(&mut vertices, node, extent, viewport, state);
 
             if vertices.len() >= self.vertex_capacity {
                 vertices.truncate(self.vertex_capacity);
@@ -140,6 +154,7 @@ impl Renderer {
         node: &Node,
         extent: vk::Extent2D,
         viewport: Viewport2D,
+        state: RenderState,
     ) {
         let (x, y) = viewport.world_to_screen(node.position.x, node.position.y);
         let node_width = viewport.scale(NODE_WIDTH);
@@ -152,6 +167,16 @@ impl Renderer {
             NodeLanguage::Auto => [0.14, 0.14, 0.15],
         };
         let border_color = [0.07, 0.07, 0.08];
+        let is_selected = state.selected_node == Some(node.id);
+        let is_hovered = state.hovered_node == Some(node.id);
+        let outer_color = if is_selected {
+            [1.0, 0.76, 0.25]
+        } else if is_hovered {
+            [0.35, 0.65, 1.0]
+        } else {
+            border_color
+        };
+        let outer_padding = if is_selected || is_hovered { 5.0 } else { 2.0 };
         let pin_color = match node.language {
             NodeLanguage::Rust => [0.95, 0.38, 0.12],
             NodeLanguage::Text => [0.35, 0.55, 0.90],
@@ -162,11 +187,11 @@ impl Renderer {
         push_rect(
             vertices,
             extent,
-            x - 2.0,
-            y - 2.0,
-            node_width + 4.0,
-            node_height + 4.0,
-            border_color,
+            x - outer_padding,
+            y - outer_padding,
+            node_width + outer_padding * 2.0,
+            node_height + outer_padding * 2.0,
+            outer_color,
         );
 
         // Cuerpo del nodo.
@@ -187,6 +212,38 @@ impl Renderer {
         );
 
         self.push_pins(vertices, node, extent, viewport, pin_color);
+    }
+
+    fn push_grid(&self, vertices: &mut Vec<Vertex>, extent: vk::Extent2D, viewport: Viewport2D) {
+        let world_top_left = viewport.screen_to_world(0.0, 0.0);
+        let world_bottom_right = viewport.screen_to_world(extent.width as f32, extent.height as f32);
+        let min_x = world_top_left.0.min(world_bottom_right.0);
+        let max_x = world_top_left.0.max(world_bottom_right.0);
+        let min_y = world_top_left.1.min(world_bottom_right.1);
+        let max_y = world_top_left.1.max(world_bottom_right.1);
+
+        let start_x = (min_x / GRID_SPACING).floor() as i32 - 1;
+        let end_x = (max_x / GRID_SPACING).ceil() as i32 + 1;
+        let start_y = (min_y / GRID_SPACING).floor() as i32 - 1;
+        let end_y = (max_y / GRID_SPACING).ceil() as i32 + 1;
+
+        for gx in start_x..=end_x {
+            let world_x = gx as f32 * GRID_SPACING;
+            let from = viewport.world_to_screen(world_x, min_y - GRID_SPACING);
+            let to = viewport.world_to_screen(world_x, max_y + GRID_SPACING);
+            let is_axis = gx == 0;
+            let color = if is_axis { [0.22, 0.22, 0.24] } else { [0.15, 0.15, 0.16] };
+            push_line(vertices, extent, from, to, if is_axis { 2.0 } else { 1.0 }, color);
+        }
+
+        for gy in start_y..=end_y {
+            let world_y = gy as f32 * GRID_SPACING;
+            let from = viewport.world_to_screen(min_x - GRID_SPACING, world_y);
+            let to = viewport.world_to_screen(max_x + GRID_SPACING, world_y);
+            let is_axis = gy == 0;
+            let color = if is_axis { [0.22, 0.22, 0.24] } else { [0.15, 0.15, 0.16] };
+            push_line(vertices, extent, from, to, if is_axis { 2.0 } else { 1.0 }, color);
+        }
     }
 
     fn push_links(

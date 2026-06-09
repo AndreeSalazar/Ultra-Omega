@@ -371,11 +371,12 @@ La ventaja de Ultra-Omega frente a VS Code no debe ser “tener pestañas”. De
 
 ## 8. Estado de implementación por fases
 
-### Fase P1 iniciada — grafo real conectado al renderer Vulkan
+### Fase P1 activa — base Vulkan limpia para nodos Rust
 
 Implementado:
 
-- `main.rs` instancia `NodeGraphApp` como estado real de aplicación.
+- `main.rs` usa `NodeGraph` directo como estado activo de aplicación.
+- Los módulos antiguos (`storage`, `templates`, `expressions`, `inheritance`, `utils`, `config`) quedan desconectados temporalmente del runtime para reescribir la base Vulkan sin ruido.
 - `VulkanContext::draw_frame()` recibe `&NodeGraph`.
 - `Renderer` deja de depender de un rectángulo hardcodeado.
 - El renderer genera vértices desde los nodos del grafo:
@@ -383,19 +384,26 @@ Implementado:
   - header coloreado
   - borde/sombra
   - pines de entrada/salida
+- El canvas tiene grid infinito básico afectado por pan/zoom.
 - El renderer dibuja conexiones reales entre pines usando los `links` del `NodeGraph`.
 - El runtime tiene cámara 2D básica:
   - rueda del mouse para zoom
   - botón central del mouse para pan
+- El runtime tiene interacción básica:
+  - hover de nodos
+  - selección con click izquierdo
+  - borde azul para hover
+  - borde amarillo para selección
 - El primer frame se solicita con `window.request_redraw()`.
-- `cargo check` pasa.
+- `cargo check` pasa sin warnings en la app activa.
 
 Pendiente dentro de P1:
 
-- Añadir selección/hover.
 - Empezar texto GPU para mostrar títulos de nodos.
 - Migrar de vértices reconstruidos por frame a instancing GPU-friendly.
+- Añadir resize robusto de swapchain.
+- Añadir curvas Bézier en links en vez de líneas rectas.
 
 ### Próximo paso inmediato
 
-El siguiente cambio recomendado es **añadir selección/hover y texto GPU para títulos de nodos**. Eso convierte los rectángulos actuales en nodos identificables y empieza la transición hacia un editor visual profesional.
+El siguiente cambio recomendado es **texto GPU para títulos de nodos y mejor sistema de recursos/pipelines**. Eso convierte los rectángulos actuales en nodos identificables y prepara la transición hacia un editor visual profesional de Rust.

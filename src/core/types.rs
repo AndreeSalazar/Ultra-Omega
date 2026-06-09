@@ -2,6 +2,8 @@
 // Tipos básicos para el motor de nodos (reemplazo de eframe::egui)
 // ═══════════════════════════════════════════════════════════════════════════
 
+#![allow(dead_code)]
+
 use std::ops::{Add, Sub};
 use serde::{Deserialize, Serialize};
 
