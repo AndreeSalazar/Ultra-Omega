@@ -22,12 +22,7 @@ pub struct CompilerInfo {
 
 #[derive(Debug, Clone)]
 pub struct CompilerStatus {
-    pub nasm: CompilerInfo,
     pub rust: CompilerInfo,
-    pub zig: CompilerInfo,
-    pub cpp_gcc: CompilerInfo,
-    pub cpp_clang: CompilerInfo,
-    pub cpp_msvc: CompilerInfo,
 }
 
 impl Default for CompilerStatus {
@@ -43,11 +38,15 @@ impl Default for CompilerStatus {
 impl CompilerStatus {
     pub fn new() -> Self {
         Self {
-            nasm: detect_nasm(),
             rust: detect_rust(),
-            zig: detect_zig(),
-            cpp_gcc: detect_cpp_gcc(),
-            cpp_clang: detect_cpp_clang(),
+        }
+    }
+
+    /// Obtener un resumen en formato texto
+    pub fn summary(&self) -> String {
+        let mut summary = String::from("=== Estado de Compiladores ===\n\n");
+        
+        summary.push_str(&format_compiler_status("Rust (Cargo)", &self.rust));
             cpp_msvc: detect_cpp_msvc(),
         }
     }
@@ -109,9 +108,8 @@ impl CompilerStatus {
 
     /// Verificar si todos los compiladores necesarios están disponibles
     pub fn is_ready(&self) -> bool {
-        self.nasm.available && self.rust.available && self.zig.available && self.has_cpp_compiler()
+        self.rust.available
     }
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // DETECCIÓN DE COMPILADORES ESPECÍFICOS

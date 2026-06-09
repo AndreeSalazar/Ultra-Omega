@@ -37,7 +37,7 @@ impl VulkanContext {
 
             // Extensiones requeridas para la ventana (Winit -> Surface)
             let surface_extensions = ash_window::enumerate_required_extensions(
-                &window.raw_display_handle(),
+                window.raw_display_handle(),
             ).expect("Failed to enumerate surface extensions");
 
             let extension_names: Vec<*const c_char> = surface_extensions
@@ -62,8 +62,8 @@ impl VulkanContext {
             let surface = ash_window::create_surface(
                 &entry,
                 &instance,
-                &window.raw_display_handle(),
-                &window.raw_window_handle(),
+                window.raw_display_handle(),
+                window.raw_window_handle(),
                 None,
             ).expect("Failed to create Vulkan surface");
 
