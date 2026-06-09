@@ -1,63 +1,62 @@
 mod core;
-mod compilation;
-mod utils;
-mod ui;
 mod storage;
 mod templates;
-mod config;
 mod expressions;
 mod inheritance;
+mod utils;
 mod vulkan;
+mod config; // <-- AÑADIDO para resolver el error de importación
 
-use crate::config::AppConfig;
-use crate::vulkan::VulkanContext;
-use winit::{
-    event::{Event, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
-    window::WindowBuilder,
-};
+use vulkan::context::VulkanContext;
+use winit::application::ApplicationHandler;
+use winit::event::WindowEvent;
+use winit::event_loop::{ActiveEventLoop, EventLoop};
+use winit::window::{Window, WindowId};
 
-fn main() {
-    env_logger::init();
-    let config = AppConfig::load();
+struct App {
+    window: Option<Window>,
+    vulkan_ctx: Option<VulkanContext>,
+}
 
-    // 1. Inicializar Event Loop y Ventana con Winit
-    let event_loop = EventLoop::new().unwrap();
-    let mut window_builder = WindowBuilder::new()
-        .with_title("Ultra-Omega Node Lab [Vulkan]")
-        .with_inner_size(winit::dpi::LogicalSize::new(1280, 720));
-
-    if let Some((w, h)) = config.window_size {
-        window_builder = window_builder.with_inner_size(winit::dpi::LogicalSize::new(w, h));
+impl ApplicationHandler for App {
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        if self.window.is_none() {
+            let window = event_loop.create_window(
+                Window::default_attributes()
+                    .with_title("Ultra-Omega | Node Editor (Vulkan Puro)")
+                    .with_inner_size(winit::dpi::LogicalSize::new(1280.0, 720.0))
+            ).unwrap();
+            
+            // FIX: Añadimos los paréntesis para resolver la ambigüedad del trait
+            self.vulkan_ctx = Some(VulkanContext::new(&window));
+            self.window = Some(window);
+        }
     }
 
-    let window = window_builder.build(&event_loop).expect("Failed to create window");
-
-    // 2. Inicializar Contexto de Vulkan (Instance, Device, Surface, Swapchain, Render Pass)
-    let mut vulkan_ctx = VulkanContext::new(&window);
-    println!("✅ Vulkan Context initialized successfully!");
-    println!("🚀 Ultra-Omega v2.0 - 100% Rust + Vulkan (ash)");
-    println!("🎨 Swapchain and Render Pass ready. Clearing screen with #1E1E1E (VS Code Dark)...");
-
-    // 3. Loop Principal de Eventos
-    event_loop.run(move |event, _, control_flow| {
-        *control_flow = ControlFlow::Poll;
-
+    fn window_event(&mut self, event_loop: &ActiveEventLoop, _window_id: WindowId, event: WindowEvent) {
         match event {
-            Event::WindowEvent {
-                event: WindowEvent::CloseRequested,
-                window_id,
-            } if window_id == window.id() => {
-                *control_flow = ControlFlow::Exit;
+            WindowEvent::CloseRequested => {
+                event_loop.exit();
             }
-            Event::MainEventsCleared => {
-                window.request_redraw();
-            }
-            Event::RedrawRequested(_) => {
-                // Renderizado con Vulkan: Limpiar pantalla y presentar
-                vulkan_ctx.draw_frame();
+            WindowEvent::RedrawRequested => {
+                if let Some(ctx) = &mut self.vulkan_ctx {
+                    ctx.draw_frame();
+                }
             }
             _ => {}
         }
-    }).unwrap();
+    }
+}
+
+fn main() {
+    env_logger::init();
+    println!("🚀 Iniciando Ultra-Omega v0.2.0 (100% Rust + Vulkan Puro)");
+
+    let event_loop = EventLoop::new().unwrap();
+    let mut app = App {
+        window: None,
+        vulkan_ctx: None,
+    };
+
+    event_loop.run_app(&mut app).unwrap();
 }

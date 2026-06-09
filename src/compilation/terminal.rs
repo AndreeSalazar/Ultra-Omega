@@ -40,7 +40,7 @@ pub enum Language {
 impl TerminalManager {
     /// Buscar un comando de compilador (con búsqueda profunda)
     fn find_compiler_cmd(cmd: &str, _output: &mut String) -> Option<String> {
-        use crate::compilation::compiler_detector::{find_executable, deep_search_executable};
+        use crate::compilation::compiler_detector::find_executable;
         
         // Primero intentar en PATH
         if let Some(path) = find_executable(cmd) {
