@@ -22,6 +22,8 @@ struct App {
     last_cursor_position: Option<(f32, f32)>,
     hovered_node: Option<NodeId>,
     selected_node: Option<NodeId>,
+    dragging_node: Option<NodeId>,
+    link_source_node: Option<NodeId>,
     created_nodes: u32,
 }
 
@@ -54,6 +56,7 @@ impl ApplicationHandler for App {
                         RenderState {
                             hovered_node: self.hovered_node,
                             selected_node: self.selected_node,
+                            link_source_node: self.link_source_node,
                         },
                     );
                 }
@@ -65,7 +68,17 @@ impl ApplicationHandler for App {
             WindowEvent::CursorMoved { position, .. } => {
                 let current = (position.x as f32, position.y as f32);
 
-                if self.is_panning {
+                if let Some(node_id) = self.dragging_node {
+                    if let Some(previous) = self.last_cursor_position {
+                        let dx = (current.0 - previous.0) / self.viewport.zoom;
+                        let dy = (current.1 - previous.1) / self.viewport.zoom;
+
+                        if let Some(node) = self.graph.node_mut(node_id) {
+                            node.position.x += dx;
+                            node.position.y += dy;
+                        }
+                    }
+                } else if self.is_panning {
                     if let Some(previous) = self.last_cursor_position {
                         self.viewport.pan_by(current.0 - previous.0, current.1 - previous.1);
                     }
@@ -78,7 +91,14 @@ impl ApplicationHandler for App {
                 if button == MouseButton::Middle {
                     self.is_panning = state == ElementState::Pressed;
                 } else if button == MouseButton::Left && state == ElementState::Pressed {
-                    self.selected_node = self.hovered_node;
+                    if self.try_finish_link_from_hover() {
+                        self.dragging_node = None;
+                    } else {
+                        self.selected_node = self.hovered_node;
+                        self.dragging_node = self.hovered_node;
+                    }
+                } else if button == MouseButton::Left && state == ElementState::Released {
+                    self.dragging_node = None;
                 }
             }
             WindowEvent::MouseWheel { delta, .. } => {
@@ -86,15 +106,25 @@ impl ApplicationHandler for App {
                     MouseScrollDelta::LineDelta(_, y) => y,
                     MouseScrollDelta::PixelDelta(position) => position.y as f32 / 120.0,
                 };
-                self.viewport.zoom_by(steps);
+
+                if let Some(cursor) = self.last_cursor_position {
+                    self.viewport.zoom_at(steps, cursor.0, cursor.1);
+                } else {
+                    self.viewport.zoom_by(steps);
+                }
             }
             WindowEvent::KeyboardInput { event, .. } => {
                 if event.state == ElementState::Pressed {
                     match event.physical_key {
                         PhysicalKey::Code(KeyCode::KeyN) => self.create_rust_node_at_view_center(),
                         PhysicalKey::Code(KeyCode::Delete) => self.delete_selected_node(),
-                        PhysicalKey::Code(KeyCode::Escape) => self.selected_node = None,
+                        PhysicalKey::Code(KeyCode::Escape) => {
+                            self.selected_node = None;
+                            self.dragging_node = None;
+                            self.link_source_node = None;
+                        }
                         PhysicalKey::Code(KeyCode::KeyR) => self.viewport = Viewport2D::default(),
+                        PhysicalKey::Code(KeyCode::KeyC) => self.link_source_node = self.selected_node,
                         _ => {}
                     }
                 }
@@ -151,10 +181,41 @@ impl App {
         self.hovered_node = Some(node_id);
     }
 
+    fn try_finish_link_from_hover(&mut self) -> bool {
+        let Some(source_id) = self.link_source_node else {
+            return false;
+        };
+        let Some(target_id) = self.hovered_node else {
+            return false;
+        };
+
+        if source_id == target_id {
+            return false;
+        }
+
+        let Some(from_pin) = self.graph.pin_id(source_id, crate::core::node_graph::PinKind::Output, 0) else {
+            self.link_source_node = None;
+            return false;
+        };
+        let Some(to_pin) = self.graph.pin_id(target_id, crate::core::node_graph::PinKind::Input, 0) else {
+            self.link_source_node = None;
+            return false;
+        };
+
+        self.graph.add_link(from_pin, to_pin, Color32::from_rgb(0xde, 0x39, 0x00));
+        self.selected_node = Some(target_id);
+        self.link_source_node = None;
+        true
+    }
+
     fn delete_selected_node(&mut self) {
         if let Some(node_id) = self.selected_node.take() {
             self.graph.remove_node(node_id);
             self.hovered_node = None;
+            self.dragging_node = None;
+            if self.link_source_node == Some(node_id) {
+                self.link_source_node = None;
+            }
         }
     }
 }
@@ -173,6 +234,8 @@ fn main() {
         last_cursor_position: None,
         hovered_node: None,
         selected_node: None,
+        dragging_node: None,
+        link_source_node: None,
         created_nodes: 0,
     };
 

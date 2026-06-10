@@ -8,6 +8,7 @@ use crate::vulkan::pipeline::{GraphicsPipeline, Vertex};
 pub struct RenderState {
     pub hovered_node: Option<NodeId>,
     pub selected_node: Option<NodeId>,
+    pub link_source_node: Option<NodeId>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -34,6 +35,15 @@ impl Viewport2D {
     pub fn zoom_by(&mut self, steps: f32) {
         let factor = 1.0 + steps * 0.10;
         self.zoom = (self.zoom * factor.max(0.10)).clamp(0.25, 4.0);
+    }
+
+    pub fn zoom_at(&mut self, steps: f32, screen_x: f32, screen_y: f32) {
+        let before = self.screen_to_world(screen_x, screen_y);
+        self.zoom_by(steps);
+        let after = self.screen_to_world(screen_x, screen_y);
+
+        self.pan[0] += (after.0 - before.0) * self.zoom;
+        self.pan[1] += (after.1 - before.1) * self.zoom;
     }
 
     pub fn screen_to_world(&self, x: f32, y: f32) -> (f32, f32) {
@@ -169,14 +179,17 @@ impl Renderer {
         let border_color = [0.07, 0.07, 0.08];
         let is_selected = state.selected_node == Some(node.id);
         let is_hovered = state.hovered_node == Some(node.id);
-        let outer_color = if is_selected {
+        let is_link_source = state.link_source_node == Some(node.id);
+        let outer_color = if is_link_source {
+            [0.20, 1.0, 0.55]
+        } else if is_selected {
             [1.0, 0.76, 0.25]
         } else if is_hovered {
             [0.35, 0.65, 1.0]
         } else {
             border_color
         };
-        let outer_padding = if is_selected || is_hovered { 5.0 } else { 2.0 };
+        let outer_padding = if is_link_source || is_selected || is_hovered { 5.0 } else { 2.0 };
         let pin_color = match node.language {
             NodeLanguage::Rust => [0.95, 0.38, 0.12],
             NodeLanguage::Text => [0.35, 0.55, 0.90],
@@ -265,7 +278,14 @@ impl Renderer {
             let to_node = &graph.nodes()[to_addr.node_index];
             let from = pin_center(from_node, from_addr.kind, from_addr.slot, viewport);
             let to = pin_center(to_node, to_addr.kind, to_addr.slot, viewport);
-            push_line(vertices, extent, from, to, viewport.scale(4.0).max(1.0), color_to_rgb(link.color));
+            push_bezier(
+                vertices,
+                extent,
+                from,
+                to,
+                viewport.scale(4.0).max(1.0),
+                color_to_rgb(link.color),
+            );
         }
     }
 
@@ -385,6 +405,48 @@ fn push_line(
         Vertex { pos: [screen_to_ndc_x(p2.0, extent.width), screen_to_ndc_y(p2.1, extent.height)], color },
         Vertex { pos: [screen_to_ndc_x(p3.0, extent.width), screen_to_ndc_y(p3.1, extent.height)], color },
     ]);
+}
+
+fn push_bezier(
+    vertices: &mut Vec<Vertex>,
+    extent: vk::Extent2D,
+    from: (f32, f32),
+    to: (f32, f32),
+    thickness: f32,
+    color: [f32; 3],
+) {
+    let horizontal = (to.0 - from.0).abs().max(120.0);
+    let control_offset = horizontal * 0.45;
+    let c1 = (from.0 + control_offset, from.1);
+    let c2 = (to.0 - control_offset, to.1);
+    let segments = 18;
+    let mut previous = from;
+
+    for index in 1..=segments {
+        let t = index as f32 / segments as f32;
+        let point = cubic_bezier(from, c1, c2, to, t);
+        push_line(vertices, extent, previous, point, thickness, color);
+        previous = point;
+    }
+}
+
+fn cubic_bezier(
+    p0: (f32, f32),
+    p1: (f32, f32),
+    p2: (f32, f32),
+    p3: (f32, f32),
+    t: f32,
+) -> (f32, f32) {
+    let inv = 1.0 - t;
+    let b0 = inv * inv * inv;
+    let b1 = 3.0 * inv * inv * t;
+    let b2 = 3.0 * inv * t * t;
+    let b3 = t * t * t;
+
+    (
+        p0.0 * b0 + p1.0 * b1 + p2.0 * b2 + p3.0 * b3,
+        p0.1 * b0 + p1.1 * b1 + p2.1 * b2 + p3.1 * b3,
+    )
 }
 
 fn pin_center(node: &Node, kind: PinKind, slot: usize, viewport: Viewport2D) -> (f32, f32) {

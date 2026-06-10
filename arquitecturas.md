@@ -387,18 +387,22 @@ Implementado:
 - El canvas tiene grid infinito básico afectado por pan/zoom.
 - El renderer dibuja conexiones reales entre pines usando los `links` del `NodeGraph`.
 - El runtime tiene cámara 2D básica:
-  - rueda del mouse para zoom
+  - rueda del mouse para zoom hacia el cursor
   - botón central del mouse para pan
 - El runtime tiene interacción básica:
   - hover de nodos
   - selección con click izquierdo
   - borde azul para hover
   - borde amarillo para selección
+  - drag con click izquierdo para mover nodos
 - El runtime permite edición inicial del grafo:
   - `N` crea un nodo Rust nuevo en el centro de la vista
   - `Delete` elimina el nodo seleccionado
   - `Esc` limpia selección
   - `R` reinicia pan/zoom
+  - `C` marca el nodo seleccionado como origen de conexión
+  - click sobre otro nodo termina la conexión usando salida `0` → entrada `0`
+- Los links se renderizan como curvas Bézier segmentadas en vez de líneas rectas.
 - El primer frame se solicita con `window.request_redraw()`.
 - `cargo check` pasa sin warnings en la app activa.
 
@@ -407,7 +411,7 @@ Pendiente dentro de P1:
 - Empezar texto GPU para mostrar títulos de nodos.
 - Migrar de vértices reconstruidos por frame a instancing GPU-friendly.
 - Añadir resize robusto de swapchain.
-- Añadir curvas Bézier en links en vez de líneas rectas.
+- Mejorar conexión interactiva por pines concretos, no solo nodo→nodo.
 
 ### Próximo paso inmediato
 
