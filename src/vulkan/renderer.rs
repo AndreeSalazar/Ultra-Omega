@@ -50,6 +50,10 @@ impl Viewport2D {
         ((x - self.pan[0]) / self.zoom, (y - self.pan[1]) / self.zoom)
     }
 
+    pub fn screen_delta_to_world(&self, dx: f32, dy: f32) -> (f32, f32) {
+        (dx / self.zoom, dy / self.zoom)
+    }
+
     pub fn world_to_screen(&self, x: f32, y: f32) -> (f32, f32) {
         (x * self.zoom + self.pan[0], y * self.zoom + self.pan[1])
     }
@@ -69,8 +73,8 @@ pub struct Renderer {
 const MAX_VERTICES: usize = 65_536;
 pub const NODE_WIDTH: f32 = 260.0;
 pub const NODE_HEIGHT: f32 = 120.0;
-const HEADER_HEIGHT: f32 = 34.0;
-const PIN_SIZE: f32 = 10.0;
+pub const HEADER_HEIGHT: f32 = 34.0;
+pub const PIN_SIZE: f32 = 10.0;
 const GRID_SPACING: f32 = 64.0;
 
 impl Renderer {
@@ -276,8 +280,8 @@ impl Renderer {
 
             let from_node = &graph.nodes()[from_addr.node_index];
             let to_node = &graph.nodes()[to_addr.node_index];
-            let from = pin_center(from_node, from_addr.kind, from_addr.slot, viewport);
-            let to = pin_center(to_node, to_addr.kind, to_addr.slot, viewport);
+            let from = pin_screen_center(from_node, from_addr.kind, from_addr.slot, viewport);
+            let to = pin_screen_center(to_node, to_addr.kind, to_addr.slot, viewport);
             push_bezier(
                 vertices,
                 extent,
@@ -449,7 +453,7 @@ fn cubic_bezier(
     )
 }
 
-fn pin_center(node: &Node, kind: PinKind, slot: usize, viewport: Viewport2D) -> (f32, f32) {
+pub fn pin_screen_center(node: &Node, kind: PinKind, slot: usize, viewport: Viewport2D) -> (f32, f32) {
     let (node_x, node_y) = viewport.world_to_screen(node.position.x, node.position.y);
     let pin_count = match kind {
         PinKind::Input => node.inputs.len(),
@@ -474,7 +478,10 @@ fn screen_to_ndc_x(x: f32, width: u32) -> f32 {
 }
 
 fn screen_to_ndc_y(y: f32, height: u32) -> f32 {
-    1.0 - (y / height.max(1) as f32) * 2.0
+    // Vulkan con viewport de altura positiva mapea NDC -1 arriba y +1 abajo.
+    // Mantener la misma orientación que winit/screen coords evita que input y render
+    // queden desincronizados al seleccionar o arrastrar nodos.
+    (y / height.max(1) as f32) * 2.0 - 1.0
 }
 
 fn color_to_rgb(color: crate::core::types::Color32) -> [f32; 3] {

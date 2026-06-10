@@ -3,15 +3,22 @@ mod vulkan;
 
 use crate::core::{NodeGraph, NodeId};
 use vulkan::context::VulkanContext;
-use vulkan::renderer::{RenderState, Viewport2D, NODE_HEIGHT, NODE_WIDTH};
+use vulkan::renderer::{pin_screen_center, RenderState, Viewport2D, NODE_HEIGHT, NODE_WIDTH, PIN_SIZE};
 use winit::application::ApplicationHandler;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{Window, WindowId};
 
-use crate::core::node_graph::NodeLanguage;
+use crate::core::node_graph::{NodeLanguage, PinKind};
 use crate::core::types::{pos2, Color32};
+
+#[derive(Clone, Copy, Debug)]
+struct HitPin {
+    node_id: NodeId,
+    kind: PinKind,
+    slot: usize,
+}
 
 struct App {
     window: Option<Window>,
@@ -23,7 +30,7 @@ struct App {
     hovered_node: Option<NodeId>,
     selected_node: Option<NodeId>,
     dragging_node: Option<NodeId>,
-    link_source_node: Option<NodeId>,
+    link_source_pin: Option<HitPin>,
     created_nodes: u32,
 }
 
@@ -56,7 +63,7 @@ impl ApplicationHandler for App {
                         RenderState {
                             hovered_node: self.hovered_node,
                             selected_node: self.selected_node,
-                            link_source_node: self.link_source_node,
+                            link_source_node: self.link_source_pin.map(|pin| pin.node_id),
                         },
                     );
                 }
@@ -70,8 +77,9 @@ impl ApplicationHandler for App {
 
                 if let Some(node_id) = self.dragging_node {
                     if let Some(previous) = self.last_cursor_position {
-                        let dx = (current.0 - previous.0) / self.viewport.zoom;
-                        let dy = (current.1 - previous.1) / self.viewport.zoom;
+                        let (dx, dy) = self
+                            .viewport
+                            .screen_delta_to_world(current.0 - previous.0, current.1 - previous.1);
 
                         if let Some(node) = self.graph.node_mut(node_id) {
                             node.position.x += dx;
@@ -92,6 +100,8 @@ impl ApplicationHandler for App {
                     self.is_panning = state == ElementState::Pressed;
                 } else if button == MouseButton::Left && state == ElementState::Pressed {
                     if self.try_finish_link_from_hover() {
+                        self.dragging_node = None;
+                    } else if self.try_start_link_from_hovered_pin() {
                         self.dragging_node = None;
                     } else {
                         self.selected_node = self.hovered_node;
@@ -121,10 +131,10 @@ impl ApplicationHandler for App {
                         PhysicalKey::Code(KeyCode::Escape) => {
                             self.selected_node = None;
                             self.dragging_node = None;
-                            self.link_source_node = None;
+                            self.link_source_pin = None;
                         }
                         PhysicalKey::Code(KeyCode::KeyR) => self.viewport = Viewport2D::default(),
-                        PhysicalKey::Code(KeyCode::KeyC) => self.link_source_node = self.selected_node,
+                        PhysicalKey::Code(KeyCode::KeyC) => self.start_link_from_selected_node(),
                         _ => {}
                     }
                 }
@@ -149,6 +159,29 @@ impl App {
                     && world.1 <= node.position.y + NODE_HEIGHT
             })
             .map(|node| node.id)
+    }
+
+    fn pin_at_screen_position(&self, screen: (f32, f32)) -> Option<HitPin> {
+        let radius = (PIN_SIZE * self.viewport.zoom).max(8.0);
+        let radius_sq = radius * radius;
+
+        for node in self.graph.nodes().iter().rev() {
+            for (slot, _) in node.outputs.iter().enumerate() {
+                let center = pin_screen_center(node, PinKind::Output, slot, self.viewport);
+                if distance_sq(screen, center) <= radius_sq {
+                    return Some(HitPin { node_id: node.id, kind: PinKind::Output, slot });
+                }
+            }
+
+            for (slot, _) in node.inputs.iter().enumerate() {
+                let center = pin_screen_center(node, PinKind::Input, slot, self.viewport);
+                if distance_sq(screen, center) <= radius_sq {
+                    return Some(HitPin { node_id: node.id, kind: PinKind::Input, slot });
+                }
+            }
+        }
+
+        None
     }
 
     fn create_rust_node_at_view_center(&mut self) {
@@ -182,30 +215,58 @@ impl App {
     }
 
     fn try_finish_link_from_hover(&mut self) -> bool {
-        let Some(source_id) = self.link_source_node else {
+        let Some(source_pin) = self.link_source_pin else {
             return false;
         };
-        let Some(target_id) = self.hovered_node else {
+        let Some(cursor) = self.last_cursor_position else {
+            return false;
+        };
+        let Some(target_pin) = self.pin_at_screen_position(cursor) else {
             return false;
         };
 
-        if source_id == target_id {
+        if source_pin.node_id == target_pin.node_id || target_pin.kind != PinKind::Input {
             return false;
         }
 
-        let Some(from_pin) = self.graph.pin_id(source_id, crate::core::node_graph::PinKind::Output, 0) else {
-            self.link_source_node = None;
+        let Some(from_pin) = self.graph.pin_id(source_pin.node_id, PinKind::Output, source_pin.slot) else {
+            self.link_source_pin = None;
             return false;
         };
-        let Some(to_pin) = self.graph.pin_id(target_id, crate::core::node_graph::PinKind::Input, 0) else {
-            self.link_source_node = None;
+        let Some(to_pin) = self.graph.pin_id(target_pin.node_id, PinKind::Input, target_pin.slot) else {
+            self.link_source_pin = None;
             return false;
         };
 
         self.graph.add_link(from_pin, to_pin, Color32::from_rgb(0xde, 0x39, 0x00));
-        self.selected_node = Some(target_id);
-        self.link_source_node = None;
+        self.selected_node = Some(target_pin.node_id);
+        self.link_source_pin = None;
         true
+    }
+
+    fn try_start_link_from_hovered_pin(&mut self) -> bool {
+        let Some(screen) = self.last_cursor_position else {
+            return false;
+        };
+        let Some(pin) = self.pin_at_screen_position(screen) else {
+            return false;
+        };
+
+        if pin.kind != PinKind::Output {
+            return false;
+        }
+
+        self.selected_node = Some(pin.node_id);
+        self.link_source_pin = Some(pin);
+        true
+    }
+
+    fn start_link_from_selected_node(&mut self) {
+        self.link_source_pin = self.selected_node.map(|node_id| HitPin {
+            node_id,
+            kind: PinKind::Output,
+            slot: 0,
+        });
     }
 
     fn delete_selected_node(&mut self) {
@@ -213,11 +274,17 @@ impl App {
             self.graph.remove_node(node_id);
             self.hovered_node = None;
             self.dragging_node = None;
-            if self.link_source_node == Some(node_id) {
-                self.link_source_node = None;
+            if self.link_source_pin.map(|pin| pin.node_id) == Some(node_id) {
+                self.link_source_pin = None;
             }
         }
     }
+}
+
+fn distance_sq(a: (f32, f32), b: (f32, f32)) -> f32 {
+    let dx = a.0 - b.0;
+    let dy = a.1 - b.1;
+    dx * dx + dy * dy
 }
 
 fn main() {
@@ -235,7 +302,7 @@ fn main() {
         hovered_node: None,
         selected_node: None,
         dragging_node: None,
-        link_source_node: None,
+        link_source_pin: None,
         created_nodes: 0,
     };
 

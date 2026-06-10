@@ -400,9 +400,11 @@ Implementado:
   - `Delete` elimina el nodo seleccionado
   - `Esc` limpia selección
   - `R` reinicia pan/zoom
-  - `C` marca el nodo seleccionado como origen de conexión
-  - click sobre otro nodo termina la conexión usando salida `0` → entrada `0`
+  - click sobre un pin de salida inicia una conexión
+  - click sobre un pin de entrada termina la conexión
+  - `C` marca la salida `0` del nodo seleccionado como origen de conexión rápido
 - Los links se renderizan como curvas Bézier segmentadas en vez de líneas rectas.
+- Corregida la conversión vertical a NDC de Vulkan: render, hit-test y drag quedan sincronizados; arriba/abajo ya no están invertidos.
 - El primer frame se solicita con `window.request_redraw()`.
 - `cargo check` pasa sin warnings en la app activa.
 
@@ -411,7 +413,7 @@ Pendiente dentro de P1:
 - Empezar texto GPU para mostrar títulos de nodos.
 - Migrar de vértices reconstruidos por frame a instancing GPU-friendly.
 - Añadir resize robusto de swapchain.
-- Mejorar conexión interactiva por pines concretos, no solo nodo→nodo.
+- Añadir feedback visual de pin hover y preview de conexión antes de soltar/click final.
 
 ### Próximo paso inmediato
 
