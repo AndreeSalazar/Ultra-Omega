@@ -394,6 +394,11 @@ Implementado:
   - selección con click izquierdo
   - borde azul para hover
   - borde amarillo para selección
+- El runtime permite edición inicial del grafo:
+  - `N` crea un nodo Rust nuevo en el centro de la vista
+  - `Delete` elimina el nodo seleccionado
+  - `Esc` limpia selección
+  - `R` reinicia pan/zoom
 - El primer frame se solicita con `window.request_redraw()`.
 - `cargo check` pasa sin warnings en la app activa.
 
