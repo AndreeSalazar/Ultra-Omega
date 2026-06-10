@@ -2,8 +2,9 @@ use crate::core::{NodeGraph, NodeId};
 use crate::core::node_graph::{NodeLanguage, PinKind};
 use crate::core::types::{pos2, Color32};
 use super::template_palette::{PaletteAction, TemplatePalette};
+use super::workspace::WorkspaceState;
 use crate::vulkan::context::VulkanContext;
-use crate::vulkan::renderer::{pin_screen_center, RenderState, Viewport2D, NODE_HEIGHT, NODE_WIDTH, PIN_SIZE};
+use crate::vulkan::renderer::{pin_screen_center, RenderState, TemplatePaletteEntry, Viewport2D, NODE_HEIGHT, NODE_WIDTH, PIN_SIZE};
 use winit::application::ApplicationHandler;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoop};
@@ -36,6 +37,7 @@ struct AppRuntime {
     link_source_pin: Option<HitPin>,
     created_nodes: u32,
     template_palette: TemplatePalette,
+    workspace: WorkspaceState,
 }
 
 impl AppRuntime {
@@ -53,17 +55,37 @@ impl AppRuntime {
             link_source_pin: None,
             created_nodes: 0,
             template_palette: TemplatePalette::new(),
+            workspace: WorkspaceState::default(),
         }
     }
 
     fn render_state(&self) -> RenderState {
+        let visible_limit = 12;
+        let template_visible_start = self.template_palette.visible_start(visible_limit);
+        let template_entries = self.template_palette.templates()
+            .iter()
+            .enumerate()
+            .skip(template_visible_start)
+            .take(visible_limit)
+            .map(|(index, template)| TemplatePaletteEntry {
+                label: format!("{} {} / {} / {}", quick_slot_label(index), template.category, template.subcategory, template.name),
+                color: [
+                    template.color.0 as f32 / 255.0,
+                    template.color.1 as f32 / 255.0,
+                    template.color.2 as f32 / 255.0,
+                ],
+            })
+            .collect();
+
         RenderState {
             hovered_node: self.hovered_node,
             selected_node: self.selected_node,
             link_source_node: self.link_source_pin.map(|pin| pin.node_id),
             template_palette_open: self.template_palette.is_open(),
-            template_count: self.template_palette.len(),
+            template_visible_start,
             selected_template_index: self.template_palette.selected_index(),
+            template_entries,
+            workspace_label: self.workspace.label(),
         }
     }
 
@@ -216,6 +238,10 @@ impl AppRuntime {
         self.template_palette.toggle();
     }
 
+    fn select_workspace_folder(&mut self) {
+        let _ = self.workspace.select_folder();
+    }
+
     fn handle_template_palette_key(&mut self, key: KeyCode) -> bool {
         match self.template_palette.handle_key(key) {
             PaletteAction::None => true,
@@ -247,12 +273,24 @@ impl ApplicationHandler for AppRuntime {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::RedrawRequested => {
                 let state = self.render_state();
-                if let Some(ctx) = &mut self.vulkan_ctx {
-                    ctx.draw_frame(&self.graph, self.viewport, state);
+                if let (Some(window), Some(ctx)) = (&self.window, &mut self.vulkan_ctx) {
+                    ctx.draw_frame(window, &self.graph, self.viewport, state);
                 }
 
                 if let Some(window) = &self.window {
                     window.request_redraw();
+                }
+            }
+            WindowEvent::Resized(size) => {
+                if size.width > 0 && size.height > 0 {
+                    if let Some(ctx) = &mut self.vulkan_ctx {
+                        ctx.mark_swapchain_dirty();
+                    }
+                }
+            }
+            WindowEvent::ScaleFactorChanged { .. } => {
+                if let Some(ctx) = &mut self.vulkan_ctx {
+                    ctx.mark_swapchain_dirty();
                 }
             }
             WindowEvent::CursorMoved { position, .. } => {
@@ -327,6 +365,7 @@ impl ApplicationHandler for AppRuntime {
                         self.link_source_pin = None;
                         self.template_palette.close();
                     }
+                    KeyCode::KeyO => self.select_workspace_folder(),
                     KeyCode::KeyR => self.viewport = Viewport2D::default(),
                     KeyCode::KeyC => self.start_link_from_selected_node(),
                     _ => {}
@@ -341,4 +380,12 @@ fn distance_sq(a: (f32, f32), b: (f32, f32)) -> f32 {
     let dx = a.0 - b.0;
     let dy = a.1 - b.1;
     dx * dx + dy * dy
+}
+
+fn quick_slot_label(index: usize) -> String {
+    match index {
+        0..=8 => (index + 1).to_string(),
+        9 => "0".to_string(),
+        _ => "-".to_string(),
+    }
 }

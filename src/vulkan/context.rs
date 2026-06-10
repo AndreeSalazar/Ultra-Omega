@@ -3,6 +3,7 @@ use ash::khr::surface::{self, Instance as SurfaceInstance};
 use ash::khr::win32_surface;
 use ash::khr::swapchain::{self, Device as SwapchainDevice};
 use winit::raw_window_handle::{HasDisplayHandle, HasWindowHandle};
+use winit::window::Window;
 use crate::core::node_graph::NodeGraph;
 use crate::vulkan::pipeline::GraphicsPipeline;
 use crate::vulkan::renderer::{Renderer, RenderState, Viewport2D};
@@ -39,13 +40,14 @@ pub struct VulkanContext {
 
     pub pipeline: GraphicsPipeline,
     pub renderer: Renderer,
+    swapchain_dirty: bool,
 }
 
 const MAX_FRAMES_IN_FLIGHT: usize = 2;
 
 impl VulkanContext {
     // FIX: Añadimos paréntesis para resolver la ambigüedad del trait
-    pub fn new(window: &(impl HasWindowHandle + HasDisplayHandle)) -> Self {
+    pub fn new(window: &Window) -> Self {
         let entry = unsafe { ash::Entry::load().expect("Failed to load Vulkan entry") };
 
         // FIX: ash 0.38 usa c"..." en lugar de CString
@@ -273,24 +275,50 @@ impl VulkanContext {
             render_pass, framebuffers, command_pool, command_buffers,
             image_available_semaphore, render_finished_semaphore, in_flight_fence, current_frame: 0,
             pipeline, renderer,
+            swapchain_dirty: false,
         }
     }
 
-    pub fn draw_frame(&mut self, graph: &NodeGraph, viewport: Viewport2D, state: RenderState) {
+    pub fn mark_swapchain_dirty(&mut self) {
+        self.swapchain_dirty = true;
+    }
+
+    pub fn draw_frame(&mut self, window: &Window, graph: &NodeGraph, viewport: Viewport2D, state: RenderState) {
+        let size = window.inner_size();
+        if size.width == 0 || size.height == 0 {
+            self.swapchain_dirty = true;
+            return;
+        }
+
+        if self.swapchain_dirty {
+            self.recreate_swapchain(window);
+        }
+
         unsafe {
             self.device.wait_for_fences(&[self.in_flight_fence], true, u64::MAX).unwrap();
         }
 
         self.renderer.update_from_graph(&self.device, graph, self.swapchain_extent, viewport, state);
 
-        let (image_index, _) = unsafe {
+        let (image_index, suboptimal) = match unsafe {
             self.swapchain_loader.acquire_next_image(
                 self.swapchain,
                 u64::MAX,
                 self.image_available_semaphore,
                 vk::Fence::null(),
-            ).unwrap()
-        } as (u32, _);
+            )
+        } {
+            Ok(result) => result,
+            Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => {
+                self.recreate_swapchain(window);
+                return;
+            }
+            Err(error) => panic!("Failed to acquire swapchain image: {error:?}"),
+        };
+
+        if suboptimal {
+            self.swapchain_dirty = true;
+        }
 
         unsafe {
             self.device.reset_fences(&[self.in_flight_fence]).unwrap();
@@ -376,12 +404,210 @@ impl VulkanContext {
             ..Default::default()
         };
 
-        unsafe {
-            let _ = self.swapchain_loader.queue_present(self.present_queue, &present_info);
+        let present_result = unsafe {
+            self.swapchain_loader.queue_present(self.present_queue, &present_info)
+        };
+
+        match present_result {
+            Ok(suboptimal) => {
+                if suboptimal {
+                    self.swapchain_dirty = true;
+                }
+            }
+            Err(vk::Result::ERROR_OUT_OF_DATE_KHR) => self.swapchain_dirty = true,
+            Err(error) => panic!("Failed to present swapchain image: {error:?}"),
         }
 
         self.current_frame = (self.current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
     }
+
+    fn recreate_swapchain(&mut self, window: &Window) {
+        let size = window.inner_size();
+        if size.width == 0 || size.height == 0 {
+            self.swapchain_dirty = true;
+            return;
+        }
+
+        unsafe {
+            self.device.device_wait_idle().unwrap();
+        }
+
+        let surface_capabilities = unsafe {
+            self.surface_loader
+                .get_physical_device_surface_capabilities(self.physical_device, self.surface)
+                .unwrap()
+        };
+        let surface_formats = unsafe {
+            self.surface_loader
+                .get_physical_device_surface_formats(self.physical_device, self.surface)
+                .unwrap()
+        };
+        let present_modes = unsafe {
+            self.surface_loader
+                .get_physical_device_surface_present_modes(self.physical_device, self.surface)
+                .unwrap()
+        };
+
+        let surface_format = surface_formats
+            .iter()
+            .copied()
+            .find(|f| f.format == vk::Format::B8G8R8A8_SRGB && f.color_space == vk::ColorSpaceKHR::SRGB_NONLINEAR)
+            .unwrap_or(surface_formats[0]);
+        let present_mode = present_modes
+            .into_iter()
+            .find(|&mode| mode == vk::PresentModeKHR::MAILBOX)
+            .unwrap_or(vk::PresentModeKHR::FIFO);
+        let extent = choose_swapchain_extent(surface_capabilities, window);
+        let desired_image_count = desired_swapchain_image_count(surface_capabilities);
+
+        let old_swapchain = self.swapchain;
+        let swapchain_create_info = vk::SwapchainCreateInfoKHR {
+            surface: self.surface,
+            min_image_count: desired_image_count,
+            image_color_space: surface_format.color_space,
+            image_format: surface_format.format,
+            image_extent: extent,
+            image_array_layers: 1,
+            image_usage: vk::ImageUsageFlags::COLOR_ATTACHMENT,
+            image_sharing_mode: vk::SharingMode::EXCLUSIVE,
+            pre_transform: surface_capabilities.current_transform,
+            composite_alpha: vk::CompositeAlphaFlagsKHR::OPAQUE,
+            present_mode,
+            clipped: vk::TRUE,
+            old_swapchain,
+            ..Default::default()
+        };
+
+        let swapchain = unsafe {
+            self.swapchain_loader
+                .create_swapchain(&swapchain_create_info, None)
+                .unwrap()
+        };
+        let swapchain_images = unsafe { self.swapchain_loader.get_swapchain_images(swapchain).unwrap() };
+        let swapchain_image_views = create_image_views(&self.device, &swapchain_images, surface_format.format);
+
+        unsafe {
+            self.device.destroy_pipeline(self.pipeline.pipeline, None);
+            self.device.destroy_pipeline_layout(self.pipeline.pipeline_layout, None);
+            for &framebuffer in &self.framebuffers {
+                self.device.destroy_framebuffer(framebuffer, None);
+            }
+            self.device.destroy_render_pass(self.render_pass, None);
+            for &view in &self.swapchain_image_views {
+                self.device.destroy_image_view(view, None);
+            }
+            self.swapchain_loader.destroy_swapchain(old_swapchain, None);
+        }
+
+        self.swapchain = swapchain;
+        self.swapchain_images = swapchain_images;
+        self.swapchain_image_views = swapchain_image_views;
+        self.swapchain_format = surface_format.format;
+        self.swapchain_extent = extent;
+        self.render_pass = create_render_pass(&self.device, self.swapchain_format);
+        self.framebuffers = create_framebuffers(&self.device, self.render_pass, &self.swapchain_image_views, self.swapchain_extent);
+        self.pipeline = GraphicsPipeline::new(&self.device, self.render_pass, self.swapchain_extent);
+        self.swapchain_dirty = false;
+    }
+}
+
+fn choose_swapchain_extent(capabilities: vk::SurfaceCapabilitiesKHR, window: &Window) -> vk::Extent2D {
+    if capabilities.current_extent.width != u32::MAX {
+        return capabilities.current_extent;
+    }
+
+    let size = window.inner_size();
+    vk::Extent2D {
+        width: size.width.clamp(capabilities.min_image_extent.width, capabilities.max_image_extent.width),
+        height: size.height.clamp(capabilities.min_image_extent.height, capabilities.max_image_extent.height),
+    }
+}
+
+fn desired_swapchain_image_count(capabilities: vk::SurfaceCapabilitiesKHR) -> u32 {
+    let mut desired_image_count = capabilities.min_image_count + 1;
+    if capabilities.max_image_count > 0 && desired_image_count > capabilities.max_image_count {
+        desired_image_count = capabilities.max_image_count;
+    }
+    desired_image_count
+}
+
+fn create_image_views(device: &ash::Device, images: &[vk::Image], format: vk::Format) -> Vec<vk::ImageView> {
+    images
+        .iter()
+        .map(|&image| {
+            let create_info = vk::ImageViewCreateInfo {
+                image,
+                view_type: vk::ImageViewType::TYPE_2D,
+                format,
+                subresource_range: vk::ImageSubresourceRange {
+                    aspect_mask: vk::ImageAspectFlags::COLOR,
+                    base_mip_level: 0,
+                    level_count: 1,
+                    base_array_layer: 0,
+                    layer_count: 1,
+                },
+                ..Default::default()
+            };
+            unsafe { device.create_image_view(&create_info, None).unwrap() }
+        })
+        .collect()
+}
+
+fn create_render_pass(device: &ash::Device, format: vk::Format) -> vk::RenderPass {
+    let color_attachment = vk::AttachmentDescription {
+        format,
+        samples: vk::SampleCountFlags::TYPE_1,
+        load_op: vk::AttachmentLoadOp::CLEAR,
+        store_op: vk::AttachmentStoreOp::STORE,
+        stencil_load_op: vk::AttachmentLoadOp::DONT_CARE,
+        stencil_store_op: vk::AttachmentStoreOp::DONT_CARE,
+        initial_layout: vk::ImageLayout::UNDEFINED,
+        final_layout: vk::ImageLayout::PRESENT_SRC_KHR,
+        ..Default::default()
+    };
+    let color_attachment_ref = vk::AttachmentReference {
+        attachment: 0,
+        layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+        ..Default::default()
+    };
+    let subpass = vk::SubpassDescription {
+        pipeline_bind_point: vk::PipelineBindPoint::GRAPHICS,
+        color_attachment_count: 1,
+        p_color_attachments: &color_attachment_ref,
+        ..Default::default()
+    };
+    let render_pass_create_info = vk::RenderPassCreateInfo {
+        attachment_count: 1,
+        p_attachments: &color_attachment,
+        subpass_count: 1,
+        p_subpasses: &subpass,
+        ..Default::default()
+    };
+
+    unsafe { device.create_render_pass(&render_pass_create_info, None).unwrap() }
+}
+
+fn create_framebuffers(
+    device: &ash::Device,
+    render_pass: vk::RenderPass,
+    image_views: &[vk::ImageView],
+    extent: vk::Extent2D,
+) -> Vec<vk::Framebuffer> {
+    image_views
+        .iter()
+        .map(|&image_view| {
+            let framebuffer_create_info = vk::FramebufferCreateInfo {
+                render_pass,
+                attachment_count: 1,
+                p_attachments: &image_view,
+                width: extent.width,
+                height: extent.height,
+                layers: 1,
+                ..Default::default()
+            };
+            unsafe { device.create_framebuffer(&framebuffer_create_info, None).unwrap() }
+        })
+        .collect()
 }
 
 impl Drop for VulkanContext {

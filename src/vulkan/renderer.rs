@@ -4,14 +4,22 @@ use crate::core::node_graph::{Node, NodeGraph, NodeLanguage, PinKind};
 use crate::core::NodeId;
 use crate::vulkan::pipeline::{GraphicsPipeline, Vertex};
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct RenderState {
     pub hovered_node: Option<NodeId>,
     pub selected_node: Option<NodeId>,
     pub link_source_node: Option<NodeId>,
     pub template_palette_open: bool,
-    pub template_count: usize,
+    pub template_visible_start: usize,
     pub selected_template_index: usize,
+    pub template_entries: Vec<TemplatePaletteEntry>,
+    pub workspace_label: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct TemplatePaletteEntry {
+    pub label: String,
+    pub color: [f32; 3],
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -136,7 +144,7 @@ impl Renderer {
         self.push_links(&mut vertices, graph, extent, viewport);
 
         for node in graph.nodes() {
-            self.push_node(&mut vertices, node, extent, viewport, state);
+            self.push_node(&mut vertices, node, extent, viewport, &state);
 
             if vertices.len() >= self.vertex_capacity {
                 vertices.truncate(self.vertex_capacity);
@@ -145,8 +153,10 @@ impl Renderer {
         }
 
         if state.template_palette_open {
-            self.push_template_palette(&mut vertices, extent, state);
+            self.push_template_palette(&mut vertices, extent, &state);
         }
+
+        self.push_workspace_badge(&mut vertices, extent, &state.workspace_label);
 
         self.vertex_count = vertices.len() as u32;
 
@@ -175,7 +185,7 @@ impl Renderer {
         node: &Node,
         extent: vk::Extent2D,
         viewport: Viewport2D,
-        state: RenderState,
+        state: &RenderState,
     ) {
         let (x, y) = viewport.world_to_screen(node.position.x, node.position.y);
         let node_width = viewport.scale(NODE_WIDTH);
@@ -304,31 +314,47 @@ impl Renderer {
         &self,
         vertices: &mut Vec<Vertex>,
         extent: vk::Extent2D,
-        state: RenderState,
+        state: &RenderState,
     ) {
         let panel_x = 32.0;
         let panel_y = 32.0;
-        let panel_width = 360.0;
-        let item_height = 28.0;
-        let visible_items = state.template_count.min(12);
-        let panel_height = 72.0 + item_height * visible_items as f32;
+        let panel_width = 560.0;
+        let item_height = 34.0;
+        let visible_items = state.template_entries.len().min(12);
+        let panel_height = 86.0 + item_height * visible_items as f32;
 
-        push_rect(vertices, extent, panel_x - 4.0, panel_y - 4.0, panel_width + 8.0, panel_height + 8.0, [0.04, 0.04, 0.05]);
-        push_rect(vertices, extent, panel_x, panel_y, panel_width, panel_height, [0.10, 0.10, 0.12]);
-        push_rect(vertices, extent, panel_x, panel_y, panel_width, 42.0, [0.22, 0.10, 0.02]);
+        push_rect(vertices, extent, panel_x - 6.0, panel_y - 6.0, panel_width + 12.0, panel_height + 12.0, [0.02, 0.02, 0.025]);
+        push_rect(vertices, extent, panel_x, panel_y, panel_width, panel_height, [0.075, 0.078, 0.095]);
+        push_rect(vertices, extent, panel_x, panel_y, panel_width, 50.0, [0.25, 0.10, 0.025]);
+        push_text(vertices, extent, panel_x + 18.0, panel_y + 16.0, 2.0, [1.0, 0.68, 0.30], "TAB RUST TEMPLATES");
+        push_text(vertices, extent, panel_x + panel_width - 168.0, panel_y + 18.0, 1.4, [0.85, 0.85, 0.88], "ENTER CREA");
 
         for index in 0..visible_items {
-            let y = panel_y + 56.0 + index as f32 * item_height;
-            let selected = index == state.selected_template_index;
+            let y = panel_y + 64.0 + index as f32 * item_height;
+            let global_index = state.template_visible_start + index;
+            let selected = global_index == state.selected_template_index;
+            let entry = &state.template_entries[index];
             let color = if selected {
-                [0.95, 0.38, 0.12]
+                [0.92, 0.35, 0.10]
             } else if index % 2 == 0 {
-                [0.16, 0.16, 0.18]
+                [0.135, 0.138, 0.16]
             } else {
-                [0.13, 0.13, 0.15]
+                [0.105, 0.108, 0.13]
             };
-            push_rect(vertices, extent, panel_x + 12.0, y, panel_width - 24.0, item_height - 4.0, color);
+            push_rect(vertices, extent, panel_x + 12.0, y, panel_width - 24.0, item_height - 5.0, color);
+            push_rect(vertices, extent, panel_x + 18.0, y + 6.0, 8.0, item_height - 17.0, entry.color);
+            push_text(vertices, extent, panel_x + 36.0, y + 9.0, 1.45, [0.90, 0.90, 0.93], &entry.label);
         }
+    }
+
+    fn push_workspace_badge(&self, vertices: &mut Vec<Vertex>, extent: vk::Extent2D, label: &str) {
+        let width = (label.chars().count() as f32 * 8.0 * 1.2 + 30.0).clamp(280.0, extent.width.saturating_sub(48) as f32);
+        let x = 24.0;
+        let y = extent.height.saturating_sub(44) as f32;
+
+        push_rect(vertices, extent, x - 4.0, y - 4.0, width + 8.0, 30.0, [0.035, 0.035, 0.045]);
+        push_rect(vertices, extent, x, y, width, 22.0, [0.10, 0.105, 0.13]);
+        push_text(vertices, extent, x + 12.0, y + 7.0, 1.2, [0.78, 0.84, 0.92], label);
     }
 
     fn push_pins(
@@ -520,6 +546,90 @@ fn screen_to_ndc_y(y: f32, height: u32) -> f32 {
     // Mantener la misma orientación que winit/screen coords evita que input y render
     // queden desincronizados al seleccionar o arrastrar nodos.
     (y / height.max(1) as f32) * 2.0 - 1.0
+}
+
+fn push_text(
+    vertices: &mut Vec<Vertex>,
+    extent: vk::Extent2D,
+    x: f32,
+    y: f32,
+    scale: f32,
+    color: [f32; 3],
+    text: &str,
+) {
+    let mut cursor_x = x;
+    for ch in text.chars().take(64) {
+        if ch == ' ' {
+            cursor_x += 4.0 * scale;
+            continue;
+        }
+
+        let glyph = glyph_5x7(ch);
+        for (row, bits) in glyph.iter().enumerate() {
+            for col in 0..5 {
+                if bits & (1 << (4 - col)) != 0 {
+                    push_rect(
+                        vertices,
+                        extent,
+                        cursor_x + col as f32 * scale,
+                        y + row as f32 * scale,
+                        scale,
+                        scale,
+                        color,
+                    );
+                }
+            }
+        }
+        cursor_x += 6.0 * scale;
+    }
+}
+
+fn glyph_5x7(ch: char) -> [u8; 7] {
+    match ch.to_ascii_uppercase() {
+        'A' => [0b01110, 0b10001, 0b10001, 0b11111, 0b10001, 0b10001, 0b10001],
+        'B' => [0b11110, 0b10001, 0b10001, 0b11110, 0b10001, 0b10001, 0b11110],
+        'C' => [0b01110, 0b10001, 0b10000, 0b10000, 0b10000, 0b10001, 0b01110],
+        'D' => [0b11110, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b11110],
+        'E' => [0b11111, 0b10000, 0b10000, 0b11110, 0b10000, 0b10000, 0b11111],
+        'F' => [0b11111, 0b10000, 0b10000, 0b11110, 0b10000, 0b10000, 0b10000],
+        'G' => [0b01110, 0b10001, 0b10000, 0b10111, 0b10001, 0b10001, 0b01110],
+        'H' => [0b10001, 0b10001, 0b10001, 0b11111, 0b10001, 0b10001, 0b10001],
+        'I' => [0b11111, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0b11111],
+        'J' => [0b00111, 0b00010, 0b00010, 0b00010, 0b10010, 0b10010, 0b01100],
+        'K' => [0b10001, 0b10010, 0b10100, 0b11000, 0b10100, 0b10010, 0b10001],
+        'L' => [0b10000, 0b10000, 0b10000, 0b10000, 0b10000, 0b10000, 0b11111],
+        'M' => [0b10001, 0b11011, 0b10101, 0b10101, 0b10001, 0b10001, 0b10001],
+        'N' => [0b10001, 0b11001, 0b10101, 0b10011, 0b10001, 0b10001, 0b10001],
+        'O' => [0b01110, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01110],
+        'P' => [0b11110, 0b10001, 0b10001, 0b11110, 0b10000, 0b10000, 0b10000],
+        'Q' => [0b01110, 0b10001, 0b10001, 0b10001, 0b10101, 0b10010, 0b01101],
+        'R' => [0b11110, 0b10001, 0b10001, 0b11110, 0b10100, 0b10010, 0b10001],
+        'S' => [0b01111, 0b10000, 0b10000, 0b01110, 0b00001, 0b00001, 0b11110],
+        'T' => [0b11111, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100],
+        'U' => [0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01110],
+        'V' => [0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01010, 0b00100],
+        'W' => [0b10001, 0b10001, 0b10001, 0b10101, 0b10101, 0b10101, 0b01010],
+        'X' => [0b10001, 0b10001, 0b01010, 0b00100, 0b01010, 0b10001, 0b10001],
+        'Y' => [0b10001, 0b10001, 0b01010, 0b00100, 0b00100, 0b00100, 0b00100],
+        'Z' => [0b11111, 0b00001, 0b00010, 0b00100, 0b01000, 0b10000, 0b11111],
+        '0' => [0b01110, 0b10001, 0b10011, 0b10101, 0b11001, 0b10001, 0b01110],
+        '1' => [0b00100, 0b01100, 0b00100, 0b00100, 0b00100, 0b00100, 0b01110],
+        '2' => [0b01110, 0b10001, 0b00001, 0b00010, 0b00100, 0b01000, 0b11111],
+        '3' => [0b11110, 0b00001, 0b00001, 0b01110, 0b00001, 0b00001, 0b11110],
+        '4' => [0b00010, 0b00110, 0b01010, 0b10010, 0b11111, 0b00010, 0b00010],
+        '5' => [0b11111, 0b10000, 0b10000, 0b11110, 0b00001, 0b00001, 0b11110],
+        '6' => [0b01110, 0b10000, 0b10000, 0b11110, 0b10001, 0b10001, 0b01110],
+        '7' => [0b11111, 0b00001, 0b00010, 0b00100, 0b01000, 0b01000, 0b01000],
+        '8' => [0b01110, 0b10001, 0b10001, 0b01110, 0b10001, 0b10001, 0b01110],
+        '9' => [0b01110, 0b10001, 0b10001, 0b01111, 0b00001, 0b00001, 0b01110],
+        '/' => [0b00001, 0b00010, 0b00010, 0b00100, 0b01000, 0b01000, 0b10000],
+        ':' => [0b00000, 0b00100, 0b00100, 0b00000, 0b00100, 0b00100, 0b00000],
+        '-' => [0b00000, 0b00000, 0b00000, 0b11111, 0b00000, 0b00000, 0b00000],
+        '_' => [0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b11111],
+        '.' => [0b00000, 0b00000, 0b00000, 0b00000, 0b00000, 0b01100, 0b01100],
+        '\\' => [0b10000, 0b01000, 0b01000, 0b00100, 0b00010, 0b00010, 0b00001],
+        _ => [0b01110, 0b10001, 0b00001, 0b00010, 0b00100, 0b00000, 0b00100],
+    }
 }
 
 fn color_to_rgb(color: crate::core::types::Color32) -> [f32; 3] {

@@ -33,5 +33,8 @@ glam = "0.25"
 # Directorios de configuración
 dirs = "5.0"
 
+# Selector nativo de carpetas para flujo tipo VS Code
+rfd = "0.14"
+
 [build-dependencies]
 shaderc = "0.8"

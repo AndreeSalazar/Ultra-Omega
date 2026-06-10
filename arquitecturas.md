@@ -428,3 +428,17 @@ Pendiente dentro de P1:
 ### Próximo paso inmediato
 
 El siguiente cambio recomendado es **texto GPU para títulos de nodos y mejor sistema de recursos/pipelines**. Eso convierte los rectángulos actuales en nodos identificables y prepara la transición hacia un editor visual profesional de Rust.
+## ActualizaciÃ³n P1.1 - Vulkan estable al maximizar, paleta visible y workspace base
+
+Esta fase deja tres bases importantes para continuar la reescritura Rust/Vulkan sin volver al monolito anterior:
+
+- **Resize/maximizar robusto:** `VulkanContext` ya no hace `unwrap()` directo sobre `acquire_next_image`. Si Vulkan devuelve `ERROR_OUT_OF_DATE_KHR` o `SUBOPTIMAL_KHR`, se marca/recrea swapchain junto con image views, framebuffers, render pass y pipeline.
+- **Paleta Houdini visible en Vulkan:** la paleta `TAB` ahora dibuja una tarjeta amplia con texto bitmap GPU inicial, color por template y fila seleccionada. La consola sigue siendo respaldo, pero la informaciÃ³n ya aparece dentro del canvas Vulkan.
+- **Workspace tipo VS Code inicial:** `O` abre selector nativo de carpeta con `rfd`, guarda la ruta en `WorkspaceState` y muestra una barra inferior con la carpeta activa o la acciÃ³n pendiente.
+
+Pendiente actualizado:
+
+- Separar `src/vulkan/renderer.rs` en mÃ³dulos pequeÃ±os (`geometry`, `text`, `canvas`, `palette`, `resources`) para mantener el proyecto sin monolitos.
+- Convertir el texto bitmap temporal en atlas SDF/FreeType para alta calidad, acentos y escalado correcto.
+- Conectar el workspace a un explorador real de archivos Rust y a nodos que referencien rutas/sÃ­mbolos reales.
+- Agregar preview de conexiÃ³n al arrastrar desde pines y hover individual de pines.

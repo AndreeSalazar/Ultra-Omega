@@ -25,16 +25,27 @@ impl TemplatePalette {
         self.open
     }
 
-    pub fn len(&self) -> usize {
-        self.templates.len()
-    }
-
     pub fn selected_index(&self) -> usize {
         self.selected_index
     }
 
     pub fn template(&self, index: usize) -> Option<&Template> {
         self.templates.get(index)
+    }
+
+    pub fn templates(&self) -> &[Template] {
+        &self.templates
+    }
+
+    pub fn visible_start(&self, limit: usize) -> usize {
+        if self.templates.len() <= limit || limit == 0 {
+            return 0;
+        }
+
+        let half = limit / 2;
+        self.selected_index
+            .saturating_sub(half)
+            .min(self.templates.len() - limit)
     }
 
     pub fn toggle(&mut self) {
