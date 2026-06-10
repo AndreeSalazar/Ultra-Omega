@@ -375,8 +375,11 @@ La ventaja de Ultra-Omega frente a VS Code no debe ser “tener pestañas”. De
 
 Implementado:
 
-- `main.rs` usa `NodeGraph` directo como estado activo de aplicación.
-- Los módulos antiguos (`storage`, `templates`, `expressions`, `inheritance`, `utils`, `config`) quedan desconectados temporalmente del runtime para reescribir la base Vulkan sin ruido.
+- `main.rs` queda como entrada mínima y delega en `src/app/`.
+- `src/app/runtime.rs` concentra el runtime activo de ventana/input/grafo.
+- `src/app/template_palette.rs` separa la paleta Houdini-style de templates Rust.
+- `templates` queda reactivado solo para crear nodos Rust desde `TAB`.
+- Los módulos antiguos (`storage`, `expressions`, `inheritance`, `utils`, `config`) quedan desconectados temporalmente del runtime para reescribir la base Vulkan sin ruido.
 - `VulkanContext::draw_frame()` recibe `&NodeGraph`.
 - `Renderer` deja de depender de un rectángulo hardcodeado.
 - El renderer genera vértices desde los nodos del grafo:
@@ -403,6 +406,12 @@ Implementado:
   - click sobre un pin de salida inicia una conexión
   - click sobre un pin de entrada termina la conexión
   - `C` marca la salida `0` del nodo seleccionado como origen de conexión rápido
+- Paleta inspirada en Houdini:
+  - `TAB` abre/cierra la paleta de templates Rust
+  - flechas arriba/abajo navegan templates
+  - `Enter` crea el template seleccionado como nodo
+  - `1`-`0` crean templates rápidos de la primera página
+  - la paleta tiene overlay visual inicial en Vulkan y lista detallada en consola hasta implementar texto GPU
 - Los links se renderizan como curvas Bézier segmentadas en vez de líneas rectas.
 - Corregida la conversión vertical a NDC de Vulkan: render, hit-test y drag quedan sincronizados; arriba/abajo ya no están invertidos.
 - El primer frame se solicita con `window.request_redraw()`.
@@ -414,6 +423,7 @@ Pendiente dentro de P1:
 - Migrar de vértices reconstruidos por frame a instancing GPU-friendly.
 - Añadir resize robusto de swapchain.
 - Añadir feedback visual de pin hover y preview de conexión antes de soltar/click final.
+- Separar `src/vulkan/renderer.rs` en submódulos de canvas/geometry/resources para evitar otro monolito.
 
 ### Próximo paso inmediato
 

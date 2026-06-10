@@ -9,6 +9,9 @@ pub struct RenderState {
     pub hovered_node: Option<NodeId>,
     pub selected_node: Option<NodeId>,
     pub link_source_node: Option<NodeId>,
+    pub template_palette_open: bool,
+    pub template_count: usize,
+    pub selected_template_index: usize,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -139,6 +142,10 @@ impl Renderer {
                 vertices.truncate(self.vertex_capacity);
                 break;
             }
+        }
+
+        if state.template_palette_open {
+            self.push_template_palette(&mut vertices, extent, state);
         }
 
         self.vertex_count = vertices.len() as u32;
@@ -290,6 +297,37 @@ impl Renderer {
                 viewport.scale(4.0).max(1.0),
                 color_to_rgb(link.color),
             );
+        }
+    }
+
+    fn push_template_palette(
+        &self,
+        vertices: &mut Vec<Vertex>,
+        extent: vk::Extent2D,
+        state: RenderState,
+    ) {
+        let panel_x = 32.0;
+        let panel_y = 32.0;
+        let panel_width = 360.0;
+        let item_height = 28.0;
+        let visible_items = state.template_count.min(12);
+        let panel_height = 72.0 + item_height * visible_items as f32;
+
+        push_rect(vertices, extent, panel_x - 4.0, panel_y - 4.0, panel_width + 8.0, panel_height + 8.0, [0.04, 0.04, 0.05]);
+        push_rect(vertices, extent, panel_x, panel_y, panel_width, panel_height, [0.10, 0.10, 0.12]);
+        push_rect(vertices, extent, panel_x, panel_y, panel_width, 42.0, [0.22, 0.10, 0.02]);
+
+        for index in 0..visible_items {
+            let y = panel_y + 56.0 + index as f32 * item_height;
+            let selected = index == state.selected_template_index;
+            let color = if selected {
+                [0.95, 0.38, 0.12]
+            } else if index % 2 == 0 {
+                [0.16, 0.16, 0.18]
+            } else {
+                [0.13, 0.13, 0.15]
+            };
+            push_rect(vertices, extent, panel_x + 12.0, y, panel_width - 24.0, item_height - 4.0, color);
         }
     }
 
