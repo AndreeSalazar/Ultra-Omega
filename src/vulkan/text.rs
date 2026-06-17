@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use crate::vulkan::pipeline::create_shader_module;
 
-pub const ATLAS_FONT_SIZE: f32 = 48.0;
+pub const ATLAS_FONT_SIZE: f32 = 64.0;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -166,18 +166,34 @@ impl FontAtlas {
 
     fn load_font_data() -> Option<Vec<u8>> {
         let paths = [
+            // High-quality coding fonts (preferred order)
+            r"C:\Users\andre\AppData\Local\Microsoft\Windows\Fonts\JetBrainsMono-Regular.ttf",
+            r"C:\Windows\Fonts\JetBrainsMono-Regular.ttf",
+            r"C:\Users\andre\AppData\Local\Microsoft\Windows\Fonts\CascadiaCode-Regular.ttf",
+            r"C:\Windows\Fonts\CascadiaCode-Regular.ttf",
+            r"C:\Users\andre\AppData\Local\Microsoft\Windows\Fonts\SourceCodePro-Regular.ttf",
+            r"C:\Windows\Fonts\SourceCodePro-Regular.ttf",
+            r"C:\Users\andre\AppData\Local\Microsoft\Windows\Fonts\FiraCode-Regular.ttf",
+            r"C:\Windows\Fonts\FiraCode-Regular.ttf",
+            r"C:\Users\andre\AppData\Local\Microsoft\Windows\Fonts\UbuntuMono-R.ttf",
+            r"C:\Windows\Fonts\UbuntuMono-R.ttf",
+            // System monospace fonts (fallback)
             r"C:\Windows\Fonts\consola.ttf",
             r"C:\Windows\Fonts\cour.ttf",
             r"C:\Windows\Fonts\lucon.ttf",
+            // Linux fonts
+            "/usr/share/fonts/truetype/jetbrains/JetBrainsMono-Regular.ttf",
             "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
             "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
             "/usr/share/fonts/TTF/DejaVuSansMono.ttf",
         ];
         for path in &paths {
             if let Ok(data) = std::fs::read(path) {
+                log::info!("Font loaded: {}", path);
                 return Some(data);
             }
         }
+        log::warn!("No font found - text will not render");
         None
     }
 

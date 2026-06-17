@@ -117,73 +117,73 @@ pub struct UltraOmegaTheme {
 impl Default for UltraOmegaTheme {
     fn default() -> Self {
         Self {
-            // ── Tinta y Porcelana ──
-            ink_black:      Color::from_rgb(22, 18, 16),      // #161210 - tinta negra cálida
-            ink_deep:       Color::from_rgb(30, 26, 23),      // #1E1A17
-            ink_medium:     Color::from_rgb(42, 37, 32),      // #2A2520
-            porcelain:      Color::from_rgb(240, 237, 229),    // #F0EDE5 - porcelana
-            porcelain_warm: Color::from_rgb(232, 228, 216),    // #E8E4D8
-            silk_cream:     Color::from_rgb(220, 212, 195),    // #DCD4C3
+            // ── Fondos cálidos estilo Houdini ──
+            ink_black:      Color::from_rgb(26, 23, 21),      // #1A1715 - car温暖 oscuro
+            ink_deep:       Color::from_rgb(34, 30, 27),      // #221E1B - marrón cálido
+            ink_medium:     Color::from_rgb(48, 43, 38),      // #302B26 - marrón medio
+            porcelain:      Color::from_rgb(228, 222, 210),    // #E4DED2 - porcelana cálida
+            porcelain_warm: Color::from_rgb(218, 210, 196),    // #DAD2C4
+            silk_cream:     Color::from_rgb(200, 192, 175),    // #C8C0AF
 
-            // ── Piedras preciosas ──
-            jade_dark:   Color::from_rgb(35, 42, 35),          // #232A23
-            jade_medium: Color::from_rgb(50, 58, 48),          // #323A30
-            jade_light:  Color::from_rgb(65, 75, 60),          // #414B3C
-            obsidian:    Color::from_rgb(28, 25, 24),          // #1C1918
-            slate:       Color::from_rgb(48, 44, 40),          // #302C28
+            // ── Superficies ──
+            jade_dark:   Color::from_rgb(38, 42, 36),          // #262A24
+            jade_medium: Color::from_rgb(52, 56, 48),          // #343830
+            jade_light:  Color::from_rgb(68, 74, 62),          // #444A3E
+            obsidian:    Color::from_rgb(30, 27, 25),          // #1E1B19
+            slate:       Color::from_rgb(52, 47, 42),          // #342F2A
 
-            // ── Texto ──
-            text_primary:   Color::from_rgb(235, 230, 218),    // #EBE6DA - marfil
-            text_secondary: Color::from_rgb(195, 185, 168),    // #C3B9A8
-            text_muted:     Color::from_rgb(140, 132, 118),    // #8C8476
-            text_gold:      Color::from_rgb(212, 168, 67),     // #D4A843 - dorado imperial
-            text_jade:      Color::from_rgb(120, 175, 120),    // #78AF78 - jade
+            // ── Texto (legible y cálido) ──
+            text_primary:   Color::from_rgb(225, 218, 204),    // #E1DACC - marfil cálido
+            text_secondary: Color::from_rgb(185, 175, 158),    // #B9AF9E
+            text_muted:     Color::from_rgb(130, 122, 108),    // #827A6C
+            text_gold:      Color::from_rgb(218, 172, 68),     // #DAAC44 - dorado imperial
+            text_jade:      Color::from_rgb(125, 170, 115),    // #7DAA73 - jade
 
-            // ── Acentos imperiales ──
-            vermillion:    Color::from_rgb(194, 59, 34),       // #C23B22 - rojo vermillon
-            imperial_gold: Color::from_rgb(212, 168, 67),      // #D4A843 - oro imperial
-            jade_green:    Color::from_rgb(91, 140, 90),       // #5B8C5A - jade verde
-            indigo:        Color::from_rgb(46, 64, 87),        // #2E4057 - indigo
-            plum:          Color::from_rgb(139, 64, 73),       // #8B4049 - ciruela
-            copper:        Color::from_rgb(168, 112, 62),      // #A8703E - cobre
+            // ── Acentos imperiales (rojo y dorado) ──
+            vermillion:    Color::from_rgb(185, 55, 32),       // #B93720 - rojo vermillón profundo
+            imperial_gold: Color::from_rgb(205, 165, 62),      // #CDA53E - oro imperial
+            jade_green:    Color::from_rgb(85, 135, 82),       // #558752 - jade verde
+            indigo:        Color::from_rgb(42, 58, 78),        // #2A3A4E - indigo profundo
+            plum:          Color::from_rgb(130, 58, 65),       // #823A41 - ciruela
+            copper:        Color::from_rgb(160, 108, 58),      // #A06C3A - cobre
 
             // ── Bordes ──
-            border_primary:   Color::from_rgb(70, 63, 55),     // #463F37
-            border_secondary: Color::from_rgb(55, 50, 44),     // #37322C
-            border_focus:     Color::from_rgb(212, 168, 67),   // #D4A843 - oro
-            border_subtle:    Color::from_rgb(38, 34, 30),     // #26221E
-            border_gold:      Color::from_rgb(180, 142, 55),   // #B48E37
+            border_primary:   Color::from_rgb(65, 58, 50),     // #413A32
+            border_secondary: Color::from_rgb(50, 45, 40),     // #322D28
+            border_focus:     Color::from_rgb(205, 165, 62),   // #CDA53E - oro
+            border_subtle:    Color::from_rgb(36, 32, 28),     // #24201C
+            border_gold:      Color::from_rgb(170, 135, 50),   // #AA8732
 
-            // ── Nodos ──
-            node_rust:       Color::from_rgb(194, 59, 34),     // vermillon para Rust
-            node_rust_body:  Color::from_rgb(45, 32, 28),      // marron oscuro cálido
-            node_text:       Color::from_rgb(168, 112, 62),    // cobre para texto
-            node_text_body:  Color::from_rgb(38, 34, 28),      // marron profundo
-            node_auto:       Color::from_rgb(91, 140, 90),     // jade para auto
-            node_auto_body:  Color::from_rgb(32, 38, 30),      // verde oscuro
-            node_folder:     Color::from_rgb(212, 168, 67),    // oro para carpetas
-            node_folder_body:Color::from_rgb(42, 38, 28),      // dorado oscuro
+            // ── Nodos (mejor contraste para texto) ──
+            node_rust:       Color::from_rgb(185, 55, 32),     // vermillón profundo
+            node_rust_body:  Color::from_rgb(55, 42, 36),      // marrón cálido claro (legible)
+            node_text:       Color::from_rgb(160, 108, 58),    // cobre
+            node_text_body:  Color::from_rgb(48, 40, 34),      // marrón medio
+            node_auto:       Color::from_rgb(85, 135, 82),     // jade
+            node_auto_body:  Color::from_rgb(40, 48, 36),      // verde cálido oscuro
+            node_folder:     Color::from_rgb(205, 165, 62),    // oro
+            node_folder_body:Color::from_rgb(50, 45, 34),      // dorado oscuro
 
             // ── Pins (perlas) ──
-            pin_input:     Color::from_rgb(120, 175, 120),     // jade claro
-            pin_output:    Color::from_rgb(194, 59, 34),       // vermillon
-            pin_connected: Color::from_rgb(212, 168, 67),      // oro imperial
-            pin_hover:     Color::from_rgb(240, 237, 229),     // porcelana
+            pin_input:     Color::from_rgb(125, 170, 115),     // jade claro
+            pin_output:    Color::from_rgb(185, 55, 32),       // vermillón
+            pin_connected: Color::from_rgb(205, 165, 62),      // oro imperial
+            pin_hover:     Color::from_rgb(228, 222, 210),     // porcelana
 
             // ── Terminal ──
-            terminal_bg:      Color::from_rgb(18, 16, 14),     // tinta pura
-            terminal_text:    Color::from_rgb(210, 200, 180),   // seda clara
-            terminal_selection: Color::from_rgb(91, 140, 90),   // jade
+            terminal_bg:      Color::from_rgb(22, 20, 18),     // car温暖 oscuro
+            terminal_text:    Color::from_rgb(200, 192, 175),   // seda clara
+            terminal_selection: Color::from_rgb(85, 135, 82),   // jade
 
-            // ── Grid ──
-            grid_line: Color::from_rgb(42, 38, 33),            // #2A2621
-            grid_axis: Color::from_rgb(70, 63, 55),            // #463F37
-            grid_dot:  Color::from_rgb(55, 50, 44),            // #37322C
+            // ── Grid (sutil y cálido) ──
+            grid_line: Color::from_rgb(40, 36, 31),            // #28241F
+            grid_axis: Color::from_rgb(65, 58, 50),            // #413A32
+            grid_dot:  Color::from_rgb(50, 45, 40),            // #322D28
 
             // ── Conexiones ──
-            link_default: Color::from_rgb(168, 112, 62),       // cobre
-            link_active:  Color::from_rgb(194, 59, 34),        // vermillon
-            link_hover:   Color::from_rgb(212, 168, 67),       // oro
+            link_default: Color::from_rgb(160, 108, 58),       // cobre
+            link_active:  Color::from_rgb(185, 55, 32),        // vermillón
+            link_hover:   Color::from_rgb(205, 165, 62),       // oro
         }
     }
 }

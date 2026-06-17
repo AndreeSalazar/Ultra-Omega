@@ -183,7 +183,7 @@ impl Renderer {
         self.push_pins(verts, node, extent, vp, hdr);
 
         // Título del nodo (GPU text)
-        let title_color = [hdr_color.r, hdr_color.g, hdr_color.b];
+        let title_color = [THEME.text_primary.r, THEME.text_primary.g, THEME.text_primary.b];
         push_text_gpu(text_verts, extent, x + vp.scale(10.0), y + vp.scale(5.0), vp.scale(2.0), title_color, &node.title, atlas);
     }
 
