@@ -4,7 +4,7 @@ use crate::core::types::{pos2, Color32};
 use super::template_palette::{PaletteAction, TemplatePalette};
 use super::workspace::WorkspaceState;
 use crate::vulkan::context::VulkanContext;
-use crate::vulkan::renderer::{pin_screen_center, RenderState, TemplatePaletteEntry, Viewport2D, NODE_HEIGHT, NODE_WIDTH, PIN_SIZE};
+use crate::vulkan::renderer::{pin_screen_center, CodeEditorState, RenderState, TemplatePaletteEntry, Viewport2D, NODE_HEIGHT, NODE_WIDTH, PIN_SIZE};
 use winit::application::ApplicationHandler;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoop};
@@ -33,6 +33,7 @@ struct AppRuntime {
     last_cursor_position: Option<(f32, f32)>,
     hovered_node: Option<NodeId>,
     selected_node: Option<NodeId>,
+    active_editor_node: Option<NodeId>,
     dragging_node: Option<NodeId>,
     link_source_pin: Option<HitPin>,
     created_nodes: u32,
@@ -51,6 +52,7 @@ impl AppRuntime {
             last_cursor_position: None,
             hovered_node: None,
             selected_node: None,
+            active_editor_node: None,
             dragging_node: None,
             link_source_pin: None,
             created_nodes: 0,
@@ -77,15 +79,31 @@ impl AppRuntime {
             })
             .collect();
 
+        let code_editor = self.active_editor_node.and_then(|node_id| {
+            self.graph.node(node_id).map(|node| CodeEditorState {
+                node_id,
+                title: node.title.clone(),
+                language: NodeGraph::language_display_name(node.language).to_string(),
+                code_path: node.code_path.clone().unwrap_or_else(|| "memoria".to_string()),
+                lines: if node.code.is_empty() {
+                    vec!["// Escribe aqui el codigo del nodo...".to_string()]
+                } else {
+                    node.code.lines().map(str::to_string).collect()
+                },
+            })
+        });
+
         RenderState {
             hovered_node: self.hovered_node,
             selected_node: self.selected_node,
             link_source_node: self.link_source_pin.map(|pin| pin.node_id),
+            code_editor_node: self.active_editor_node,
             template_palette_open: self.template_palette.is_open(),
             template_visible_start,
             selected_template_index: self.template_palette.selected_index(),
             template_entries,
             workspace_label: self.workspace.label(),
+            code_editor,
         }
     }
 
@@ -151,6 +169,7 @@ impl AppRuntime {
 
         self.selected_node = Some(node_id);
         self.hovered_node = Some(node_id);
+        self.active_editor_node = Some(node_id);
         self.auto_save();
     }
 
@@ -176,6 +195,7 @@ impl AppRuntime {
 
         self.selected_node = Some(node_id);
         self.hovered_node = Some(node_id);
+        self.active_editor_node = Some(node_id);
         self.template_palette.close();
         self.auto_save();
     }
@@ -231,6 +251,9 @@ impl AppRuntime {
             self.graph.remove_node(node_id);
             self.hovered_node = None;
             self.dragging_node = None;
+            if self.active_editor_node == Some(node_id) {
+                self.active_editor_node = None;
+            }
             if self.link_source_pin.map(|pin| pin.node_id) == Some(node_id) {
                 self.link_source_pin = None;
             }
@@ -250,6 +273,71 @@ impl AppRuntime {
         self.template_palette.toggle();
     }
 
+    fn open_code_editor_at_cursor(&mut self) -> bool {
+        let Some(node_id) = self.hovered_node else {
+            self.active_editor_node = None;
+            return false;
+        };
+
+        self.selected_node = Some(node_id);
+        self.active_editor_node = Some(node_id);
+        self.dragging_node = None;
+        self.link_source_pin = None;
+        self.template_palette.close();
+        true
+    }
+
+    fn insert_editor_text(&mut self, text: &str) {
+        let Some(node_id) = self.active_editor_node else { return; };
+        let mut changed = false;
+
+        if let Some(node) = self.graph.node_mut(node_id) {
+            for ch in text.chars() {
+                if ch == '\r' {
+                    continue;
+                }
+                if ch == '\n' || !ch.is_control() {
+                    node.code.push(ch);
+                    changed = true;
+                }
+            }
+        }
+
+        if changed {
+            self.auto_save();
+        }
+    }
+
+    fn handle_code_editor_key(&mut self, key: KeyCode) -> bool {
+        let Some(node_id) = self.active_editor_node else { return false; };
+
+        match key {
+            KeyCode::Escape => {
+                self.active_editor_node = None;
+                true
+            }
+            KeyCode::Backspace => {
+                let mut changed = false;
+                if let Some(node) = self.graph.node_mut(node_id) {
+                    changed = node.code.pop().is_some();
+                }
+                if changed {
+                    self.auto_save();
+                }
+                true
+            }
+            KeyCode::Enter => {
+                self.insert_editor_text("\n");
+                true
+            }
+            KeyCode::Tab => {
+                self.insert_editor_text("    ");
+                true
+            }
+            _ => true,
+        }
+    }
+
     fn select_workspace_folder(&mut self) {
         if self.workspace.select_folder().is_some() {
             if let Some(loaded) = self.workspace.load_graph() {
@@ -257,6 +345,7 @@ impl AppRuntime {
                 self.graph.recalculate_ids();
                 self.hovered_node = None;
                 self.selected_node = None;
+                self.active_editor_node = None;
                 self.dragging_node = None;
                 self.link_source_pin = None;
                 log::info!("Grafo cargado desde workspace");
@@ -341,6 +430,8 @@ impl ApplicationHandler for AppRuntime {
             WindowEvent::MouseInput { state, button, .. } => {
                 if button == MouseButton::Middle {
                     self.is_panning = state == ElementState::Pressed;
+                } else if button == MouseButton::Right && state == ElementState::Pressed {
+                    self.open_code_editor_at_cursor();
                 } else if button == MouseButton::Left && state == ElementState::Pressed {
                     if self.try_finish_link_from_hover() || self.try_start_link_from_hovered_pin() {
                         self.dragging_node = None;
@@ -373,6 +464,20 @@ impl ApplicationHandler for AppRuntime {
                     return;
                 };
 
+                if self.active_editor_node.is_some() {
+                    match key {
+                        KeyCode::Escape | KeyCode::Backspace | KeyCode::Enter | KeyCode::Tab => {
+                            self.handle_code_editor_key(key);
+                        }
+                        _ => {
+                            if let Some(text) = event.text {
+                                self.insert_editor_text(&text);
+                            }
+                        }
+                    }
+                    return;
+                }
+
                 if self.template_palette.is_open() && self.handle_template_palette_key(key) {
                     return;
                 }
@@ -383,6 +488,7 @@ impl ApplicationHandler for AppRuntime {
                     KeyCode::Delete => self.delete_selected_node(),
                     KeyCode::Escape => {
                         self.selected_node = None;
+                        self.active_editor_node = None;
                         self.dragging_node = None;
                         self.link_source_pin = None;
                         self.template_palette.close();

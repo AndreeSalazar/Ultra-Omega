@@ -11,17 +11,28 @@ pub struct RenderState {
     pub hovered_node: Option<NodeId>,
     pub selected_node: Option<NodeId>,
     pub link_source_node: Option<NodeId>,
+    pub code_editor_node: Option<NodeId>,
     pub template_palette_open: bool,
     pub template_visible_start: usize,
     pub selected_template_index: usize,
     pub template_entries: Vec<TemplatePaletteEntry>,
     pub workspace_label: String,
+    pub code_editor: Option<CodeEditorState>,
 }
 
 #[derive(Clone, Debug)]
 pub struct TemplatePaletteEntry {
     pub label: String,
     pub color: [f32; 3],
+}
+
+#[derive(Clone, Debug)]
+pub struct CodeEditorState {
+    pub node_id: NodeId,
+    pub title: String,
+    pub language: String,
+    pub code_path: String,
+    pub lines: Vec<String>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -106,6 +117,7 @@ impl Renderer {
             if verts.len() >= self.vertex_capacity { verts.truncate(self.vertex_capacity); break; }
         }
         if state.template_palette_open { self.push_template_palette(&mut verts, &mut text_verts, extent, &state, atlas); }
+        if let Some(editor) = &state.code_editor { self.push_code_editor(&mut verts, &mut text_verts, extent, editor, atlas); }
         self.push_workspace_badge(&mut verts, &mut text_verts, extent, &state.workspace_label, atlas);
 
         self.vertex_count = verts.len() as u32;
@@ -138,6 +150,7 @@ impl Renderer {
         let is_sel = state.selected_node == Some(node.id);
         let is_hov = state.hovered_node == Some(node.id);
         let is_src = state.link_source_node == Some(node.id);
+        let is_editing = state.code_editor_node == Some(node.id);
 
         // Colores del nodo según lenguaje
         let (hdr_color, body_color, accent) = match node.language {
@@ -151,8 +164,8 @@ impl Renderer {
         push_rounded_rect(verts, extent, x - vp.scale(4.0), y - vp.scale(4.0), w + vp.scale(8.0), h + vp.scale(8.0), vp.scale(NODE_CORNER + 2.0), shadow);
 
         // Borde de selección/hover
-        if is_src || is_sel || is_hov {
-            let bc = if is_src { THEME.jade_green } else if is_sel { THEME.imperial_gold } else { accent };
+        if is_src || is_editing || is_sel || is_hov {
+            let bc = if is_src { THEME.jade_green } else if is_editing { THEME.plum } else if is_sel { THEME.imperial_gold } else { accent };
             let bc3 = [bc.r, bc.g, bc.b];
             push_rounded_rect(verts, extent, x - vp.scale(2.0), y - vp.scale(2.0), w + vp.scale(4.0), h + vp.scale(4.0), vp.scale(NODE_CORNER + 1.0), bc3);
         }
@@ -318,6 +331,59 @@ impl Renderer {
     }
 
     // ─── Badge de workspace estilo sello chino ───
+    // Editor en vivo del nodo, abierto con click derecho.
+    fn push_code_editor(&self, verts: &mut Vec<Vertex>, text_verts: &mut Vec<TextVertex>, extent: vk::Extent2D, editor: &CodeEditorState, atlas: Option<&FontAtlas>) {
+        let margin = 32.0;
+        let pw = (extent.width as f32 * 0.42).clamp(420.0, 680.0);
+        let ph = (extent.height as f32 - margin * 2.0).clamp(360.0, 760.0);
+        let px = (extent.width as f32 - pw - margin).max(margin);
+        let py = margin;
+
+        let shade = [THEME.ink_black.r * 0.78, THEME.ink_black.g * 0.78, THEME.ink_black.b * 0.78];
+        push_rounded_rect(verts, extent, px - 10.0, py - 10.0, pw + 20.0, ph + 20.0, 14.0, shade);
+
+        let bg = [THEME.ink_deep.r, THEME.ink_deep.g, THEME.ink_deep.b];
+        push_rounded_rect(verts, extent, px, py, pw, ph, 10.0, bg);
+
+        let hdr = [THEME.indigo.r, THEME.indigo.g, THEME.indigo.b];
+        push_rounded_rect_top(verts, extent, px, py, pw, 72.0, 10.0, hdr);
+
+        let accent = [THEME.plum.r, THEME.plum.g, THEME.plum.b];
+        let gold = [THEME.imperial_gold.r, THEME.imperial_gold.g, THEME.imperial_gold.b];
+        push_rect(verts, extent, px + 16.0, py + 68.0, pw - 32.0, 3.0, gold);
+        push_rect(verts, extent, px, py + 82.0, 5.0, ph - 98.0, accent);
+
+        let primary = [THEME.text_primary.r, THEME.text_primary.g, THEME.text_primary.b];
+        push_text_gpu(text_verts, extent, px + 20.0, py + 24.0, 2.0, primary, "NODE CODE EDITOR", atlas);
+        push_text_gpu(text_verts, extent, px + pw - 132.0, py + 28.0, 1.25, gold, "LIVE", atlas);
+
+        let title = format!("{}  [{}]", editor.title, editor.language);
+        push_text_gpu(text_verts, extent, px + 22.0, py + 94.0, 1.45, gold, &clip_text(&title, 54), atlas);
+
+        let meta = format!("node {} | {}", editor.node_id.0, editor.code_path);
+        push_text_gpu(text_verts, extent, px + 22.0, py + 118.0, 1.1, [THEME.text_secondary.r, THEME.text_secondary.g, THEME.text_secondary.b], &clip_text(&meta, 66), atlas);
+
+        let code_x = px + 24.0;
+        let code_y = py + 154.0;
+        let line_h = 20.0;
+        let max_lines = ((ph - 188.0) / line_h).max(1.0) as usize;
+        let start = editor.lines.len().saturating_sub(max_lines);
+
+        for (screen_line, line) in editor.lines.iter().skip(start).take(max_lines).enumerate() {
+            let y = code_y + screen_line as f32 * line_h;
+            if screen_line % 2 == 0 {
+                push_rect(verts, extent, px + 16.0, y - 4.0, pw - 32.0, line_h, [THEME.ink_medium.r, THEME.ink_medium.g, THEME.ink_medium.b]);
+            }
+
+            let line_no = format!("{:>3}", start + screen_line + 1);
+            push_text_gpu(text_verts, extent, code_x, y + 10.0, 1.05, [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b], &line_no, atlas);
+            push_text_gpu(text_verts, extent, code_x + 42.0, y + 10.0, 1.2, primary, &clip_text(line, 72), atlas);
+        }
+
+        let hint = "Right click node to open | type live | Enter newline | Backspace | Esc close";
+        push_text_gpu(text_verts, extent, px + 20.0, py + ph - 22.0, 1.0, [THEME.text_jade.r, THEME.text_jade.g, THEME.text_jade.b], hint, atlas);
+    }
+
     fn push_workspace_badge(&self, verts: &mut Vec<Vertex>, text_verts: &mut Vec<TextVertex>, extent: vk::Extent2D, label: &str, atlas: Option<&FontAtlas>) {
         let w = (label.chars().count() as f32 * 8.0 * 1.2 + 40.0).clamp(300.0, extent.width.saturating_sub(48) as f32);
         let x = 24.0;
@@ -539,6 +605,17 @@ pub fn pin_screen_center(node: &Node, kind: PinKind, slot: usize, vp: Viewport2D
 
 fn ndc_x(x: f32, w: u32) -> f32 { (x / w.max(1) as f32) * 2.0 - 1.0 }
 fn ndc_y(y: f32, h: u32) -> f32 { (y / h.max(1) as f32) * 2.0 - 1.0 }
+
+fn clip_text(text: &str, max_chars: usize) -> String {
+    if text.chars().count() <= max_chars {
+        return text.to_string();
+    }
+
+    let keep = max_chars.saturating_sub(3);
+    let mut clipped: String = text.chars().take(keep).collect();
+    clipped.push_str("...");
+    clipped
+}
 
 fn push_text_gpu(tv: &mut Vec<TextVertex>, ext: vk::Extent2D, x: f32, y: f32, scale: f32, c: [f32; 3], text: &str, atlas: Option<&FontAtlas>) {
     let Some(atlas) = atlas else {
