@@ -27,6 +27,9 @@ env_logger = "0.10"
 # Utilidades para vértices y shaders
 bytemuck = { version = "1.14", features = ["derive"] }
 
+# Renderizado de texto GPU (rasterización de fuentes)
+ab_glyph = "0.2"
+
 # Matemáticas para UI y nodos
 glam = "0.25"
 

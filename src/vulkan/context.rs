@@ -7,6 +7,7 @@ use winit::window::Window;
 use crate::core::node_graph::NodeGraph;
 use crate::vulkan::pipeline::GraphicsPipeline;
 use crate::vulkan::renderer::{Renderer, RenderState, Viewport2D};
+use crate::vulkan::text::{FontAtlas, TextPipeline};
 
 #[allow(dead_code)]
 pub struct VulkanContext {
@@ -39,6 +40,8 @@ pub struct VulkanContext {
     pub current_frame: usize,
 
     pub pipeline: GraphicsPipeline,
+    pub text_pipeline: Option<TextPipeline>,
+    pub font_atlas: Option<FontAtlas>,
     pub renderer: Renderer,
     swapchain_dirty: bool,
 }
@@ -264,6 +267,8 @@ impl VulkanContext {
         let in_flight_fence = unsafe { device.create_fence(&fence_create_info, None).unwrap() };
 
         let pipeline = GraphicsPipeline::new(&device, render_pass, extent);
+        let text_pipeline_obj = TextPipeline::new(&device, render_pass, extent);
+        let font_atlas = FontAtlas::new(&device, &instance, physical_device, text_pipeline_obj.descriptor_set_layout);
         // FIX: Pasamos instance para get_physical_device_memory_properties
         let renderer = Renderer::new(&device, &instance, physical_device);
 
@@ -274,7 +279,8 @@ impl VulkanContext {
             swapchain_format: surface_format.format, swapchain_extent: extent,
             render_pass, framebuffers, command_pool, command_buffers,
             image_available_semaphore, render_finished_semaphore, in_flight_fence, current_frame: 0,
-            pipeline, renderer,
+            pipeline, text_pipeline: Some(text_pipeline_obj), font_atlas,
+            renderer,
             swapchain_dirty: false,
         }
     }
@@ -298,7 +304,7 @@ impl VulkanContext {
             self.device.wait_for_fences(&[self.in_flight_fence], true, u64::MAX).unwrap();
         }
 
-        self.renderer.update_from_graph(&self.device, graph, self.swapchain_extent, viewport, state);
+        self.renderer.update_from_graph(&self.device, graph, self.swapchain_extent, viewport, state, self.font_atlas.as_ref());
 
         let (image_index, suboptimal) = match unsafe {
             self.swapchain_loader.acquire_next_image(
@@ -361,6 +367,8 @@ impl VulkanContext {
                 &self.device,
                 self.command_buffers[self.current_frame],
                 &self.pipeline,
+                self.text_pipeline.as_ref(),
+                self.font_atlas.as_ref(),
             );
 
             self.device.cmd_end_render_pass(self.command_buffers[self.current_frame]);
@@ -507,6 +515,10 @@ impl VulkanContext {
         self.render_pass = create_render_pass(&self.device, self.swapchain_format);
         self.framebuffers = create_framebuffers(&self.device, self.render_pass, &self.swapchain_image_views, self.swapchain_extent);
         self.pipeline = GraphicsPipeline::new(&self.device, self.render_pass, self.swapchain_extent);
+        if let Some(ref old_tp) = self.text_pipeline {
+            old_tp.destroy(&self.device);
+        }
+        self.text_pipeline = Some(TextPipeline::new(&self.device, self.render_pass, self.swapchain_extent));
         self.swapchain_dirty = false;
     }
 }
@@ -618,6 +630,12 @@ impl Drop for VulkanContext {
             // Destruir pipeline y renderer
             self.device.destroy_pipeline(self.pipeline.pipeline, None);
             self.device.destroy_pipeline_layout(self.pipeline.pipeline_layout, None);
+            if let Some(ref tp) = self.text_pipeline {
+                tp.destroy(&self.device);
+            }
+            if let Some(ref atlas) = self.font_atlas {
+                atlas.destroy(&self.device);
+            }
             self.renderer.destroy(&self.device);
 
             self.device.destroy_semaphore(self.image_available_semaphore, None);

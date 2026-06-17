@@ -168,7 +168,7 @@ impl GraphicsPipeline {
     }
 }
 
-unsafe fn create_shader_module(device: &ash::Device, code: &[u8]) -> vk::ShaderModule {
+pub unsafe fn create_shader_module(device: &ash::Device, code: &[u8]) -> vk::ShaderModule {
     let code_u32 = std::slice::from_raw_parts(code.as_ptr() as *const u32, code.len() / 4);
     let create_info = vk::ShaderModuleCreateInfo {
         code_size: code_u32.len() * 4,

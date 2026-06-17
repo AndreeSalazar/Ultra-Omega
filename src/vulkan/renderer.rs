@@ -4,6 +4,7 @@ use crate::core::node_graph::{Node, NodeGraph, NodeLanguage, PinKind};
 use crate::core::NodeId;
 use crate::ui::theme::THEME;
 use crate::vulkan::pipeline::{GraphicsPipeline, Vertex};
+use crate::vulkan::text::{FontAtlas, TextPipeline, TextVertex, ATLAS_FONT_SIZE};
 
 #[derive(Clone, Debug, Default)]
 pub struct RenderState {
@@ -56,6 +57,10 @@ pub struct Renderer {
     vertex_buffer_memory: vk::DeviceMemory,
     vertex_capacity: usize,
     vertex_count: u32,
+    text_vertex_buffer: vk::Buffer,
+    text_vertex_buffer_memory: vk::DeviceMemory,
+    text_vertex_capacity: usize,
+    text_vertex_count: u32,
 }
 
 const MAX_VERTICES: usize = 65_536;
@@ -75,33 +80,57 @@ impl Renderer {
         let alloc_info = vk::MemoryAllocateInfo { allocation_size: mem_requirements.size, memory_type_index: find_memory_type(instance, physical_device, mem_requirements.memory_type_bits, vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT), ..Default::default() };
         let vertex_buffer_memory = unsafe { device.allocate_memory(&alloc_info, None).unwrap() };
         unsafe { device.bind_buffer_memory(vertex_buffer, vertex_buffer_memory, 0).unwrap() };
-        Self { vertex_buffer, vertex_buffer_memory, vertex_capacity: MAX_VERTICES, vertex_count: 0 }
+
+        let text_buffer_size = (std::mem::size_of::<TextVertex>() * MAX_VERTICES) as vk::DeviceSize;
+        let text_buffer_info = vk::BufferCreateInfo { size: text_buffer_size, usage: vk::BufferUsageFlags::VERTEX_BUFFER, sharing_mode: vk::SharingMode::EXCLUSIVE, ..Default::default() };
+        let text_vertex_buffer = unsafe { device.create_buffer(&text_buffer_info, None).unwrap() };
+        let text_mem_req = unsafe { device.get_buffer_memory_requirements(text_vertex_buffer) };
+        let text_alloc = vk::MemoryAllocateInfo { allocation_size: text_mem_req.size, memory_type_index: find_memory_type(instance, physical_device, text_mem_req.memory_type_bits, vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT), ..Default::default() };
+        let text_vertex_buffer_memory = unsafe { device.allocate_memory(&text_alloc, None).unwrap() };
+        unsafe { device.bind_buffer_memory(text_vertex_buffer, text_vertex_buffer_memory, 0).unwrap() };
+
+        Self {
+            vertex_buffer, vertex_buffer_memory, vertex_capacity: MAX_VERTICES, vertex_count: 0,
+            text_vertex_buffer, text_vertex_buffer_memory, text_vertex_capacity: MAX_VERTICES, text_vertex_count: 0,
+        }
     }
 
-    pub fn update_from_graph(&mut self, device: &ash::Device, graph: &NodeGraph, extent: vk::Extent2D, viewport: Viewport2D, state: RenderState) {
+    pub fn update_from_graph(&mut self, device: &ash::Device, graph: &NodeGraph, extent: vk::Extent2D, viewport: Viewport2D, state: RenderState, atlas: Option<&FontAtlas>) {
         let mut verts = Vec::with_capacity(graph.nodes().len() * 40);
+        let mut text_verts = Vec::with_capacity(graph.nodes().len() * 64);
 
         self.push_grid(&mut verts, extent, viewport);
         self.push_links(&mut verts, graph, extent, viewport);
         for node in graph.nodes() {
-            self.push_node(&mut verts, node, extent, viewport, &state);
+            self.push_node(&mut verts, &mut text_verts, node, extent, viewport, &state, atlas);
             if verts.len() >= self.vertex_capacity { verts.truncate(self.vertex_capacity); break; }
         }
-        if state.template_palette_open { self.push_template_palette(&mut verts, extent, &state); }
-        self.push_workspace_badge(&mut verts, extent, &state.workspace_label);
+        if state.template_palette_open { self.push_template_palette(&mut verts, &mut text_verts, extent, &state, atlas); }
+        self.push_workspace_badge(&mut verts, &mut text_verts, extent, &state.workspace_label, atlas);
 
         self.vertex_count = verts.len() as u32;
-        if verts.is_empty() { return; }
-        let copy_size = (std::mem::size_of::<Vertex>() * verts.len()) as vk::DeviceSize;
-        unsafe {
-            let ptr = device.map_memory(self.vertex_buffer_memory, 0, copy_size, vk::MemoryMapFlags::empty()).unwrap() as *mut Vertex;
-            ptr.copy_from_nonoverlapping(verts.as_ptr(), verts.len());
-            device.unmap_memory(self.vertex_buffer_memory);
+        if !verts.is_empty() {
+            let copy_size = (std::mem::size_of::<Vertex>() * verts.len()) as vk::DeviceSize;
+            unsafe {
+                let ptr = device.map_memory(self.vertex_buffer_memory, 0, copy_size, vk::MemoryMapFlags::empty()).unwrap() as *mut Vertex;
+                ptr.copy_from_nonoverlapping(verts.as_ptr(), verts.len());
+                device.unmap_memory(self.vertex_buffer_memory);
+            }
+        }
+
+        self.text_vertex_count = text_verts.len() as u32;
+        if !text_verts.is_empty() {
+            let copy_size = (std::mem::size_of::<TextVertex>() * text_verts.len()) as vk::DeviceSize;
+            unsafe {
+                let ptr = device.map_memory(self.text_vertex_buffer_memory, 0, copy_size, vk::MemoryMapFlags::empty()).unwrap() as *mut TextVertex;
+                ptr.copy_from_nonoverlapping(text_verts.as_ptr(), text_verts.len());
+                device.unmap_memory(self.text_vertex_buffer_memory);
+            }
         }
     }
 
     // ─── Nodo estilo sello chino ───
-    fn push_node(&self, verts: &mut Vec<Vertex>, node: &Node, extent: vk::Extent2D, vp: Viewport2D, state: &RenderState) {
+    fn push_node(&self, verts: &mut Vec<Vertex>, text_verts: &mut Vec<TextVertex>, node: &Node, extent: vk::Extent2D, vp: Viewport2D, state: &RenderState, atlas: Option<&FontAtlas>) {
         let (x, y) = vp.world_to_screen(node.position.x, node.position.y);
         let w = vp.scale(NODE_WIDTH);
         let h = vp.scale(NODE_HEIGHT);
@@ -152,6 +181,10 @@ impl Renderer {
 
         // Pins (perlas)
         self.push_pins(verts, node, extent, vp, hdr);
+
+        // Título del nodo (GPU text)
+        let title_color = [hdr_color.r, hdr_color.g, hdr_color.b];
+        push_text_gpu(text_verts, extent, x + vp.scale(10.0), y + vp.scale(5.0), vp.scale(2.0), title_color, &node.title, atlas);
     }
 
     // ─── Grid estilo cuaderno de caligrafía ───
@@ -226,7 +259,7 @@ impl Renderer {
     }
 
     // ─── Paleta de templates estilo menú chino ───
-    fn push_template_palette(&self, verts: &mut Vec<Vertex>, extent: vk::Extent2D, state: &RenderState) {
+    fn push_template_palette(&self, verts: &mut Vec<Vertex>, text_verts: &mut Vec<TextVertex>, extent: vk::Extent2D, state: &RenderState, atlas: Option<&FontAtlas>) {
         let px = 40.0;
         let py = 40.0;
         let pw = 580.0;
@@ -251,8 +284,8 @@ impl Renderer {
         push_rect(verts, extent, px + 12.0, py + 50.0, pw - 24.0, 3.0, gold);
 
         // Texto del header
-        push_text(verts, extent, px + 20.0, py + 18.0, 2.0, [1.0, 0.92, 0.7], "RUST TEMPLATES");
-        push_text(verts, extent, px + pw - 175.0, py + 20.0, 1.4, [1.0, 0.92, 0.7], "ENTER CREATE");
+        push_text_gpu(text_verts, extent, px + 20.0, py + 18.0, 2.0, [1.0, 0.92, 0.7], "RUST TEMPLATES", atlas);
+        push_text_gpu(text_verts, extent, px + pw - 175.0, py + 20.0, 1.4, [1.0, 0.92, 0.7], "ENTER CREATE", atlas);
 
         // Items
         for i in 0..vis {
@@ -280,12 +313,12 @@ impl Renderer {
 
             // Texto
             let tc = if sel { [THEME.imperial_gold.r, THEME.imperial_gold.g, THEME.imperial_gold.b] } else { [THEME.text_primary.r, THEME.text_primary.g, THEME.text_primary.b] };
-            push_text(verts, extent, px + 44.0, y + 10.0, 1.4, tc, &entry.label);
+            push_text_gpu(text_verts, extent, px + 44.0, y + 10.0, 1.4, tc, &entry.label, atlas);
         }
     }
 
     // ─── Badge de workspace estilo sello chino ───
-    fn push_workspace_badge(&self, verts: &mut Vec<Vertex>, extent: vk::Extent2D, label: &str) {
+    fn push_workspace_badge(&self, verts: &mut Vec<Vertex>, text_verts: &mut Vec<TextVertex>, extent: vk::Extent2D, label: &str, atlas: Option<&FontAtlas>) {
         let w = (label.chars().count() as f32 * 8.0 * 1.2 + 40.0).clamp(300.0, extent.width.saturating_sub(48) as f32);
         let x = 24.0;
         let y = extent.height.saturating_sub(48) as f32;
@@ -304,7 +337,7 @@ impl Renderer {
 
         // Texto
         let tc = [THEME.text_gold.r, THEME.text_gold.g, THEME.text_gold.b];
-        push_text(verts, extent, x + 14.0, y + 8.0, 1.2, tc, label);
+        push_text_gpu(text_verts, extent, x + 14.0, y + 8.0, 1.2, tc, label, atlas);
     }
 
     // ─── Pins estilo perla ───
@@ -343,18 +376,42 @@ impl Renderer {
         }
     }
 
-    pub fn record_command_buffer(&self, device: &ash::Device, command_buffer: vk::CommandBuffer, pipeline: &GraphicsPipeline) {
+    pub fn record_command_buffer(&self, device: &ash::Device, command_buffer: vk::CommandBuffer, pipeline: &GraphicsPipeline, text_pipeline: Option<&TextPipeline>, atlas: Option<&FontAtlas>) {
         unsafe {
+            // Pass 1: geometry (opaque)
             device.cmd_bind_pipeline(command_buffer, vk::PipelineBindPoint::GRAPHICS, pipeline.pipeline);
             let vb = [self.vertex_buffer];
             let off = [0];
             device.cmd_bind_vertex_buffers(command_buffer, 0, &vb, &off);
             if self.vertex_count > 0 { device.cmd_draw(command_buffer, self.vertex_count, 1, 0, 0); }
+
+            // Pass 2: text (alpha blended)
+            if self.text_vertex_count > 0 {
+                if let (Some(tp), Some(atlas)) = (text_pipeline, atlas) {
+                    device.cmd_bind_pipeline(command_buffer, vk::PipelineBindPoint::GRAPHICS, tp.pipeline);
+                    let tvb = [self.text_vertex_buffer];
+                    device.cmd_bind_vertex_buffers(command_buffer, 0, &tvb, &off);
+                    device.cmd_bind_descriptor_sets(
+                        command_buffer,
+                        vk::PipelineBindPoint::GRAPHICS,
+                        tp.pipeline_layout,
+                        0,
+                        &[atlas.descriptor_set],
+                        &[],
+                    );
+                    device.cmd_draw(command_buffer, self.text_vertex_count, 1, 0, 0);
+                }
+            }
         }
     }
 
     pub fn destroy(&self, device: &ash::Device) {
-        unsafe { device.destroy_buffer(self.vertex_buffer, None); device.free_memory(self.vertex_buffer_memory, None); }
+        unsafe {
+            device.destroy_buffer(self.vertex_buffer, None);
+            device.free_memory(self.vertex_buffer_memory, None);
+            device.destroy_buffer(self.text_vertex_buffer, None);
+            device.free_memory(self.text_vertex_buffer_memory, None);
+        }
     }
 }
 
@@ -483,67 +540,46 @@ pub fn pin_screen_center(node: &Node, kind: PinKind, slot: usize, vp: Viewport2D
 fn ndc_x(x: f32, w: u32) -> f32 { (x / w.max(1) as f32) * 2.0 - 1.0 }
 fn ndc_y(y: f32, h: u32) -> f32 { (y / h.max(1) as f32) * 2.0 - 1.0 }
 
-fn push_text(v: &mut Vec<Vertex>, ext: vk::Extent2D, x: f32, y: f32, scale: f32, c: [f32; 3], text: &str) {
+fn push_text_gpu(tv: &mut Vec<TextVertex>, ext: vk::Extent2D, x: f32, y: f32, scale: f32, c: [f32; 3], text: &str, atlas: Option<&FontAtlas>) {
+    let Some(atlas) = atlas else {
+        return;
+    };
+    let font_scale = 7.0 * scale / ATLAS_FONT_SIZE;
     let mut cx = x;
-    for ch in text.chars().take(64) {
-        if ch == ' ' { cx += 4.0 * scale; continue; }
-        let g = glyph_5x7(ch);
-        for (row, bits) in g.iter().enumerate() {
-            for col in 0..5 {
-                if bits & (1 << (4 - col)) != 0 {
-                    push_rect(v, ext, cx + col as f32 * scale, y + row as f32 * scale, scale, scale, c);
-                }
-            }
+    for ch in text.chars().take(128) {
+        if ch == ' ' {
+            cx += atlas.space_advance() * font_scale;
+            continue;
         }
-        cx += 6.0 * scale;
-    }
-}
+        if let Some(glyph) = atlas.glyph_cache.get(&ch) {
+            let gw = glyph.px_width * font_scale;
+            let gh = glyph.px_height * font_scale;
+            let bx = glyph.bearing_x * font_scale;
+            let by = glyph.bearing_y * font_scale;
 
-fn glyph_5x7(ch: char) -> [u8; 7] {
-    match ch.to_ascii_uppercase() {
-        'A' => [0b01110,0b10001,0b10001,0b11111,0b10001,0b10001,0b10001],
-        'B' => [0b11110,0b10001,0b10001,0b11110,0b10001,0b10001,0b11110],
-        'C' => [0b01110,0b10001,0b10000,0b10000,0b10000,0b10001,0b01110],
-        'D' => [0b11110,0b10001,0b10001,0b10001,0b10001,0b10001,0b11110],
-        'E' => [0b11111,0b10000,0b10000,0b11110,0b10000,0b10000,0b11111],
-        'F' => [0b11111,0b10000,0b10000,0b11110,0b10000,0b10000,0b10000],
-        'G' => [0b01110,0b10001,0b10000,0b10111,0b10001,0b10001,0b01110],
-        'H' => [0b10001,0b10001,0b10001,0b11111,0b10001,0b10001,0b10001],
-        'I' => [0b11111,0b00100,0b00100,0b00100,0b00100,0b00100,0b11111],
-        'J' => [0b00111,0b00010,0b00010,0b00010,0b10010,0b10010,0b01100],
-        'K' => [0b10001,0b10010,0b10100,0b11000,0b10100,0b10010,0b10001],
-        'L' => [0b10000,0b10000,0b10000,0b10000,0b10000,0b10000,0b11111],
-        'M' => [0b10001,0b11011,0b10101,0b10101,0b10001,0b10001,0b10001],
-        'N' => [0b10001,0b11001,0b10101,0b10011,0b10001,0b10001,0b10001],
-        'O' => [0b01110,0b10001,0b10001,0b10001,0b10001,0b10001,0b01110],
-        'P' => [0b11110,0b10001,0b10001,0b11110,0b10000,0b10000,0b10000],
-        'Q' => [0b01110,0b10001,0b10001,0b10001,0b10101,0b10010,0b01101],
-        'R' => [0b11110,0b10001,0b10001,0b11110,0b10100,0b10010,0b10001],
-        'S' => [0b01111,0b10000,0b10000,0b01110,0b00001,0b00001,0b11110],
-        'T' => [0b11111,0b00100,0b00100,0b00100,0b00100,0b00100,0b00100],
-        'U' => [0b10001,0b10001,0b10001,0b10001,0b10001,0b10001,0b01110],
-        'V' => [0b10001,0b10001,0b10001,0b10001,0b10001,0b01010,0b00100],
-        'W' => [0b10001,0b10001,0b10001,0b10101,0b10101,0b10101,0b01010],
-        'X' => [0b10001,0b10001,0b01010,0b00100,0b01010,0b10001,0b10001],
-        'Y' => [0b10001,0b10001,0b01010,0b00100,0b00100,0b00100,0b00100],
-        'Z' => [0b11111,0b00001,0b00010,0b00100,0b01000,0b10000,0b11111],
-        '0' => [0b01110,0b10001,0b10011,0b10101,0b11001,0b10001,0b01110],
-        '1' => [0b00100,0b01100,0b00100,0b00100,0b00100,0b00100,0b01110],
-        '2' => [0b01110,0b10001,0b00001,0b00010,0b00100,0b01000,0b11111],
-        '3' => [0b11110,0b00001,0b00001,0b01110,0b00001,0b00001,0b11110],
-        '4' => [0b00010,0b00110,0b01010,0b10010,0b11111,0b00010,0b00010],
-        '5' => [0b11111,0b10000,0b10000,0b11110,0b00001,0b00001,0b11110],
-        '6' => [0b01110,0b10000,0b10000,0b11110,0b10001,0b10001,0b01110],
-        '7' => [0b11111,0b00001,0b00010,0b00100,0b01000,0b01000,0b01000],
-        '8' => [0b01110,0b10001,0b10001,0b01110,0b10001,0b10001,0b01110],
-        '9' => [0b01110,0b10001,0b10001,0b01111,0b00001,0b00001,0b01110],
-        '/' => [0b00001,0b00010,0b00010,0b00100,0b01000,0b01000,0b10000],
-        ':' => [0b00000,0b00100,0b00100,0b00000,0b00100,0b00100,0b00000],
-        '-' => [0b00000,0b00000,0b00000,0b11111,0b00000,0b00000,0b00000],
-        '_' => [0b00000,0b00000,0b00000,0b00000,0b00000,0b00000,0b11111],
-        '.' => [0b00000,0b00000,0b00000,0b00000,0b00000,0b01100,0b01100],
-        '\\' => [0b10000,0b01000,0b01000,0b00100,0b00010,0b00010,0b00001],
-        _ => [0b01110,0b10001,0b00001,0b00010,0b00100,0b00000,0b00100],
+            let left = cx + bx;
+            let top = y - by + gh;
+            let right = left + gw;
+            let bottom = top - gh;
+
+            let (u0, v0, u1, v1) = (glyph.u0, glyph.v0, glyph.u1, glyph.v1);
+
+            let x0 = ndc_x(left, ext.width);
+            let y0 = ndc_y(top, ext.height);
+            let x1 = ndc_x(right, ext.width);
+            let y1 = ndc_y(bottom, ext.height);
+
+            tv.extend_from_slice(&[
+                TextVertex { pos: [x0, y0], tex_coord: [u0, v0], color: c },
+                TextVertex { pos: [x1, y0], tex_coord: [u1, v0], color: c },
+                TextVertex { pos: [x1, y1], tex_coord: [u1, v1], color: c },
+                TextVertex { pos: [x0, y0], tex_coord: [u0, v0], color: c },
+                TextVertex { pos: [x1, y1], tex_coord: [u1, v1], color: c },
+                TextVertex { pos: [x0, y1], tex_coord: [u0, v1], color: c },
+            ]);
+
+            cx += glyph.advance * font_scale;
+        }
     }
 }
 
