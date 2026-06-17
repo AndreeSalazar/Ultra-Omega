@@ -136,7 +136,7 @@ impl AppRuntime {
         let node_id = self.graph.add_node(
             format!("Rust Node {}", self.created_nodes),
             pos2(world.0 - NODE_WIDTH * 0.5, world.1 - NODE_HEIGHT * 0.5),
-            Color32::from_rgb(0xde, 0x39, 0x00),
+            Color32::from_rgb(194, 59, 34), // Vermillion
             &["in"],
             &["out"],
             NodeLanguage::Rust,
@@ -198,7 +198,7 @@ impl AppRuntime {
             return false;
         };
 
-        self.graph.add_link(from_pin, to_pin, Color32::from_rgb(0xde, 0x39, 0x00));
+        self.graph.add_link(from_pin, to_pin, Color32::from_rgb(168, 112, 62)); // Copper
         self.selected_node = Some(target_pin.node_id);
         self.link_source_pin = None;
         self.auto_save();

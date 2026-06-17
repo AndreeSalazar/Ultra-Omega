@@ -165,33 +165,33 @@ impl NodeGraph {
         let sys_node_id = graph.add_node(
             "Base Rust (Sistemas)",
             pos2(100.0, 100.0),
-            Color32::from_rgb(0xde, 0x39, 0x00), // Rust Orange
+            Color32::from_rgb(194, 59, 34), // Vermillion
             &[],
-            &["Código Fuente"],
+            &["Codigo Fuente"],
             NodeLanguage::Rust,
         );
         if let Some(node) = graph.node_mut(sys_node_id) {
-            node.code = "fn main() {\n    println!(\"Hola desde Rust en Ultra Omega!\");\n}".to_string();
+            node.code = "fn main() {\n    println!(\"Ultra-Omega Rust\");\n}".to_string();
         }
 
         // Node 2: Base Rust
         let rust_node_id = graph.add_node(
             "Base Rust",
-            pos2(100.0, 280.0),
-            Color32::from_rgb(0xde, 0x39, 0x00), // Rust Orange
+            pos2(100.0, 300.0),
+            Color32::from_rgb(194, 59, 34), // Vermillion
             &["Base"],
-            &["Código Rust"],
+            &["Codigo Rust"],
             NodeLanguage::Rust,
         );
         if let Some(node) = graph.node_mut(rust_node_id) {
-            node.code = "fn main() {\n    println!(\"Hola desde Rust en Ultra Omega!\");\n}".to_string();
+            node.code = "fn main() {\n    println!(\"Ultra-Omega Rust\");\n}".to_string();
         }
 
         if let (Some(from), Some(to)) = (
             graph.pin_id(sys_node_id, PinKind::Output, 0),
             graph.pin_id(rust_node_id, PinKind::Input, 0),
         ) {
-            graph.add_link(from, to, Color32::from_rgb(0xde, 0x39, 0x00));
+            graph.add_link(from, to, Color32::from_rgb(168, 112, 62)); // Copper
         }
 
         graph
@@ -467,40 +467,38 @@ impl NodeGraph {
     /// Crear un proyecto de ejemplo básico con Rust
     pub fn create_example_project() -> Self {
         let mut graph = Self::default();
-        let color_rust = Color32::from_rgb(0xde, 0x39, 0x00);
+        let vermillion = Color32::from_rgb(194, 59, 34);
+        let copper = Color32::from_rgb(168, 112, 62);
         
-        // Nodo principal
         let hello = graph.add_node(
-            "🦀 Hello World",
+            "Hello World",
             pos2(200.0, 100.0),
-            color_rust,
+            vermillion,
             &[],
-            &["▼"],
+            &["Salida"],
             NodeLanguage::Rust,
         );
         if let Some(n) = graph.node_mut(hello) {
-            n.code = "fn main() {\n    println!(\"Hola desde Ultra-Omega Rust\");\n}".to_string();
+            n.code = "fn main() {\n    println!(\"Ultra-Omega Rust\");\n}".to_string();
         }
         
-        // Nodo de variables
         let vars = graph.add_node(
-            "📦 Variables",
-            pos2(200.0, 220.0),
-            color_rust,
-            &["▲"],
-            &["▼"],
+            "Variables",
+            pos2(200.0, 240.0),
+            copper,
+            &["Entrada"],
+            &["Salida"],
             NodeLanguage::Rust,
         );
         if let Some(n) = graph.node_mut(vars) {
             n.code = "let nombre = \"Ultra-Omega\";\nlet version = 0.2;".to_string();
         }
         
-        // Conectar nodos
         if let (Some(out_pin), Some(in_pin)) = (
             graph.pin_id(hello, PinKind::Output, 0),
             graph.pin_id(vars, PinKind::Input, 0)
         ) {
-            graph.add_link(out_pin, in_pin, color_rust);
+            graph.add_link(out_pin, in_pin, copper);
         }
         
         graph
