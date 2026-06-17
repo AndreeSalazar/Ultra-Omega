@@ -558,9 +558,9 @@ fn push_text_gpu(tv: &mut Vec<TextVertex>, ext: vk::Extent2D, x: f32, y: f32, sc
             let by = glyph.bearing_y * font_scale;
 
             let left = cx + bx;
-            let top = y - by + gh;
+            let top = y - by;
             let right = left + gw;
-            let bottom = top - gh;
+            let bottom = top + gh;
 
             let (u0, v0, u1, v1) = (glyph.u0, glyph.v0, glyph.u1, glyph.v1);
 

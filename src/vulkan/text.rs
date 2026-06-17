@@ -125,17 +125,15 @@ impl FontAtlas {
         for (row_idx, row) in rows.iter().enumerate() {
             let y_offset = row_idx as u32 * row_height;
             for &(glyph_idx, x_offset, _gw) in row {
-                let (ch, _, _, _) = &glyphs[glyph_idx];
+                let (ch, _, gw, gh) = &mut glyphs[glyph_idx];
                 let glyph_id = font.glyph_id(*ch);
                 let glyph = glyph_id.with_scale_and_position(ATLAS_FONT_SIZE, ab_glyph::point(0.0, 0.0));
 
                 if let Some(outlined) = font.outline_glyph(glyph) {
                     let pb = outlined.px_bounds();
-                    let bx = pb.min.x.max(0.0) as u32;
-                    let by = (-pb.min.y).max(0.0) as u32;
-                    outlined.draw(|px, py, coverage| {
-                        let dst_x = x_offset + bx + px;
-                        let dst_y = y_offset + by + py;
+                    outlined.draw(|x, y, coverage| {
+                        let dst_x = x_offset + x;
+                        let dst_y = y_offset + y;
                         if dst_x < atlas_w && dst_y < atlas_h {
                             let idx = (dst_y * atlas_w + dst_x) as usize;
                             if idx < pixel_data.len() {
@@ -143,33 +141,15 @@ impl FontAtlas {
                             }
                         }
                     });
+
+                    let gi = glyph_cache.get_mut(ch).unwrap();
+                    gi.u0 = x_offset as f32 / atlas_w as f32;
+                    gi.v0 = y_offset as f32 / atlas_h as f32;
+                    gi.u1 = (x_offset + *gw) as f32 / atlas_w as f32;
+                    gi.v1 = (y_offset + *gh) as f32 / atlas_h as f32;
+                    gi.bearing_x = pb.min.x as f32;
+                    gi.bearing_y = -pb.min.y as f32;
                 }
-            }
-        }
-
-        for (row_idx, row) in rows.iter().enumerate() {
-            let y_offset = row_idx as u32 * row_height;
-            for &(glyph_idx, x_offset, _gw) in row {
-                let (ch, _info, gw, gh) = &mut glyphs[glyph_idx];
-
-                let glyph_id = font.glyph_id(*ch);
-                let glyph = glyph_id.with_scale_and_position(ATLAS_FONT_SIZE, ab_glyph::point(0.0, 0.0));
-
-                let (actual_bx, actual_by) = if let Some(outlined) = font.outline_glyph(glyph) {
-                    let pb = outlined.px_bounds();
-                    (pb.min.x.max(0.0) as u32, (-pb.min.y).max(0.0) as u32)
-                } else {
-                    (0, 0)
-                };
-
-                let actual_x = x_offset + actual_bx;
-                let actual_y = y_offset + actual_by;
-
-                let gi = glyph_cache.get_mut(ch).unwrap();
-                gi.u0 = actual_x as f32 / atlas_w as f32;
-                gi.v0 = actual_y as f32 / atlas_h as f32;
-                gi.u1 = (actual_x + *gw) as f32 / atlas_w as f32;
-                gi.v1 = (actual_y + *gh) as f32 / atlas_h as f32;
             }
         }
 

@@ -269,6 +269,60 @@ impl VulkanContext {
         let pipeline = GraphicsPipeline::new(&device, render_pass, extent);
         let text_pipeline_obj = TextPipeline::new(&device, render_pass, extent);
         let font_atlas = FontAtlas::new(&device, &instance, physical_device, text_pipeline_obj.descriptor_set_layout);
+
+        // Transition font atlas texture layout to SHADER_READ_ONLY_OPTIMAL
+        if let Some(ref atlas) = font_atlas {
+            let cmd_alloc_info = vk::CommandBufferAllocateInfo {
+                command_pool,
+                level: vk::CommandBufferLevel::PRIMARY,
+                command_buffer_count: 1,
+                ..Default::default()
+            };
+            let cmd_buf = unsafe { device.allocate_command_buffers(&cmd_alloc_info).unwrap() }[0];
+            let begin_info = vk::CommandBufferBeginInfo {
+                flags: vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT,
+                ..Default::default()
+            };
+            unsafe {
+                device.begin_command_buffer(cmd_buf, &begin_info).unwrap();
+                let barrier = vk::ImageMemoryBarrier {
+                    old_layout: vk::ImageLayout::UNDEFINED,
+                    new_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                    src_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+                    dst_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+                    image: atlas.texture,
+                    subresource_range: vk::ImageSubresourceRange {
+                        aspect_mask: vk::ImageAspectFlags::COLOR,
+                        base_mip_level: 0,
+                        level_count: 1,
+                        base_array_layer: 0,
+                        layer_count: 1,
+                    },
+                    src_access_mask: vk::AccessFlags::empty(),
+                    dst_access_mask: vk::AccessFlags::SHADER_READ,
+                    ..Default::default()
+                };
+                device.cmd_pipeline_barrier(
+                    cmd_buf,
+                    vk::PipelineStageFlags::TOP_OF_PIPE,
+                    vk::PipelineStageFlags::FRAGMENT_SHADER,
+                    vk::DependencyFlags::empty(),
+                    &[],
+                    &[],
+                    &[barrier],
+                );
+                device.end_command_buffer(cmd_buf).unwrap();
+                let submit_info = vk::SubmitInfo {
+                    command_buffer_count: 1,
+                    p_command_buffers: &cmd_buf,
+                    ..Default::default()
+                };
+                device.queue_submit(graphics_queue, &[submit_info], vk::Fence::null()).unwrap();
+                device.queue_wait_idle(graphics_queue).unwrap();
+                device.free_command_buffers(command_pool, &[cmd_buf]);
+            }
+        }
+
         // FIX: Pasamos instance para get_physical_device_memory_properties
         let renderer = Renderer::new(&device, &instance, physical_device);
 
