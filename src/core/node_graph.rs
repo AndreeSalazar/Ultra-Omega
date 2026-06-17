@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::core::types::{Color32, Pos2, pos2};
 use serde::{Deserialize, Serialize};
 
@@ -48,48 +46,39 @@ pub struct Node {
     pub color: Color32,
     pub inputs: Vec<Pin>,
     pub outputs: Vec<Pin>,
-    
+
     /// Ruta relativa al código fuente (formato nuevo: código separado)
     /// Ejemplo: "nodes/node_000001.rs"
     #[serde(skip_serializing_if = "Option::is_none")]
     pub code_path: Option<String>,
-    
+
     /// Código fuente (mantener por compatibilidad y para acceso rápido)
     /// Si code_path existe, este código se carga desde el archivo
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub code: String,
-    
+
     #[serde(default)]
     pub language: NodeLanguage,
 
-    // Propiedades específicas para herencia
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub parent_node: Option<NodeId>,
 
-    // ═══════════════════════════════════════════════════════════════════
-    // 🆕 SISTEMA DE SUBNETWORKS (Inspiración Houdini)
-    // ═══════════════════════════════════════════════════════════════════
-    
-    /// Si este nodo es un subnetwork, contiene un grafo completo dentro
-    /// Cuando está presente, el nodo actúa como contenedor de otros nodos
-    /// También usado para Nodos Carpeta (Idea 11)
+    /// Si este nodo es un subnetwork/carpeta, contiene un grafo completo dentro
     #[serde(skip_serializing_if = "Option::is_none")]
     pub subnetwork_graph: Option<NodeGraph>,
-    
-    // ═══════════════════════════════════════════════════════════════════
-    // 🆕 SISTEMA DE NODO CARPETA (Idea 11)
-    // ═══════════════════════════════════════════════════════════════════
-    
+
+    /// Campo explícito: true si es nodo carpeta (reemplaza detección por emoji)
+    #[serde(default)]
+    pub is_folder: bool,
+
     /// Si este nodo hereda de un nodo carpeta, contiene el ID del nodo carpeta
-    /// Permite que el nodo acceda a todo el código contenido en la carpeta
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub inherits_from_folder: Option<NodeId>,
-    
+
     /// Pines expuestos al nivel padre (para subnetworks)
-    /// Estos son los inputs/outputs que se pueden conectar desde el nivel padre
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub exposed_inputs: Vec<ExposedPin>,
-    
+
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub exposed_outputs: Vec<ExposedPin>,
 }
@@ -244,22 +233,12 @@ impl NodeGraph {
         self.nodes.iter().find(|node| node.id == id)
     }
 
-    #[allow(dead_code)] // Available for single node deletion if needed
+    #[allow(dead_code)]
     pub fn remove_node(&mut self, id: NodeId) -> bool {
         let initial_len = self.nodes.len();
         self.nodes.retain(|node| node.id != id);
-        
-        // Remove links connected to this node
         if initial_len != self.nodes.len() {
-            let node_pin_ids: std::collections::HashSet<PinId> = self.nodes.iter()
-                .flat_map(|n| n.inputs.iter().chain(n.outputs.iter()))
-                .map(|p| p.id)
-                .collect();
-            
-            self.links.retain(|link| {
-                node_pin_ids.contains(&link.from) && node_pin_ids.contains(&link.to)
-            });
-            
+            self.clean_orphaned_links();
             true
         } else {
             false
@@ -269,17 +248,8 @@ impl NodeGraph {
     pub fn remove_nodes(&mut self, ids: &std::collections::HashSet<NodeId>) {
         let initial_len = self.nodes.len();
         self.nodes.retain(|node| !ids.contains(&node.id));
-        
-        // Remove links connected to removed nodes
         if initial_len != self.nodes.len() {
-            let node_pin_ids: std::collections::HashSet<PinId> = self.nodes.iter()
-                .flat_map(|n| n.inputs.iter().chain(n.outputs.iter()))
-                .map(|p| p.id)
-                .collect();
-            
-            self.links.retain(|link| {
-                node_pin_ids.contains(&link.from) && node_pin_ids.contains(&link.to)
-            });
+            self.clean_orphaned_links();
         }
     }
 
@@ -310,13 +280,14 @@ impl NodeGraph {
             inputs: input_pins,
             outputs: output_pins,
             code: String::new(),
-            code_path: None, // Se asignará al guardar
+            code_path: None,
             language,
-            parent_node: None, // Inicializar campo de herencia
-            subnetwork_graph: None, // No es subnetwork por defecto
+            parent_node: None,
+            subnetwork_graph: None,
+            is_folder: false,
             exposed_inputs: Vec::new(),
             exposed_outputs: Vec::new(),
-            inherits_from_folder: None, // No hereda de carpeta por defecto
+            inherits_from_folder: None,
         });
 
         id
@@ -473,6 +444,24 @@ impl NodeGraph {
         let id = PinId(self.next_pin_id);
         self.next_pin_id += 1;
         id
+    }
+
+    pub fn language_display_name(lang: NodeLanguage) -> &'static str {
+        match lang {
+            NodeLanguage::Rust => "Rust",
+            NodeLanguage::Text => "Text",
+            NodeLanguage::Auto => "Auto",
+        }
+    }
+
+    fn clean_orphaned_links(&mut self) {
+        let valid_pin_ids: std::collections::HashSet<PinId> = self.nodes.iter()
+            .flat_map(|n| n.inputs.iter().chain(n.outputs.iter()))
+            .map(|p| p.id)
+            .collect();
+        self.links.retain(|link| {
+            valid_pin_ids.contains(&link.from) && valid_pin_ids.contains(&link.to)
+        });
     }
 
     /// Crear un proyecto de ejemplo básico con Rust

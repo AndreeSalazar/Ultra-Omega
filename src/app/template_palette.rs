@@ -109,17 +109,17 @@ impl TemplatePalette {
     }
 
     fn print_hint(&self) {
-        println!("\nTAB: Paleta Rust abierta estilo Houdini");
-        println!("Flechas: navegar | Enter: crear | 1-0: crear template rápido | Esc/TAB: cerrar");
+        log::info!("TAB: Paleta Rust abierta estilo Houdini");
+        log::info!("Flechas: navegar | Enter: crear | 1-0: crear template rapido | Esc/TAB: cerrar");
         for (index, template) in self.templates.iter().take(10).enumerate() {
-            println!("{}: {} / {} / {}", index + 1, template.category, template.subcategory, template.name);
+            log::info!("{}: {} / {} / {}", index + 1, template.category, template.subcategory, template.name);
         }
         self.print_selected();
     }
 
     fn print_selected(&self) {
         if let Some(template) = self.templates.get(self.selected_index) {
-            println!(
+            log::info!(
                 "Template seleccionado: [{}] {} / {} / {}",
                 self.selected_index + 1,
                 template.category,

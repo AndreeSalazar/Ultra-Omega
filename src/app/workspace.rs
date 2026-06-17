@@ -1,8 +1,11 @@
 use std::path::{Path, PathBuf};
+use crate::core::NodeGraph;
+use crate::storage::workspace::Workspace as StorageWorkspace;
 
 #[derive(Debug, Default)]
 pub struct WorkspaceState {
     root: Option<PathBuf>,
+    storage: Option<StorageWorkspace>,
 }
 
 impl WorkspaceState {
@@ -20,11 +23,28 @@ impl WorkspaceState {
         }
 
         if let Some(folder) = dialog.pick_folder() {
-            println!("Workspace seleccionado: {}", folder.display());
-            self.root = Some(folder);
+            log::info!("Workspace seleccionado: {}", folder.display());
+            self.root = Some(folder.clone());
+
+            let mut ws = StorageWorkspace::new();
+            ws.set_root(folder);
+            self.storage = Some(ws);
         }
 
         self.root()
+    }
+
+    pub fn load_graph(&self) -> Option<NodeGraph> {
+        self.storage.as_ref().and_then(|ws| {
+            ws.load_graph().ok()
+        })
+    }
+
+    pub fn save_graph(&self, graph: &mut NodeGraph) -> Result<(), String> {
+        if let Some(ws) = &self.storage {
+            ws.save_graph(graph)?;
+        }
+        Ok(())
     }
 
     pub fn label(&self) -> String {

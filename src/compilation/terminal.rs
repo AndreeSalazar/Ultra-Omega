@@ -1,5 +1,6 @@
 use std::process::Command;
 use std::path::{Path, PathBuf};
+use crate::compilation::compiler_detector::deep_search_executable;
 
 #[cfg(target_os = "windows")]
 const EXE_EXTENSION: &str = ".exe";

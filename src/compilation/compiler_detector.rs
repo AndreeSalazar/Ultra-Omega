@@ -141,18 +141,79 @@ pub fn find_executable(name: &str) -> Option<PathBuf> {
         name.to_string()
     };
 
-    if let Ok(path) = which::which(&name_with_ext) {
-        return Some(path);
-    }
-    if let Ok(path) = which::which(name) {
-        return Some(path);
+    // Buscar en PATH usando which-like logic
+    if let Ok(path) = std::env::var("PATH") {
+        for dir in std::env::split_paths(&path) {
+            let candidate = dir.join(&name_with_ext);
+            if candidate.is_file() {
+                return Some(candidate);
+            }
+        }
     }
 
-    // Buscar en ubicaciones comunes
+    // Buscar en ubicaciones comunes de Rust
     if let Ok(home) = std::env::var(if cfg!(target_os = "windows") { "USERPROFILE" } else { "HOME" }) {
         let cargo_bin = PathBuf::from(home).join(".cargo").join("bin").join(&name_with_ext);
         if cargo_bin.exists() {
             return Some(cargo_bin);
+        }
+    }
+
+    None
+}
+
+/// Búsqueda profunda en directorios del sistema (Windows/Linux/macOS)
+pub fn deep_search_executable(name: &str) -> Option<PathBuf> {
+    let name_with_ext = if cfg!(target_os = "windows") {
+        format!("{}.exe", name)
+    } else {
+        name.to_string()
+    };
+
+    let search_dirs: Vec<PathBuf> = if cfg!(target_os = "windows") {
+        // Windows: buscar en Program Files, System32, etc.
+        let mut dirs = Vec::new();
+        if let Ok(program_files) = std::env::var("ProgramFiles") {
+            dirs.push(PathBuf::from(program_files));
+        }
+        if let Ok(program_files_x86) = std::env::var("ProgramFiles(x86)") {
+            dirs.push(PathBuf::from(program_files_x86));
+        }
+        if let Ok(system_root) = std::env::var("SystemRoot") {
+            let sys_root = PathBuf::from(system_root);
+            dirs.push(sys_root.join("System32"));
+            dirs.push(sys_root);
+        }
+        // Rustup default locations
+        if let Ok(user_profile) = std::env::var("USERPROFILE") {
+            let base = PathBuf::from(user_profile);
+            dirs.push(base.join(".rustup").join("toolchains"));
+            dirs.push(base.join(".cargo").join("bin"));
+        }
+        dirs
+    } else {
+        // Linux/macOS
+        vec![
+            PathBuf::from("/usr/bin"),
+            PathBuf::from("/usr/local/bin"),
+            PathBuf::from("/opt"),
+        ]
+    };
+
+    for base_dir in &search_dirs {
+        if let Ok(walker) = std::fs::read_dir(base_dir) {
+            for entry in walker.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    let dir_name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+                    if !dir_name.starts_with('.') {
+                        let candidate = path.join(&name_with_ext);
+                        if candidate.is_file() {
+                            return Some(candidate);
+                        }
+                    }
+                }
+            }
         }
     }
 

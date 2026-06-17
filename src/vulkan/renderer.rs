@@ -2,6 +2,7 @@ use ash::vk;
 
 use crate::core::node_graph::{Node, NodeGraph, NodeLanguage, PinKind};
 use crate::core::NodeId;
+use crate::ui::theme::THEME;
 use crate::vulkan::pipeline::{GraphicsPipeline, Vertex};
 
 #[derive(Clone, Debug, Default)]
@@ -193,28 +194,50 @@ impl Renderer {
         let header_height = viewport.scale(HEADER_HEIGHT);
         let node_color = color_to_rgb(node.color);
         let body_color = match node.language {
-            NodeLanguage::Rust => [0.16, 0.16, 0.18],
-            NodeLanguage::Text => [0.12, 0.15, 0.19],
-            NodeLanguage::Auto => [0.14, 0.14, 0.15],
+            NodeLanguage::Rust => {
+                let c = THEME.node_rust;
+                [c.r * 0.18, c.g * 0.18, c.b * 0.18]
+            }
+            NodeLanguage::Text => {
+                let c = THEME.node_text;
+                [c.r * 0.18, c.g * 0.18, c.b * 0.18]
+            }
+            NodeLanguage::Auto => {
+                let c = THEME.node_auto;
+                [c.r * 0.18, c.g * 0.18, c.b * 0.18]
+            }
         };
-        let border_color = [0.07, 0.07, 0.08];
+        let border_c = THEME.border_primary;
+        let border_color = [border_c.r, border_c.g, border_c.b];
         let is_selected = state.selected_node == Some(node.id);
         let is_hovered = state.hovered_node == Some(node.id);
         let is_link_source = state.link_source_node == Some(node.id);
         let outer_color = if is_link_source {
-            [0.20, 1.0, 0.55]
+            let c = THEME.accent_success;
+            [c.r, c.g, c.b]
         } else if is_selected {
-            [1.0, 0.76, 0.25]
+            let c = THEME.accent_warning;
+            [c.r, c.g, c.b]
         } else if is_hovered {
-            [0.35, 0.65, 1.0]
+            let c = THEME.accent_primary;
+            [c.r, c.g, c.b]
         } else {
             border_color
         };
         let outer_padding = if is_link_source || is_selected || is_hovered { 5.0 } else { 2.0 };
         let pin_color = match node.language {
-            NodeLanguage::Rust => [0.95, 0.38, 0.12],
-            NodeLanguage::Text => [0.35, 0.55, 0.90],
-            NodeLanguage::Auto => [0.65, 0.65, 0.70],
+            NodeLanguage::Rust => {
+                let c = THEME.pin_output;
+                [c.r, c.g, c.b]
+            }
+            NodeLanguage::Text => {
+                let c = THEME.pin_input;
+                [c.r, c.g, c.b]
+            }
+            NodeLanguage::Auto => {
+                let c = THEME.node_auto;
+                [c.r, c.g, c.b]
+            }
         };
 
         // Borde/sombra exterior.
@@ -266,7 +289,13 @@ impl Renderer {
             let from = viewport.world_to_screen(world_x, min_y - GRID_SPACING);
             let to = viewport.world_to_screen(world_x, max_y + GRID_SPACING);
             let is_axis = gx == 0;
-            let color = if is_axis { [0.22, 0.22, 0.24] } else { [0.15, 0.15, 0.16] };
+            let color = if is_axis {
+                let c = THEME.border_secondary;
+                [c.r * 1.5, c.g * 1.5, c.b * 1.5]
+            } else {
+                let c = THEME.border_subtle;
+                [c.r * 1.5, c.g * 1.5, c.b * 1.5]
+            };
             push_line(vertices, extent, from, to, if is_axis { 2.0 } else { 1.0 }, color);
         }
 
@@ -275,7 +304,13 @@ impl Renderer {
             let from = viewport.world_to_screen(min_x - GRID_SPACING, world_y);
             let to = viewport.world_to_screen(max_x + GRID_SPACING, world_y);
             let is_axis = gy == 0;
-            let color = if is_axis { [0.22, 0.22, 0.24] } else { [0.15, 0.15, 0.16] };
+            let color = if is_axis {
+                let c = THEME.border_secondary;
+                [c.r * 1.5, c.g * 1.5, c.b * 1.5]
+            } else {
+                let c = THEME.border_subtle;
+                [c.r * 1.5, c.g * 1.5, c.b * 1.5]
+            };
             push_line(vertices, extent, from, to, if is_axis { 2.0 } else { 1.0 }, color);
         }
     }
@@ -323,11 +358,20 @@ impl Renderer {
         let visible_items = state.template_entries.len().min(12);
         let panel_height = 86.0 + item_height * visible_items as f32;
 
-        push_rect(vertices, extent, panel_x - 6.0, panel_y - 6.0, panel_width + 12.0, panel_height + 12.0, [0.02, 0.02, 0.025]);
-        push_rect(vertices, extent, panel_x, panel_y, panel_width, panel_height, [0.075, 0.078, 0.095]);
-        push_rect(vertices, extent, panel_x, panel_y, panel_width, 50.0, [0.25, 0.10, 0.025]);
+        let bg = THEME.background_primary;
+        let surface = THEME.surface_elevated;
+        let header_bg = THEME.accent_primary;
+        let text_c = THEME.text_primary;
+        let text_m = THEME.text_muted;
+        let sel_bg = THEME.accent_primary;
+        let alt1 = THEME.surface_primary;
+        let alt2 = THEME.surface_secondary;
+
+        push_rect(vertices, extent, panel_x - 6.0, panel_y - 6.0, panel_width + 12.0, panel_height + 12.0, [bg.r * 0.5, bg.g * 0.5, bg.b * 0.5]);
+        push_rect(vertices, extent, panel_x, panel_y, panel_width, panel_height, [surface.r, surface.g, surface.b]);
+        push_rect(vertices, extent, panel_x, panel_y, panel_width, 50.0, [header_bg.r * 0.6, header_bg.g * 0.6, header_bg.b * 0.6]);
         push_text(vertices, extent, panel_x + 18.0, panel_y + 16.0, 2.0, [1.0, 0.68, 0.30], "TAB RUST TEMPLATES");
-        push_text(vertices, extent, panel_x + panel_width - 168.0, panel_y + 18.0, 1.4, [0.85, 0.85, 0.88], "ENTER CREA");
+        push_text(vertices, extent, panel_x + panel_width - 168.0, panel_y + 18.0, 1.4, [text_m.r, text_m.g, text_m.b], "ENTER CREA");
 
         for index in 0..visible_items {
             let y = panel_y + 64.0 + index as f32 * item_height;
@@ -335,15 +379,15 @@ impl Renderer {
             let selected = global_index == state.selected_template_index;
             let entry = &state.template_entries[index];
             let color = if selected {
-                [0.92, 0.35, 0.10]
+                [sel_bg.r, sel_bg.g, sel_bg.b]
             } else if index % 2 == 0 {
-                [0.135, 0.138, 0.16]
+                [alt1.r, alt1.g, alt1.b]
             } else {
-                [0.105, 0.108, 0.13]
+                [alt2.r, alt2.g, alt2.b]
             };
             push_rect(vertices, extent, panel_x + 12.0, y, panel_width - 24.0, item_height - 5.0, color);
             push_rect(vertices, extent, panel_x + 18.0, y + 6.0, 8.0, item_height - 17.0, entry.color);
-            push_text(vertices, extent, panel_x + 36.0, y + 9.0, 1.45, [0.90, 0.90, 0.93], &entry.label);
+            push_text(vertices, extent, panel_x + 36.0, y + 9.0, 1.45, [text_c.r, text_c.g, text_c.b], &entry.label);
         }
     }
 
@@ -352,9 +396,13 @@ impl Renderer {
         let x = 24.0;
         let y = extent.height.saturating_sub(44) as f32;
 
-        push_rect(vertices, extent, x - 4.0, y - 4.0, width + 8.0, 30.0, [0.035, 0.035, 0.045]);
-        push_rect(vertices, extent, x, y, width, 22.0, [0.10, 0.105, 0.13]);
-        push_text(vertices, extent, x + 12.0, y + 7.0, 1.2, [0.78, 0.84, 0.92], label);
+        let bg = THEME.surface_primary;
+        let surface = THEME.surface_secondary;
+        let text_c = THEME.accent_info;
+
+        push_rect(vertices, extent, x - 4.0, y - 4.0, width + 8.0, 30.0, [bg.r, bg.g, bg.b]);
+        push_rect(vertices, extent, x, y, width, 22.0, [surface.r, surface.g, surface.b]);
+        push_text(vertices, extent, x + 12.0, y + 7.0, 1.2, [text_c.r, text_c.g, text_c.b], label);
     }
 
     fn push_pins(
@@ -654,5 +702,6 @@ fn find_memory_type(
             return i;
         }
     }
-    panic!("Failed to find suitable memory type!");
+    log::error!("No suitable memory type found - falling back to type 0");
+    0
 }

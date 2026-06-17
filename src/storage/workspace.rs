@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use crate::core::node_graph::NodeGraph;
 use super::node_storage::NodeStorage;
 
-#[derive(Default, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct Workspace {
     pub root_path: Option<PathBuf>,
     pub current_file: Option<PathBuf>,

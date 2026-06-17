@@ -151,6 +151,7 @@ impl AppRuntime {
 
         self.selected_node = Some(node_id);
         self.hovered_node = Some(node_id);
+        self.auto_save();
     }
 
     fn create_template_node_at_view_center(&mut self, template_index: usize) {
@@ -176,6 +177,7 @@ impl AppRuntime {
         self.selected_node = Some(node_id);
         self.hovered_node = Some(node_id);
         self.template_palette.close();
+        self.auto_save();
     }
 
     fn try_finish_link_from_hover(&mut self) -> bool {
@@ -199,6 +201,7 @@ impl AppRuntime {
         self.graph.add_link(from_pin, to_pin, Color32::from_rgb(0xde, 0x39, 0x00));
         self.selected_node = Some(target_pin.node_id);
         self.link_source_pin = None;
+        self.auto_save();
         true
     }
 
@@ -231,6 +234,15 @@ impl AppRuntime {
             if self.link_source_pin.map(|pin| pin.node_id) == Some(node_id) {
                 self.link_source_pin = None;
             }
+            self.auto_save();
+        }
+    }
+
+    fn auto_save(&mut self) {
+        if self.workspace.root().is_some() {
+            if let Err(e) = self.workspace.save_graph(&mut self.graph) {
+                log::warn!("Auto-save falló: {}", e);
+            }
         }
     }
 
@@ -239,7 +251,17 @@ impl AppRuntime {
     }
 
     fn select_workspace_folder(&mut self) {
-        let _ = self.workspace.select_folder();
+        if self.workspace.select_folder().is_some() {
+            if let Some(loaded) = self.workspace.load_graph() {
+                self.graph = loaded;
+                self.graph.recalculate_ids();
+                self.hovered_node = None;
+                self.selected_node = None;
+                self.dragging_node = None;
+                self.link_source_pin = None;
+                log::info!("Grafo cargado desde workspace");
+            }
+        }
     }
 
     fn handle_template_palette_key(&mut self, key: KeyCode) -> bool {

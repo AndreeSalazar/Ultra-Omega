@@ -79,12 +79,12 @@ impl NodeGraph {
         
         // Configurar como nodo carpeta
         if let Some(node) = self.node_mut(id) {
-            node.subnetwork_graph = Some(NodeGraph::default()); // Usar subnetwork_graph como contenedor
+            node.is_folder = true;
+            node.subnetwork_graph = Some(NodeGraph::default());
             if matches!(mode, FolderNodeMode::Inheritable) {
                 if !node.title.contains("(Heredable)") {
-                    // Agregar el lenguaje requerido al título para que sea visible
                     let lang_suffix = if !matches!(folder_language, NodeLanguage::Auto | NodeLanguage::Text) {
-                        format!(" [{}]", Self::language_display_name(folder_language))
+                        format!(" [{}]", NodeGraph::language_display_name(folder_language))
                     } else {
                         String::new()
                     };
@@ -99,9 +99,7 @@ impl NodeGraph {
     /// Verificar si un nodo es un nodo carpeta
     pub fn is_folder_node(&self, node_id: NodeId) -> bool {
         if let Some(node) = self.node(node_id) {
-            // Por ahora, verificamos por el título que empiece con 📁
-            // En el futuro, agregaremos un campo específico
-            node.title.starts_with("📁 ") && node.subnetwork_graph.is_some()
+            node.is_folder && node.subnetwork_graph.is_some()
         } else {
             false
         }
@@ -110,8 +108,7 @@ impl NodeGraph {
     /// Obtener el grafo interno de un nodo carpeta
     pub fn get_folder_content(&self, folder_node_id: NodeId) -> Option<&NodeGraph> {
         if let Some(node) = self.node(folder_node_id) {
-            // Verificar si es nodo carpeta
-            if node.title.starts_with("📁 ") && node.subnetwork_graph.is_some() {
+            if node.is_folder && node.subnetwork_graph.is_some() {
                 node.subnetwork_graph.as_ref()
             } else {
                 None
@@ -124,8 +121,7 @@ impl NodeGraph {
     /// Obtener el grafo interno mutable de un nodo carpeta
     pub fn get_folder_content_mut(&mut self, folder_node_id: NodeId) -> Option<&mut NodeGraph> {
         if let Some(node) = self.node_mut(folder_node_id) {
-            // Verificar si es nodo carpeta
-            if node.title.starts_with("📁 ") && node.subnetwork_graph.is_some() {
+            if node.is_folder && node.subnetwork_graph.is_some() {
                 node.subnetwork_graph.as_mut()
             } else {
                 None
@@ -150,30 +146,23 @@ impl NodeGraph {
         // 🆕 VALIDAR LENGUAJE SI ES CARPETA HEREDABLE
         // ═══════════════════════════════════════════════════════════════════
         if let Some(folder_node) = self.node(folder_node_id) {
-            // Verificar si es carpeta heredable
             if folder_node.title.contains("(Heredable)") {
-                // Obtener el lenguaje requerido de la carpeta
                 let mut folder_language = folder_node.language;
                 
-                // Si el lenguaje es Auto o Text, intentar extraer del título
                 if matches!(folder_language, NodeLanguage::Auto | NodeLanguage::Text) {
                     if folder_node.title.contains("[Rust]") {
                         folder_language = NodeLanguage::Rust;
                     }
                 }
                 
-                // Si el lenguaje de la carpeta no es Auto o Text, validar compatibilidad
                 if !matches!(folder_language, NodeLanguage::Auto | NodeLanguage::Text) {
-                    // SOLO bloquear si el lenguaje NO coincide
                     if language != folder_language {
                         return Err(format!(
-                            "❌ ERROR: El nodo tiene lenguaje '{}' pero la carpeta heredable solo acepta '{}'.\n\
-                            Las carpetas heredables solo pueden contener un único lenguaje de programación.",
-                            Self::language_display_name(language),
-                            Self::language_display_name(folder_language)
+                            "ERROR: El nodo tiene lenguaje '{}' pero la carpeta heredable solo acepta '{}'.",
+                            NodeGraph::language_display_name(language),
+                            NodeGraph::language_display_name(folder_language)
                         ));
                     }
-                    // Si el lenguaje SÍ coincide, continuar normalmente
                 }
             }
         }
@@ -182,15 +171,6 @@ impl NodeGraph {
             Ok(folder_graph.add_node(title, position, color, inputs, outputs, language))
         } else {
             Err("No se pudo acceder al contenido de la carpeta".to_string())
-        }
-    }
-    
-    /// Obtener nombre de visualización para un lenguaje
-    fn language_display_name(lang: NodeLanguage) -> String {
-        match lang {
-            NodeLanguage::Rust => "Rust".to_string(),
-            NodeLanguage::Text => "Text".to_string(),
-            NodeLanguage::Auto => "Auto".to_string(),
         }
     }
     
@@ -258,16 +238,14 @@ impl NodeGraph {
                 .collect()
         };
         
-        // Verificar si se filtraron nodos por incompatibilidad de lenguaje
         if !incompatible_nodes.is_empty() {
             if let Some(required_lang) = folder_language_opt {
                 let nodes_list = incompatible_nodes.join(", ");
                 return Err(format!(
-                    "❌ ERROR: Los siguientes nodos tienen lenguajes incompatibles: {}\n\
-                    La carpeta heredable solo acepta '{}'.\n\
-                    Las carpetas heredables solo pueden contener un único lenguaje de programación.",
+                    "ERROR: Los siguientes nodos tienen lenguajes incompatibles: {}\n\
+                    La carpeta heredable solo acepta '{}'.",
                     nodes_list,
-                    Self::language_display_name(required_lang)
+                    NodeGraph::language_display_name(required_lang)
                 ));
             }
         }
@@ -369,15 +347,11 @@ impl NodeGraph {
     
     /// Establecer si un nodo carpeta es heredable
     pub fn set_folder_inheritable(&mut self, folder_node_id: NodeId, inheritable: bool) -> Result<(), String> {
-        // Verificar primero si es nodo carpeta
-        let is_folder = self.is_folder_node(folder_node_id);
-        if !is_folder {
+        if !self.is_folder_node(folder_node_id) {
             return Err("El nodo especificado no es un nodo carpeta".to_string());
         }
         
         if let Some(node) = self.node_mut(folder_node_id) {
-            // Por ahora, usamos el título para indicar modo
-            // En el futuro, agregaremos un campo específico
             if inheritable {
                 if !node.title.contains("(Heredable)") {
                     node.title = format!("{} (Heredable)", node.title);
@@ -394,7 +368,7 @@ impl NodeGraph {
     /// Verificar si un nodo carpeta es heredable
     pub fn is_folder_inheritable(&self, folder_node_id: NodeId) -> bool {
         if let Some(node) = self.node(folder_node_id) {
-            node.title.contains("(Heredable)")
+            node.is_folder && node.title.contains("(Heredable)")
         } else {
             false
         }
