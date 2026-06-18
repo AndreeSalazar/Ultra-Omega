@@ -39,6 +39,8 @@ struct AppRuntime {
     created_nodes: u32,
     template_palette: TemplatePalette,
     workspace: WorkspaceState,
+    editor_cursor_line: usize,
+    editor_cursor_col: usize,
 }
 
 impl AppRuntime {
@@ -58,6 +60,8 @@ impl AppRuntime {
             created_nodes: 0,
             template_palette: TemplatePalette::new(),
             workspace: WorkspaceState::default(),
+            editor_cursor_line: 0,
+            editor_cursor_col: 0,
         }
     }
 
@@ -80,16 +84,22 @@ impl AppRuntime {
             .collect();
 
         let code_editor = self.active_editor_node.and_then(|node_id| {
-            self.graph.node(node_id).map(|node| CodeEditorState {
-                node_id,
-                title: node.title.clone(),
-                language: NodeGraph::language_display_name(node.language).to_string(),
-                code_path: node.code_path.clone().unwrap_or_else(|| "memoria".to_string()),
-                lines: if node.code.is_empty() {
+            self.graph.node(node_id).map(|node| {
+                let lines: Vec<String> = if node.code.is_empty() {
                     vec!["// Escribe aqui el codigo del nodo...".to_string()]
                 } else {
                     node.code.lines().map(str::to_string).collect()
-                },
+                };
+                CodeEditorState {
+                    node_id,
+                    title: node.title.clone(),
+                    language: NodeGraph::language_display_name(node.language).to_string(),
+                    code_path: node.code_path.clone().unwrap_or_else(|| "memoria".to_string()),
+                    lines,
+                    cursor_line: self.editor_cursor_line,
+                    cursor_col: self.editor_cursor_col,
+                    is_active: true,
+                }
             })
         });
 
@@ -284,6 +294,13 @@ impl AppRuntime {
         self.dragging_node = None;
         self.link_source_pin = None;
         self.template_palette.close();
+
+        // Posicionar cursor al final del código
+        if let Some(node) = self.graph.node(node_id) {
+            let lines: Vec<&str> = node.code.lines().collect();
+            self.editor_cursor_line = lines.len().saturating_sub(1);
+            self.editor_cursor_col = lines.last().map_or(0, |l| l.len());
+        }
         true
     }
 
@@ -293,11 +310,32 @@ impl AppRuntime {
 
         if let Some(node) = self.graph.node_mut(node_id) {
             for ch in text.chars() {
-                if ch == '\r' {
-                    continue;
-                }
-                if ch == '\n' || !ch.is_control() {
-                    node.code.push(ch);
+                if ch == '\r' { continue; }
+                if ch == '\n' {
+                    // Insertar nueva línea en la posición del cursor
+                    let lines: Vec<String> = node.code.lines().map(str::to_string).collect();
+                    let line = self.editor_cursor_line.min(lines.len().saturating_sub(1).max(0));
+                    let col = self.editor_cursor_col.min(lines.get(line).map_or(0, |l| l.len()));
+                    let before: String = lines.get(line).map_or(String::new(), |l| l[..col].to_string());
+                    let after: String = lines.get(line).map_or(String::new(), |l| l[col..].to_string());
+                    let mut new_lines: Vec<String> = lines[..line].to_vec();
+                    new_lines.push(before);
+                    new_lines.push(after);
+                    node.code = new_lines.join("\n");
+                    self.editor_cursor_line = (line + 1).min(new_lines.len().saturating_sub(1));
+                    self.editor_cursor_col = 0;
+                    changed = true;
+                } else if !ch.is_control() {
+                    // Insertar carácter en la posición del cursor
+                    let lines: Vec<String> = node.code.lines().map(str::to_string).collect();
+                    let line = self.editor_cursor_line.min(lines.len().saturating_sub(1).max(0));
+                    let col = self.editor_cursor_col.min(lines.get(line).map_or(0, |l| l.len()));
+                    let mut new_lines = lines;
+                    if let Some(l) = new_lines.get_mut(line) {
+                        l.insert(col, ch);
+                    }
+                    node.code = new_lines.join("\n");
+                    self.editor_cursor_col += ch.len_utf8();
                     changed = true;
                 }
             }
@@ -319,11 +357,37 @@ impl AppRuntime {
             KeyCode::Backspace => {
                 let mut changed = false;
                 if let Some(node) = self.graph.node_mut(node_id) {
-                    changed = node.code.pop().is_some();
+                    let lines: Vec<String> = node.code.lines().map(str::to_string).collect();
+                    if self.editor_cursor_col > 0 {
+                        let line = self.editor_cursor_line.min(lines.len().saturating_sub(1).max(0));
+                        let col = self.editor_cursor_col;
+                        let mut new_lines = lines;
+                        if let Some(l) = new_lines.get_mut(line) {
+                            if col <= l.len() {
+                                let byte_idx = l.char_indices().nth(col.saturating_sub(1)).map_or(l.len(), |(i, _)| i);
+                                l.remove(byte_idx);
+                                changed = true;
+                                self.editor_cursor_col -= 1;
+                            }
+                        }
+                        if changed { node.code = new_lines.join("\n"); }
+                    } else if self.editor_cursor_line > 0 {
+                        // Unir con la línea anterior
+                        let prev_line_len = lines.get(self.editor_cursor_line.saturating_sub(1)).map_or(0, |l| l.len());
+                        let mut new_lines = lines;
+                        if self.editor_cursor_line < new_lines.len() {
+                            let current = new_lines.remove(self.editor_cursor_line);
+                            if let Some(prev) = new_lines.last_mut() {
+                                prev.push_str(&current);
+                            }
+                            node.code = new_lines.join("\n");
+                            self.editor_cursor_line -= 1;
+                            self.editor_cursor_col = prev_line_len;
+                            changed = true;
+                        }
+                    }
                 }
-                if changed {
-                    self.auto_save();
-                }
+                if changed { self.auto_save(); }
                 true
             }
             KeyCode::Enter => {
@@ -332,6 +396,64 @@ impl AppRuntime {
             }
             KeyCode::Tab => {
                 self.insert_editor_text("    ");
+                true
+            }
+            KeyCode::ArrowLeft => {
+                if self.editor_cursor_col > 0 {
+                    self.editor_cursor_col -= 1;
+                } else if self.editor_cursor_line > 0 {
+                    self.editor_cursor_line -= 1;
+                    if let Some(node) = self.graph.node(node_id) {
+                        let lines: Vec<&str> = node.code.lines().collect();
+                        self.editor_cursor_col = lines.get(self.editor_cursor_line).map_or(0, |l| l.len());
+                    }
+                }
+                true
+            }
+            KeyCode::ArrowRight => {
+                if let Some(node) = self.graph.node(node_id) {
+                    let lines: Vec<&str> = node.code.lines().collect();
+                    let max_col = lines.get(self.editor_cursor_line).map_or(0, |l| l.len());
+                    if self.editor_cursor_col < max_col {
+                        self.editor_cursor_col += 1;
+                    } else if self.editor_cursor_line + 1 < lines.len() {
+                        self.editor_cursor_line += 1;
+                        self.editor_cursor_col = 0;
+                    }
+                }
+                true
+            }
+            KeyCode::ArrowUp => {
+                if self.editor_cursor_line > 0 {
+                    self.editor_cursor_line -= 1;
+                    if let Some(node) = self.graph.node(node_id) {
+                        let lines: Vec<&str> = node.code.lines().collect();
+                        let max_col = lines.get(self.editor_cursor_line).map_or(0, |l| l.len());
+                        self.editor_cursor_col = self.editor_cursor_col.min(max_col);
+                    }
+                }
+                true
+            }
+            KeyCode::ArrowDown => {
+                if let Some(node) = self.graph.node(node_id) {
+                    let lines: Vec<&str> = node.code.lines().collect();
+                    if self.editor_cursor_line + 1 < lines.len() {
+                        self.editor_cursor_line += 1;
+                        let max_col = lines.get(self.editor_cursor_line).map_or(0, |l| l.len());
+                        self.editor_cursor_col = self.editor_cursor_col.min(max_col);
+                    }
+                }
+                true
+            }
+            KeyCode::Home => {
+                self.editor_cursor_col = 0;
+                true
+            }
+            KeyCode::End => {
+                if let Some(node) = self.graph.node(node_id) {
+                    let lines: Vec<&str> = node.code.lines().collect();
+                    self.editor_cursor_col = lines.get(self.editor_cursor_line).map_or(0, |l| l.len());
+                }
                 true
             }
             _ => true,
@@ -466,7 +588,9 @@ impl ApplicationHandler for AppRuntime {
 
                 if self.active_editor_node.is_some() {
                     match key {
-                        KeyCode::Escape | KeyCode::Backspace | KeyCode::Enter | KeyCode::Tab => {
+                        KeyCode::Escape | KeyCode::Backspace | KeyCode::Enter | KeyCode::Tab
+                        | KeyCode::ArrowLeft | KeyCode::ArrowRight | KeyCode::ArrowUp | KeyCode::ArrowDown
+                        | KeyCode::Home | KeyCode::End => {
                             self.handle_code_editor_key(key);
                         }
                         _ => {

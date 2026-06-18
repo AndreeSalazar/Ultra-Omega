@@ -33,6 +33,9 @@ pub struct CodeEditorState {
     pub language: String,
     pub code_path: String,
     pub lines: Vec<String>,
+    pub cursor_line: usize,
+    pub cursor_col: usize,
+    pub is_active: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -141,7 +144,7 @@ impl Renderer {
         }
     }
 
-    // ─── Nodo estilo sello chino ───
+    // ─── Nodo estilo Houdini ───
     fn push_node(&self, verts: &mut Vec<Vertex>, text_verts: &mut Vec<TextVertex>, node: &Node, extent: vk::Extent2D, vp: Viewport2D, state: &RenderState, atlas: Option<&FontAtlas>) {
         let (x, y) = vp.world_to_screen(node.position.x, node.position.y);
         let w = vp.scale(NODE_WIDTH);
@@ -152,14 +155,13 @@ impl Renderer {
         let is_src = state.link_source_node == Some(node.id);
         let is_editing = state.code_editor_node == Some(node.id);
 
-        // Colores del nodo según lenguaje
         let (hdr_color, body_color, accent) = match node.language {
             NodeLanguage::Rust => (THEME.vermillion, THEME.node_rust_body, THEME.vermillion),
             NodeLanguage::Text => (THEME.copper, THEME.node_text_body, THEME.copper),
             NodeLanguage::Auto => (THEME.jade_green, THEME.node_auto_body, THEME.jade_green),
         };
 
-        // Sombra exterior (estilo tinta difuminada)
+        // Sombra exterior
         let shadow = [THEME.ink_black.r, THEME.ink_black.g, THEME.ink_black.b];
         push_rounded_rect(verts, extent, x - vp.scale(4.0), y - vp.scale(4.0), w + vp.scale(8.0), h + vp.scale(8.0), vp.scale(NODE_CORNER + 2.0), shadow);
 
@@ -174,30 +176,68 @@ impl Renderer {
         let bc = [body_color.r, body_color.g, body_color.b];
         push_rounded_rect(verts, extent, x, y, w, h, vp.scale(NODE_CORNER), bc);
 
-        // Header con gradiente sutil (simulado con dos rectángulos)
+        // Header (estilo Houdini: gradiente sutil)
         let hc = [hdr_color.r, hdr_color.g, hdr_color.b];
         push_rounded_rect_top(verts, extent, x, y, w, hdr, vp.scale(NODE_CORNER), hc);
-        // Franja sutil en header
-        let hc_dim = [hdr_color.r * 0.75, hdr_color.g * 0.75, hdr_color.b * 0.75];
+        let hc_bright = [hdr_color.r * 1.15, hdr_color.g * 1.15, hdr_color.b * 1.15];
+        push_rect(verts, extent, x + vp.scale(2.0), y + vp.scale(2.0), w - vp.scale(4.0), vp.scale(3.0), hc_bright);
+
+        // Franja divisoria header/cuerpo
+        let hc_dim = [hdr_color.r * 0.7, hdr_color.g * 0.7, hdr_color.b * 0.7];
         push_rect(verts, extent, x, y + hdr - vp.scale(2.0), w, vp.scale(2.0), hc_dim);
 
+        // Badge de lenguaje en header (estilo Houdini)
+        let lang_label = match node.language {
+            NodeLanguage::Rust => "Rs",
+            NodeLanguage::Text => "Tx",
+            NodeLanguage::Auto => "Au",
+        };
+        let badge_x = x + w - vp.scale(36.0);
+        let badge_y = y + vp.scale(6.0);
+        let badge_bg = [hdr_color.r * 0.5, hdr_color.g * 0.5, hdr_color.b * 0.5];
+        push_rounded_rect(verts, extent, badge_x, badge_y, vp.scale(30.0), vp.scale(18.0), vp.scale(4.0), badge_bg);
+        push_text_gpu(text_verts, extent, badge_x + vp.scale(4.0), badge_y + vp.scale(2.0), vp.scale(1.4), [1.0, 0.95, 0.85], lang_label, atlas);
+
+        // Título del nodo
+        let title_color = [THEME.text_primary.r, THEME.text_primary.g, THEME.text_primary.b];
+        push_text_gpu(text_verts, extent, x + vp.scale(10.0), y + vp.scale(2.0), vp.scale(3.0), title_color, &node.title, atlas);
+
         // Línea decorativa inferior (estilo sello)
-        let footer_h = vp.scale(5.0);
-        let fc = [hdr_color.r * 0.6, hdr_color.g * 0.6, hdr_color.b * 0.6];
-        push_rect(verts, extent, x + vp.scale(8.0), y + h - footer_h - vp.scale(3.0), w - vp.scale(16.0), footer_h, fc);
+        let footer_h = vp.scale(3.0);
+        let fc = [hdr_color.r * 0.5, hdr_color.g * 0.5, hdr_color.b * 0.5];
+        push_rect(verts, extent, x + vp.scale(8.0), y + h - footer_h - vp.scale(4.0), w - vp.scale(16.0), footer_h, fc);
 
-        // Puntos decorativos en esquinas (estilo tachuela)
-        let dot = vp.scale(3.0);
-        let dc = [THEME.border_gold.r, THEME.border_gold.g, THEME.border_gold.b];
-        push_rect(verts, extent, x + vp.scale(3.0), y + vp.scale(3.0), dot, dot, dc);
-        push_rect(verts, extent, x + w - vp.scale(6.0), y + vp.scale(3.0), dot, dot, dc);
+        // Preview del código en el body (primera línea no-vacía)
+        let code_preview = node.code.lines()
+            .find(|l| !l.trim().is_empty() && !l.trim().starts_with("//"))
+            .or_else(|| node.code.lines().find(|l| !l.trim().is_empty()))
+            .unwrap_or("");
+        if !code_preview.is_empty() {
+            let preview_color = [THEME.text_secondary.r, THEME.text_secondary.g, THEME.text_secondary.b];
+            push_text_gpu(text_verts, extent, x + vp.scale(10.0), y + hdr + vp.scale(14.0), vp.scale(1.5), preview_color, &clip_text(code_preview.trim(), 34), atlas);
+        }
 
-        // Pins (perlas)
+        // Pins (perlas circulares)
         self.push_pins(verts, node, extent, vp, hdr);
 
-        // Título del nodo (GPU text)
-        let title_color = [THEME.text_primary.r, THEME.text_primary.g, THEME.text_primary.b];
-        push_text_gpu(text_verts, extent, x + vp.scale(10.0), y + vp.scale(5.0), vp.scale(2.0), title_color, &node.title, atlas);
+        // Labels de pins
+        for (i, pin) in node.inputs.iter().enumerate() {
+            let py = y + hdr + (h - hdr) * (i as f32 + 1.0) / (node.inputs.len() as f32 + 1.0);
+            let label_color = [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b];
+            push_text_gpu(text_verts, extent, x + vp.scale(14.0), py - vp.scale(3.0), vp.scale(1.3), label_color, &pin.label, atlas);
+        }
+        for (i, pin) in node.outputs.iter().enumerate() {
+            let py = y + hdr + (h - hdr) * (i as f32 + 1.0) / (node.outputs.len() as f32 + 1.0);
+            let label_color = [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b];
+            let label_w = pin.label.len() as f32 * vp.scale(6.5);
+            push_text_gpu(text_verts, extent, x + w - vp.scale(14.0) - label_w, py - vp.scale(3.0), vp.scale(1.3), label_color, &pin.label, atlas);
+        }
+
+        // Puntos decorativos dorados en esquinas (estilo sello)
+        let dot = vp.scale(2.5);
+        let dc = [THEME.border_gold.r, THEME.border_gold.g, THEME.border_gold.b];
+        push_rect(verts, extent, x + vp.scale(3.0), y + vp.scale(3.0), dot, dot, dc);
+        push_rect(verts, extent, x + w - vp.scale(5.5), y + vp.scale(3.0), dot, dot, dc);
     }
 
     // ─── Grid estilo cuaderno de caligrafía ───
@@ -246,7 +286,7 @@ impl Renderer {
         }
     }
 
-    // ─── Conexiones estilo tinta con curva Bezier ───
+    // ─── Conexiones estilo tinta con curva Bezier y glow ───
     fn push_links(&self, verts: &mut Vec<Vertex>, graph: &NodeGraph, extent: vk::Extent2D, vp: Viewport2D) {
         for link in graph.links() {
             let Some(fa) = graph.locate_pin(link.from) else { continue; };
@@ -256,18 +296,20 @@ impl Renderer {
             let from = pin_screen_center(fn_, fa.kind, fa.slot, vp);
             let to = pin_screen_center(tn, ta.kind, ta.slot, vp);
 
-            // Color de la conexión: cobre por defecto, vermillón si activa
             let link_c = THEME.link_default;
             let color = [link_c.r, link_c.g, link_c.b];
 
-            // Sombra de la conexión (más ancha, más oscura)
+            // Glow exterior (muy ancho, muy transparente - simula bloom)
+            let glow = [link_c.r * 0.5, link_c.g * 0.5, link_c.b * 0.3];
+            push_bezier(verts, extent, from, to, vp.scale(14.0).max(4.0), glow);
+            // Sombra
             let shadow_c = [THEME.ink_black.r, THEME.ink_black.g, THEME.ink_black.b];
             push_bezier(verts, extent, from, to, vp.scale(6.0).max(2.0), shadow_c);
             // Línea principal
-            push_bezier(verts, extent, from, to, vp.scale(3.0).max(1.0), color);
-            // Highlight sutil
-            let highlight = [link_c.r * 1.3, link_c.g * 1.3, link_c.b * 1.3];
-            push_bezier(verts, extent, from, to, vp.scale(1.0).max(0.5), highlight);
+            push_bezier(verts, extent, from, to, vp.scale(3.5).max(1.0), color);
+            // Highlight central (más brillante)
+            let highlight = [link_c.r * 1.4, link_c.g * 1.4, link_c.b * 1.4];
+            push_bezier(verts, extent, from, to, vp.scale(1.2).max(0.4), highlight);
         }
     }
 
@@ -330,17 +372,16 @@ impl Renderer {
         }
     }
 
-    // ─── Badge de workspace estilo sello chino ───
-    // Editor en vivo del nodo, abierto con click derecho.
+    // ─── Editor de código con cursor y coloring de sintaxis ───
     fn push_code_editor(&self, verts: &mut Vec<Vertex>, text_verts: &mut Vec<TextVertex>, extent: vk::Extent2D, editor: &CodeEditorState, atlas: Option<&FontAtlas>) {
         let margin = 32.0;
-        let pw = (extent.width as f32 * 0.42).clamp(420.0, 680.0);
-        let ph = (extent.height as f32 - margin * 2.0).clamp(360.0, 760.0);
+        let pw = (extent.width as f32 * 0.42).clamp(420.0, 720.0);
+        let ph = (extent.height as f32 - margin * 2.0).clamp(400.0, 800.0);
         let px = (extent.width as f32 - pw - margin).max(margin);
         let py = margin;
 
         let shade = [THEME.ink_black.r * 0.78, THEME.ink_black.g * 0.78, THEME.ink_black.b * 0.78];
-        push_rounded_rect(verts, extent, px - 10.0, py - 10.0, pw + 20.0, ph + 20.0, 14.0, shade);
+        push_rounded_rect(verts, extent, px - 12.0, py - 12.0, pw + 24.0, ph + 24.0, 14.0, shade);
 
         let bg = [THEME.ink_deep.r, THEME.ink_deep.g, THEME.ink_deep.b];
         push_rounded_rect(verts, extent, px, py, pw, ph, 10.0, bg);
@@ -354,34 +395,74 @@ impl Renderer {
         push_rect(verts, extent, px, py + 82.0, 5.0, ph - 98.0, accent);
 
         let primary = [THEME.text_primary.r, THEME.text_primary.g, THEME.text_primary.b];
-        push_text_gpu(text_verts, extent, px + 20.0, py + 24.0, 2.0, primary, "NODE CODE EDITOR", atlas);
-        push_text_gpu(text_verts, extent, px + pw - 132.0, py + 28.0, 1.25, gold, "LIVE", atlas);
+        push_text_gpu(text_verts, extent, px + 20.0, py + 24.0, 2.2, primary, "NODE CODE EDITOR", atlas);
+        push_text_gpu(text_verts, extent, px + pw - 140.0, py + 28.0, 1.4, gold, "LIVE", atlas);
 
         let title = format!("{}  [{}]", editor.title, editor.language);
-        push_text_gpu(text_verts, extent, px + 22.0, py + 94.0, 1.45, gold, &clip_text(&title, 54), atlas);
+        push_text_gpu(text_verts, extent, px + 22.0, py + 92.0, 1.5, gold, &clip_text(&title, 54), atlas);
 
         let meta = format!("node {} | {}", editor.node_id.0, editor.code_path);
-        push_text_gpu(text_verts, extent, px + 22.0, py + 118.0, 1.1, [THEME.text_secondary.r, THEME.text_secondary.g, THEME.text_secondary.b], &clip_text(&meta, 66), atlas);
+        push_text_gpu(text_verts, extent, px + 22.0, py + 116.0, 1.15, [THEME.text_secondary.r, THEME.text_secondary.g, THEME.text_secondary.b], &clip_text(&meta, 66), atlas);
 
         let code_x = px + 24.0;
-        let code_y = py + 154.0;
-        let line_h = 20.0;
-        let max_lines = ((ph - 188.0) / line_h).max(1.0) as usize;
-        let start = editor.lines.len().saturating_sub(max_lines);
+        let code_y = py + 152.0;
+        let line_h = 22.0;
+        let max_lines = ((ph - 190.0) / line_h).max(1.0) as usize;
+        let total_lines = editor.lines.len();
+        let scroll_offset = if total_lines > max_lines { total_lines.saturating_sub(max_lines) } else { 0 };
 
-        for (screen_line, line) in editor.lines.iter().skip(start).take(max_lines).enumerate() {
+        let keyword_color = [THEME.copper.r, THEME.copper.g, THEME.copper.b];
+        let string_color = [THEME.jade_green.r, THEME.jade_green.g, THEME.jade_green.b];
+        let comment_color = [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b];
+
+        for screen_line in 0..max_lines.min(total_lines) {
+            let line_idx = scroll_offset + screen_line;
+            let line = editor.lines.get(line_idx).map(|s| s.as_str()).unwrap_or("");
             let y = code_y + screen_line as f32 * line_h;
+
             if screen_line % 2 == 0 {
                 push_rect(verts, extent, px + 16.0, y - 4.0, pw - 32.0, line_h, [THEME.ink_medium.r, THEME.ink_medium.g, THEME.ink_medium.b]);
             }
 
-            let line_no = format!("{:>3}", start + screen_line + 1);
-            push_text_gpu(text_verts, extent, code_x, y + 10.0, 1.05, [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b], &line_no, atlas);
-            push_text_gpu(text_verts, extent, code_x + 42.0, y + 10.0, 1.2, primary, &clip_text(line, 72), atlas);
+            // Highlight de línea actual
+            if editor.is_active && line_idx == editor.cursor_line {
+                push_rect(verts, extent, px + 16.0, y - 4.0, pw - 32.0, line_h, [THEME.jade_dark.r + 0.04, THEME.jade_dark.g + 0.04, THEME.jade_dark.b + 0.04]);
+            }
+
+            // Separador visual
+            push_rect(verts, extent, code_x + 40.0, y - 4.0, 1.0, line_h, [THEME.border_secondary.r, THEME.border_secondary.g, THEME.border_secondary.b]);
+
+            let line_no = format!("{:>3}", line_idx + 1);
+            push_text_gpu(text_verts, extent, code_x, y + 10.0, 1.1, [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b], &line_no, atlas);
+
+            let trimmed = line.trim();
+            let (text_color, text_str) = if trimmed.starts_with("//") {
+                (comment_color, line)
+            } else if trimmed.starts_with("pub") || trimmed.starts_with("fn ") || trimmed.starts_with("let ") || trimmed.starts_with("mut ") || trimmed.starts_with("if ") || trimmed.starts_with("else") || trimmed.starts_with("match ") || trimmed.starts_with("return") || trimmed.starts_with("where") || trimmed.starts_with("struct ") || trimmed.starts_with("enum ") || trimmed.starts_with("impl ") || trimmed.starts_with("use ") || trimmed.starts_with("mod ") || trimmed.starts_with("for ") || trimmed.starts_with("while ") || trimmed.starts_with("loop ") || trimmed.starts_with("async ") || trimmed.starts_with("await ") || trimmed.starts_with("self") || trimmed.starts_with("Self") {
+                (keyword_color, line)
+            } else {
+                let has_string = line.contains('"');
+                if has_string { (string_color, line) } else { (primary, line) }
+            };
+            push_text_gpu(text_verts, extent, code_x + 48.0, y + 10.0, 1.2, text_color, &clip_text(text_str, 68), atlas);
+        }
+
+        // Cursor parpadeante
+        if editor.is_active {
+            let cursor_line_idx = editor.cursor_line.saturating_sub(scroll_offset);
+            if cursor_line_idx < max_lines {
+                let cursor_y = code_y + cursor_line_idx as f32 * line_h;
+                let cursor_line_text = editor.lines.get(editor.cursor_line).map_or("", |l| l.as_str());
+                let col = editor.cursor_col.min(cursor_line_text.len());
+                let display_text: String = cursor_line_text.chars().take(col).collect();
+                let char_count = display_text.chars().count() as f32;
+                let cursor_x = code_x + 48.0 + char_count * 7.5;
+                push_rect(verts, extent, cursor_x, cursor_y - 2.0, 2.0, line_h - 2.0, gold);
+            }
         }
 
         let hint = "Right click node to open | type live | Enter newline | Backspace | Esc close";
-        push_text_gpu(text_verts, extent, px + 20.0, py + ph - 22.0, 1.0, [THEME.text_jade.r, THEME.text_jade.g, THEME.text_jade.b], hint, atlas);
+        push_text_gpu(text_verts, extent, px + 20.0, py + ph - 24.0, 1.05, [THEME.text_jade.r, THEME.text_jade.g, THEME.text_jade.b], hint, atlas);
     }
 
     fn push_workspace_badge(&self, verts: &mut Vec<Vertex>, text_verts: &mut Vec<TextVertex>, extent: vk::Extent2D, label: &str, atlas: Option<&FontAtlas>) {
@@ -406,7 +487,7 @@ impl Renderer {
         push_text_gpu(text_verts, extent, x + 14.0, y + 8.0, 1.2, tc, label, atlas);
     }
 
-    // ─── Pins estilo perla ───
+    // ─── Pins estilo perla circular ───
     fn push_pins(&self, verts: &mut Vec<Vertex>, node: &Node, extent: vk::Extent2D, vp: Viewport2D, _hdr: f32) {
         let (nx, ny) = vp.world_to_screen(node.position.x, node.position.y);
         let ps = vp.scale(PIN_SIZE).max(3.0);
@@ -417,28 +498,23 @@ impl Renderer {
         let in_step = if node.inputs.is_empty() { 0.0 } else { (nh - hdr_h) / (node.inputs.len() + 1) as f32 };
         let out_step = if node.outputs.is_empty() { 0.0 } else { (nh - hdr_h) / (node.outputs.len() + 1) as f32 };
 
-        // Sombra de pin
-        let shadow = [THEME.ink_black.r, THEME.ink_black.g, THEME.ink_black.b];
-
         for (i, _) in node.inputs.iter().enumerate() {
-            let px = nx - ps * 0.5;
-            let py = ny + hdr_h + in_step * (i + 1) as f32;
-            push_rect(verts, extent, px + 1.0, py + 1.0, ps, ps, shadow);
-            let pc = [THEME.pin_input.r, THEME.pin_input.g, THEME.pin_input.b];
-            push_rect(verts, extent, px, py, ps, ps, pc);
-            // Highlight
-            let ph = [THEME.pin_input.r * 1.4, THEME.pin_input.g * 1.4, THEME.pin_input.b * 1.4];
-            push_rect(verts, extent, px + ps * 0.2, py + ps * 0.2, ps * 0.4, ps * 0.4, ph);
+            let cx = nx;
+            let cy = ny + hdr_h + in_step * (i + 1) as f32;
+            // Sombra circular
+            push_circle(verts, extent, cx + 1.0, cy + 1.0, ps * 0.5, [THEME.ink_black.r, THEME.ink_black.g, THEME.ink_black.b]);
+            // Pin base
+            push_circle(verts, extent, cx, cy, ps * 0.5, [THEME.pin_input.r, THEME.pin_input.g, THEME.pin_input.b]);
+            // Highlight interior
+            push_circle(verts, extent, cx - ps * 0.08, cy - ps * 0.08, ps * 0.22, [THEME.pin_input.r * 1.5, THEME.pin_input.g * 1.5, THEME.pin_input.b * 1.5]);
         }
 
         for (i, _) in node.outputs.iter().enumerate() {
-            let px = nx + nw - ps * 0.5;
-            let py = ny + hdr_h + out_step * (i + 1) as f32;
-            push_rect(verts, extent, px + 1.0, py + 1.0, ps, ps, shadow);
-            let pc = [THEME.pin_output.r, THEME.pin_output.g, THEME.pin_output.b];
-            push_rect(verts, extent, px, py, ps, ps, pc);
-            let ph = [THEME.pin_output.r * 1.4, THEME.pin_output.g * 1.4, THEME.pin_output.b * 1.4];
-            push_rect(verts, extent, px + ps * 0.2, py + ps * 0.2, ps * 0.4, ps * 0.4, ph);
+            let cx = nx + nw;
+            let cy = ny + hdr_h + out_step * (i + 1) as f32;
+            push_circle(verts, extent, cx + 1.0, cy + 1.0, ps * 0.5, [THEME.ink_black.r, THEME.ink_black.g, THEME.ink_black.b]);
+            push_circle(verts, extent, cx, cy, ps * 0.5, [THEME.pin_output.r, THEME.pin_output.g, THEME.pin_output.b]);
+            push_circle(verts, extent, cx - ps * 0.08, cy - ps * 0.08, ps * 0.22, [THEME.pin_output.r * 1.5, THEME.pin_output.g * 1.5, THEME.pin_output.b * 1.5]);
         }
     }
 
@@ -573,12 +649,28 @@ fn push_line(v: &mut Vec<Vertex>, ext: vk::Extent2D, from: (f32, f32), to: (f32,
     ]);
 }
 
+fn push_circle(v: &mut Vec<Vertex>, ext: vk::Extent2D, cx: f32, cy: f32, radius: f32, c: [f32; 3]) {
+    let segments = 12;
+    let center = (ndc_x(cx, ext.width), ndc_y(cy, ext.height));
+    for i in 0..segments {
+        let a0 = (i as f32) * (std::f32::consts::TAU / segments as f32);
+        let a1 = ((i + 1) as f32) * (std::f32::consts::TAU / segments as f32);
+        let p0 = (ndc_x(cx + radius * a0.cos(), ext.width), ndc_y(cy + radius * a0.sin(), ext.height));
+        let p1 = (ndc_x(cx + radius * a1.cos(), ext.width), ndc_y(cy + radius * a1.sin(), ext.height));
+        v.extend_from_slice(&[
+            Vertex { pos: [center.0, center.1], color: c },
+            Vertex { pos: [p0.0, p0.1], color: c },
+            Vertex { pos: [p1.0, p1.1], color: c },
+        ]);
+    }
+}
+
 fn push_bezier(v: &mut Vec<Vertex>, ext: vk::Extent2D, from: (f32, f32), to: (f32, f32), thick: f32, c: [f32; 3]) {
     let h = (to.0 - from.0).abs().max(120.0);
     let co = h * 0.42;
     let c1 = (from.0 + co, from.1);
     let c2 = (to.0 - co, to.1);
-    let segs = 22;
+    let segs = 36;
     let mut prev = from;
     for i in 1..=segs {
         let t = i as f32 / segs as f32;
@@ -621,7 +713,7 @@ fn push_text_gpu(tv: &mut Vec<TextVertex>, ext: vk::Extent2D, x: f32, y: f32, sc
     let Some(atlas) = atlas else {
         return;
     };
-    let font_scale = 7.0 * scale / ATLAS_FONT_SIZE;
+    let font_scale = 12.0 * scale / ATLAS_FONT_SIZE;
     let mut cx = x;
     for ch in text.chars().take(128) {
         if ch == ' ' {

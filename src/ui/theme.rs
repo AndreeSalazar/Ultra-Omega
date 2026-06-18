@@ -117,20 +117,20 @@ pub struct UltraOmegaTheme {
 impl Default for UltraOmegaTheme {
     fn default() -> Self {
         Self {
-            // ── Fondos de tinta, laca y porcelana nocturna ──
-            ink_black:      Color::from_rgb(18, 21, 24),       // #121518 - tinta azulada profunda
-            ink_deep:       Color::from_rgb(24, 29, 32),       // #181D20 - laca antigua
-            ink_medium:     Color::from_rgb(36, 42, 43),       // #242A2B - piedra húmeda
+            // ── Fondos cálidos estilo Houdini (no azulados) ──
+            ink_black:      Color::from_rgb(22, 19, 17),       // #161311 - tinta cálida
+            ink_deep:       Color::from_rgb(30, 26, 23),       // #1E1A17 - laca oscura
+            ink_medium:     Color::from_rgb(42, 37, 32),       // #2A2520 - piedra cálida
             porcelain:      Color::from_rgb(226, 218, 199),    // #E2DAC7 - porcelana cálida
             porcelain_warm: Color::from_rgb(214, 203, 181),    // #D6CBB5 - arroz y seda
             silk_cream:     Color::from_rgb(194, 181, 153),    // #C2B599 - seda envejecida
 
             // ── Superficies de jade, obsidiana y pizarra ──
-            jade_dark:   Color::from_rgb(22, 45, 39),          // #162D27 - jade oscuro
+            jade_dark:   Color::from_rgb(22, 38, 32),          // #162620 - jade oscuro cálido
             jade_medium: Color::from_rgb(37, 72, 61),          // #25483D - jade pulido
             jade_light:  Color::from_rgb(78, 125, 96),         // #4E7D60 - jade imperial
-            obsidian:    Color::from_rgb(21, 25, 28),          // #15191C - obsidiana azulada
-            slate:       Color::from_rgb(35, 39, 43),          // #23272B - pizarra fría
+            obsidian:    Color::from_rgb(24, 21, 19),          // #181513 - obsidiana cálida
+            slate:       Color::from_rgb(38, 34, 29),          // #26221D - pizarra cálida
 
             // ── Texto legible sobre superficies oscuras ──
             text_primary:   Color::from_rgb(232, 223, 205),    // #E8DFCD - marfil
@@ -139,50 +139,50 @@ impl Default for UltraOmegaTheme {
             text_gold:      Color::from_rgb(224, 178, 65),     // #E0B241 - dorado imperial
             text_jade:      Color::from_rgb(128, 184, 144),    // #80B890 - jade claro
 
-            // ── Acentos culturales: cinabrio, oro, jade, añil y ciruela ──
-            vermillion:    Color::from_rgb(196, 49, 39),       // #C43127 - cinabrio de sello
+            // ── Acentos culturales: rojo chino, oro imperial, jade ──
+            vermillion:    Color::from_rgb(155, 30, 20),       // #9B1E14 - rojo chino profundo (no salmón)
             imperial_gold: Color::from_rgb(218, 171, 54),      // #DAAB36 - oro imperial
             jade_green:    Color::from_rgb(74, 150, 105),      // #4A9669 - jade vivo
             indigo:        Color::from_rgb(34, 52, 80),        // #223450 - añil nocturno
             plum:          Color::from_rgb(118, 47, 78),       // #762F4E - flor de ciruelo
-            copper:        Color::from_rgb(176, 103, 47),      // #B0672F - cobre antiguo
+            copper:        Color::from_rgb(160, 90, 38),       // #A05A26 - cobre oscuro
 
             // ── Bordes tipo trazo de pincel ──
-            border_primary:   Color::from_rgb(68, 61, 50),     // #443D32
-            border_secondary: Color::from_rgb(43, 47, 45),     // #2B2F2D
+            border_primary:   Color::from_rgb(62, 55, 45),     // #3E372D
+            border_secondary: Color::from_rgb(40, 36, 32),     // #282420
             border_focus:     Color::from_rgb(218, 171, 54),   // #DAAB36 - oro
-            border_subtle:    Color::from_rgb(27, 32, 34),     // #1B2022
-            border_gold:      Color::from_rgb(181, 138, 44),   // #B58A2C
+            border_subtle:    Color::from_rgb(28, 25, 22),     // #1C1916
+            border_gold:      Color::from_rgb(175, 132, 40),   // #AF8428
 
-            // ── Nodos con más contraste y lenguaje visual chino ──
-            node_rust:       Color::from_rgb(196, 49, 39),     // cinabrio
-            node_rust_body:  Color::from_rgb(49, 35, 34),      // laca roja profunda
-            node_text:       Color::from_rgb(176, 103, 47),    // cobre
-            node_text_body:  Color::from_rgb(43, 36, 31),      // arcilla oscura
+            // ── Nodos: cuerpos oscuros para máximo contraste con texto claro ──
+            node_rust:       Color::from_rgb(155, 30, 20),     // rojo chino profundo
+            node_rust_body:  Color::from_rgb(28, 22, 20),      // laca oscura
+            node_text:       Color::from_rgb(160, 90, 38),     // cobre oscuro
+            node_text_body:  Color::from_rgb(26, 23, 20),      // arcilla profunda
             node_auto:       Color::from_rgb(74, 150, 105),    // jade
-            node_auto_body:  Color::from_rgb(28, 46, 39),      // jade nocturno
+            node_auto_body:  Color::from_rgb(20, 30, 26),      // jade nocturno
             node_folder:     Color::from_rgb(218, 171, 54),    // oro
-            node_folder_body:Color::from_rgb(48, 42, 28),      // brocado oscuro
+            node_folder_body:Color::from_rgb(32, 28, 18),      // brocado oscuro
 
             // ── Pins como perlas lacadas ──
             pin_input:     Color::from_rgb(128, 184, 144),     // jade claro
-            pin_output:    Color::from_rgb(196, 49, 39),       // cinabrio
+            pin_output:    Color::from_rgb(155, 30, 20),       // rojo chino profundo
             pin_connected: Color::from_rgb(218, 171, 54),      // oro imperial
             pin_hover:     Color::from_rgb(226, 218, 199),     // porcelana
 
             // ── Terminal ──
-            terminal_bg:      Color::from_rgb(16, 19, 22),     // tinta azulada profunda
+            terminal_bg:      Color::from_rgb(18, 16, 14),     // tinta cálida oscura
             terminal_text:    Color::from_rgb(194, 181, 153),  // seda clara
             terminal_selection: Color::from_rgb(74, 150, 105), // jade
 
-            // ── Grid sutil de papel de caligrafía nocturno ──
-            grid_line: Color::from_rgb(29, 36, 38),            // #1D2426
-            grid_axis: Color::from_rgb(55, 64, 61),            // #37403D
-            grid_dot:  Color::from_rgb(45, 52, 50),            // #2D3432
+            // ── Grid sutil de papel de caligrafía cálido ──
+            grid_line: Color::from_rgb(30, 27, 23),            // #1E1B17
+            grid_axis: Color::from_rgb(52, 46, 38),            // #342E26
+            grid_dot:  Color::from_rgb(42, 38, 33),            // #2A2621
 
             // ── Conexiones tipo tinta metálica ──
-            link_default: Color::from_rgb(176, 103, 47),       // cobre
-            link_active:  Color::from_rgb(196, 49, 39),        // cinabrio
+            link_default: Color::from_rgb(160, 90, 38),       // cobre oscuro
+            link_active:  Color::from_rgb(155, 30, 20),        // rojo chino
             link_hover:   Color::from_rgb(218, 171, 54),       // oro
         }
     }
