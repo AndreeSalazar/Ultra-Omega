@@ -139,13 +139,13 @@ impl Default for UltraOmegaTheme {
             text_gold:      Color::from_rgb(224, 178, 65),     // #E0B241 - dorado imperial
             text_jade:      Color::from_rgb(128, 184, 144),    // #80B890 - jade claro
 
-            // ── Acentos culturales: rojo chino, oro imperial, jade ──
-            vermillion:    Color::from_rgb(155, 30, 20),       // #9B1E14 - rojo chino profundo (no salmón)
-            imperial_gold: Color::from_rgb(218, 171, 54),      // #DAAB36 - oro imperial
-            jade_green:    Color::from_rgb(74, 150, 105),      // #4A9669 - jade vivo
+            // ── Acentos culturales: rojo chino profundo, oro, jade ──
+            vermillion:    Color::from_rgb(118, 38, 28),       // #76261C - rojo chino oscuro elegante
+            imperial_gold: Color::from_rgb(178, 142, 52),      // #B28E34 - oro apagado
+            jade_green:    Color::from_rgb(62, 110, 78),       // #3E6E4E - jade oscuro
             indigo:        Color::from_rgb(34, 52, 80),        // #223450 - añil nocturno
-            plum:          Color::from_rgb(118, 47, 78),       // #762F4E - flor de ciruelo
-            copper:        Color::from_rgb(160, 90, 38),       // #A05A26 - cobre oscuro
+            plum:          Color::from_rgb(96, 42, 62),        // #602A3E - ciruela oscura
+            copper:        Color::from_rgb(120, 75, 38),       // #784B26 - cobre antiguo apagado
 
             // ── Bordes tipo trazo de pincel ──
             border_primary:   Color::from_rgb(62, 55, 45),     // #3E372D
@@ -154,15 +154,15 @@ impl Default for UltraOmegaTheme {
             border_subtle:    Color::from_rgb(28, 25, 22),     // #1C1916
             border_gold:      Color::from_rgb(175, 132, 40),   // #AF8428
 
-            // ── Nodos: cuerpos oscuros para máximo contraste con texto claro ──
-            node_rust:       Color::from_rgb(155, 30, 20),     // rojo chino profundo
-            node_rust_body:  Color::from_rgb(28, 22, 20),      // laca oscura
-            node_text:       Color::from_rgb(160, 90, 38),     // cobre oscuro
-            node_text_body:  Color::from_rgb(26, 23, 20),      // arcilla profunda
-            node_auto:       Color::from_rgb(74, 150, 105),    // jade
-            node_auto_body:  Color::from_rgb(20, 30, 26),      // jade nocturno
-            node_folder:     Color::from_rgb(218, 171, 54),    // oro
-            node_folder_body:Color::from_rgb(32, 28, 18),      // brocado oscuro
+            // ── Nodos: cuerpos muy oscuros y elegantes, headers apagados ──
+            node_rust:       Color::from_rgb(118, 38, 28),     // rojo chino oscuro
+            node_rust_body:  Color::from_rgb(24, 20, 19),      // laca muy oscura
+            node_text:       Color::from_rgb(120, 75, 38),     // cobre apagado
+            node_text_body:  Color::from_rgb(22, 20, 18),      // arcilla profunda
+            node_auto:       Color::from_rgb(62, 110, 78),     // jade oscuro
+            node_auto_body:  Color::from_rgb(18, 26, 22),      // jade nocturno oscuro
+            node_folder:     Color::from_rgb(178, 142, 52),    // oro apagado
+            node_folder_body:Color::from_rgb(26, 23, 16),      // brocado profundo
 
             // ── Pins como perlas lacadas ──
             pin_input:     Color::from_rgb(128, 184, 144),     // jade claro
@@ -180,10 +180,10 @@ impl Default for UltraOmegaTheme {
             grid_axis: Color::from_rgb(52, 46, 38),            // #342E26
             grid_dot:  Color::from_rgb(42, 38, 33),            // #2A2621
 
-            // ── Conexiones tipo tinta metálica ──
-            link_default: Color::from_rgb(160, 90, 38),       // cobre oscuro
-            link_active:  Color::from_rgb(155, 30, 20),        // rojo chino
-            link_hover:   Color::from_rgb(218, 171, 54),       // oro
+            // ── Conexiones tipo tinta antigua (cobre apagado) ──
+            link_default: Color::from_rgb(120, 75, 38),       // cobre antiguo
+            link_active:  Color::from_rgb(118, 38, 28),        // rojo chino oscuro
+            link_hover:   Color::from_rgb(178, 142, 52),       // oro apagado
         }
     }
 }

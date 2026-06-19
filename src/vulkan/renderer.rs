@@ -78,10 +78,12 @@ pub struct Renderer {
 }
 
 const MAX_VERTICES: usize = 65_536;
-pub const NODE_WIDTH: f32 = 280.0;
-pub const NODE_HEIGHT: f32 = 130.0;
-pub const HEADER_HEIGHT: f32 = 38.0;
-pub const PIN_SIZE: f32 = 10.0;
+pub const NODE_WIDTH: f32 = 300.0;
+pub const NODE_HEIGHT: f32 = 160.0;
+pub const HEADER_HEIGHT: f32 = 36.0;
+pub const PIN_SIZE: f32 = 11.0;
+pub const PIN_ROW_HEIGHT: f32 = 20.0;
+pub const SECTION_HEIGHT: f32 = 14.0;
 const GRID_SPACING: f32 = 64.0;
 const NODE_CORNER: f32 = 6.0;
 
@@ -176,68 +178,111 @@ impl Renderer {
         let bc = [body_color.r, body_color.g, body_color.b];
         push_rounded_rect(verts, extent, x, y, w, h, vp.scale(NODE_CORNER), bc);
 
-        // Header (estilo Houdini: gradiente sutil)
+        // Header (estilo Houdini: sin brillo, solo color sólido elegante)
         let hc = [hdr_color.r, hdr_color.g, hdr_color.b];
         push_rounded_rect_top(verts, extent, x, y, w, hdr, vp.scale(NODE_CORNER), hc);
-        let hc_bright = [hdr_color.r * 1.15, hdr_color.g * 1.15, hdr_color.b * 1.15];
-        push_rect(verts, extent, x + vp.scale(2.0), y + vp.scale(2.0), w - vp.scale(4.0), vp.scale(3.0), hc_bright);
 
-        // Franja divisoria header/cuerpo
-        let hc_dim = [hdr_color.r * 0.7, hdr_color.g * 0.7, hdr_color.b * 0.7];
-        push_rect(verts, extent, x, y + hdr - vp.scale(2.0), w, vp.scale(2.0), hc_dim);
+        // Franja divisoria header/cuerpo (más oscura para profundidad)
+        let hc_dim = [hdr_color.r * 0.4, hdr_color.g * 0.4, hdr_color.b * 0.4];
+        push_rect(verts, extent, x, y + hdr - vp.scale(1.5), w, vp.scale(1.5), hc_dim);
 
-        // Badge de lenguaje en header (estilo Houdini)
-        let lang_label = match node.language {
-            NodeLanguage::Rust => "Rs",
-            NodeLanguage::Text => "Tx",
-            NodeLanguage::Auto => "Au",
+        // ── TIPO a la IZQUIERDA del header (estilo Houdini: "RUST", "TEXT", "AUTO") ──
+        let type_label = match node.language {
+            NodeLanguage::Rust => "RUST",
+            NodeLanguage::Text => "TEXT",
+            NodeLanguage::Auto => "AUTO",
         };
-        let badge_x = x + w - vp.scale(36.0);
-        let badge_y = y + vp.scale(6.0);
-        let badge_bg = [hdr_color.r * 0.5, hdr_color.g * 0.5, hdr_color.b * 0.5];
-        push_rounded_rect(verts, extent, badge_x, badge_y, vp.scale(30.0), vp.scale(18.0), vp.scale(4.0), badge_bg);
-        push_text_gpu(text_verts, extent, badge_x + vp.scale(4.0), badge_y + vp.scale(2.0), vp.scale(1.4), [1.0, 0.95, 0.85], lang_label, atlas);
+        let type_color = [1.0, 0.95, 0.85];
+        push_text_gpu(text_verts, extent, x + vp.scale(8.0), y + vp.scale(7.0), vp.scale(2.0), type_color, type_label, atlas);
 
-        // Título del nodo
+        // ── Status dot a la DERECHA del header (elegante, sin highlight blanco) ──
+        let status_color = if node.code.is_empty() {
+            [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b]
+        } else if node.code.contains("fn main") {
+            [THEME.jade_green.r, THEME.jade_green.g, THEME.jade_green.b]
+        } else {
+            [THEME.copper.r, THEME.copper.g, THEME.copper.b]
+        };
+        let dot_r = vp.scale(3.0);
+        let dot_x = x + w - vp.scale(12.0);
+        let dot_y = y + hdr * 0.5;
+        // Solo el dot, sin anillo brillante
+        push_circle(verts, extent, dot_x, dot_y, dot_r, status_color);
+
+        // ── Sombra interior header → body (sutil) ──
+        let inner_shadow = [THEME.ink_black.r, THEME.ink_black.g, THEME.ink_black.b];
+        push_rect(verts, extent, x + vp.scale(2.0), y + hdr, w - vp.scale(4.0), vp.scale(2.0), inner_shadow);
+
+        // ── TÍTULO del nodo (debajo del header) ──
+        let title_y = y + hdr + vp.scale(8.0);
         let title_color = [THEME.text_primary.r, THEME.text_primary.g, THEME.text_primary.b];
-        push_text_gpu(text_verts, extent, x + vp.scale(10.0), y + vp.scale(2.0), vp.scale(3.0), title_color, &node.title, atlas);
+        push_text_gpu(text_verts, extent, x + vp.scale(8.0), title_y, vp.scale(2.5), title_color, &node.title, atlas);
 
-        // Línea decorativa inferior (estilo sello)
-        let footer_h = vp.scale(3.0);
-        let fc = [hdr_color.r * 0.5, hdr_color.g * 0.5, hdr_color.b * 0.5];
-        push_rect(verts, extent, x + vp.scale(8.0), y + h - footer_h - vp.scale(4.0), w - vp.scale(16.0), footer_h, fc);
+        // ── SECCIÓN DE PINS con label Houdini-style ──
+        let mut current_y = title_y + vp.scale(20.0);
+        for (i, pin) in node.inputs.iter().enumerate() {
+            let py = current_y + vp.scale(PIN_ROW_HEIGHT) * i as f32 + vp.scale(PIN_ROW_HEIGHT) * 0.5;
+            let cx = x;
+            let cy = py;
 
-        // Preview del código en el body (primera línea no-vacía)
+            // Pin circular con sombra
+            push_circle(verts, extent, cx + 1.0, cy + 1.0, vp.scale(PIN_SIZE) * 0.5, [0.0, 0.0, 0.0]);
+            push_circle(verts, extent, cx, cy, vp.scale(PIN_SIZE) * 0.5, [THEME.pin_input.r, THEME.pin_input.g, THEME.pin_input.b]);
+            push_circle(verts, extent, cx - vp.scale(PIN_SIZE) * 0.1, cy - vp.scale(PIN_SIZE) * 0.1, vp.scale(PIN_SIZE) * 0.22, [THEME.pin_input.r * 1.4, THEME.pin_input.g * 1.4, THEME.pin_input.b * 1.4]);
+
+            // Label
+            let label_color = [THEME.text_secondary.r, THEME.text_secondary.g, THEME.text_secondary.b];
+            push_text_gpu(text_verts, extent, x + vp.scale(14.0), cy - vp.scale(3.0), vp.scale(1.5), label_color, &pin.label, atlas);
+        }
+
+        // Outputs alineados a la derecha
+        for (i, pin) in node.outputs.iter().enumerate() {
+            let py = current_y + vp.scale(PIN_ROW_HEIGHT) * i as f32 + vp.scale(PIN_ROW_HEIGHT) * 0.5;
+            let cx = x + w;
+            let cy = py;
+
+            push_circle(verts, extent, cx + 1.0, cy + 1.0, vp.scale(PIN_SIZE) * 0.5, [0.0, 0.0, 0.0]);
+            push_circle(verts, extent, cx, cy, vp.scale(PIN_SIZE) * 0.5, [THEME.pin_output.r, THEME.pin_output.g, THEME.pin_output.b]);
+            push_circle(verts, extent, cx - vp.scale(PIN_SIZE) * 0.1, cy - vp.scale(PIN_SIZE) * 0.1, vp.scale(PIN_SIZE) * 0.22, [THEME.pin_output.r * 1.4, THEME.pin_output.g * 1.4, THEME.pin_output.b * 1.4]);
+
+            let label_color = [THEME.text_secondary.r, THEME.text_secondary.g, THEME.text_secondary.b];
+            let label_w = pin.label.len() as f32 * vp.scale(6.5);
+            push_text_gpu(text_verts, extent, x + w - vp.scale(14.0) - label_w, cy - vp.scale(3.0), vp.scale(1.5), label_color, &pin.label, atlas);
+        }
+
+        let pin_count = node.inputs.len() + node.outputs.len();
+        current_y = current_y + vp.scale(PIN_ROW_HEIGHT) * pin_count as f32;
+
+        // ── DIVISOR entre pins y código ──
+        if pin_count > 0 {
+            current_y += vp.scale(4.0);
+            let divider_color = [THEME.border_secondary.r, THEME.border_secondary.g, THEME.border_secondary.b];
+            push_rect(verts, extent, x + vp.scale(8.0), current_y, w - vp.scale(16.0), vp.scale(1.0), divider_color);
+            current_y += vp.scale(6.0);
+        }
+
+        // ── CODE PREVIEW estilo parámetro Houdini (key: value) ──
+        let key_color = [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b];
+        let key_label = if node.code.is_empty() { "code" } else { "source" };
+        push_text_gpu(text_verts, extent, x + vp.scale(8.0), current_y, vp.scale(1.3), key_color, key_label, atlas);
+        current_y += vp.scale(16.0);
+
         let code_preview = node.code.lines()
             .find(|l| !l.trim().is_empty() && !l.trim().starts_with("//"))
             .or_else(|| node.code.lines().find(|l| !l.trim().is_empty()))
             .unwrap_or("");
         if !code_preview.is_empty() {
-            let preview_color = [THEME.text_secondary.r, THEME.text_secondary.g, THEME.text_secondary.b];
-            push_text_gpu(text_verts, extent, x + vp.scale(10.0), y + hdr + vp.scale(14.0), vp.scale(1.5), preview_color, &clip_text(code_preview.trim(), 34), atlas);
+            let value_color = [THEME.text_primary.r, THEME.text_primary.g, THEME.text_primary.b];
+            push_text_gpu(text_verts, extent, x + vp.scale(8.0), current_y, vp.scale(1.8), value_color, &clip_text(code_preview.trim(), 36), atlas);
+        } else {
+            let value_color = [THEME.text_muted.r * 0.8, THEME.text_muted.g * 0.8, THEME.text_muted.b * 0.8];
+            push_text_gpu(text_verts, extent, x + vp.scale(8.0), current_y, vp.scale(1.5), value_color, "  (vacio)", atlas);
         }
 
-        // Pins (perlas circulares)
-        self.push_pins(verts, node, extent, vp, hdr);
-
-        // Labels de pins
-        for (i, pin) in node.inputs.iter().enumerate() {
-            let py = y + hdr + (h - hdr) * (i as f32 + 1.0) / (node.inputs.len() as f32 + 1.0);
-            let label_color = [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b];
-            push_text_gpu(text_verts, extent, x + vp.scale(14.0), py - vp.scale(3.0), vp.scale(1.3), label_color, &pin.label, atlas);
-        }
-        for (i, pin) in node.outputs.iter().enumerate() {
-            let py = y + hdr + (h - hdr) * (i as f32 + 1.0) / (node.outputs.len() as f32 + 1.0);
-            let label_color = [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b];
-            let label_w = pin.label.len() as f32 * vp.scale(6.5);
-            push_text_gpu(text_verts, extent, x + w - vp.scale(14.0) - label_w, py - vp.scale(3.0), vp.scale(1.3), label_color, &pin.label, atlas);
-        }
-
-        // Puntos decorativos dorados en esquinas (estilo sello)
-        let dot = vp.scale(2.5);
+        // Puntos decorativos en esquinas del header
+        let dot = vp.scale(2.0);
         let dc = [THEME.border_gold.r, THEME.border_gold.g, THEME.border_gold.b];
-        push_rect(verts, extent, x + vp.scale(3.0), y + vp.scale(3.0), dot, dot, dc);
-        push_rect(verts, extent, x + w - vp.scale(5.5), y + vp.scale(3.0), dot, dot, dc);
+        push_rect(verts, extent, x + w - vp.scale(5.0), y + h - vp.scale(5.0), dot, dot, dc);
     }
 
     // ─── Grid estilo cuaderno de caligrafía ───
@@ -286,7 +331,7 @@ impl Renderer {
         }
     }
 
-    // ─── Conexiones estilo tinta con curva Bezier y glow ───
+    // ─── Conexiones estilo tinta con curva Bezier y glow sutil ───
     fn push_links(&self, verts: &mut Vec<Vertex>, graph: &NodeGraph, extent: vk::Extent2D, vp: Viewport2D) {
         for link in graph.links() {
             let Some(fa) = graph.locate_pin(link.from) else { continue; };
@@ -299,17 +344,17 @@ impl Renderer {
             let link_c = THEME.link_default;
             let color = [link_c.r, link_c.g, link_c.b];
 
-            // Glow exterior (muy ancho, muy transparente - simula bloom)
-            let glow = [link_c.r * 0.5, link_c.g * 0.5, link_c.b * 0.3];
-            push_bezier(verts, extent, from, to, vp.scale(14.0).max(4.0), glow);
-            // Sombra
+            // Glow sutil (más estrecho y oscuro)
+            let glow = [link_c.r * 0.4, link_c.g * 0.4, link_c.b * 0.3];
+            push_bezier(verts, extent, from, to, vp.scale(8.0).max(2.5), glow);
+            // Sombra oscura (profundidad)
             let shadow_c = [THEME.ink_black.r, THEME.ink_black.g, THEME.ink_black.b];
-            push_bezier(verts, extent, from, to, vp.scale(6.0).max(2.0), shadow_c);
-            // Línea principal
-            push_bezier(verts, extent, from, to, vp.scale(3.5).max(1.0), color);
-            // Highlight central (más brillante)
-            let highlight = [link_c.r * 1.4, link_c.g * 1.4, link_c.b * 1.4];
-            push_bezier(verts, extent, from, to, vp.scale(1.2).max(0.4), highlight);
+            push_bezier(verts, extent, from, to, vp.scale(4.5).max(1.5), shadow_c);
+            // Línea principal (más delgada, más elegante)
+            push_bezier(verts, extent, from, to, vp.scale(2.2).max(0.8), color);
+            // Highlight sutil
+            let highlight = [link_c.r * 1.25, link_c.g * 1.25, link_c.b * 1.25];
+            push_bezier(verts, extent, from, to, vp.scale(0.8).max(0.3), highlight);
         }
     }
 
