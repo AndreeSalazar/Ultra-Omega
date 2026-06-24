@@ -137,7 +137,8 @@ impl AppRuntime {
             open_menu: self.open_menu,
             toast_message: self.toast_message.clone(),
             sidebar_entries: self.workspace.list_files_for_sidebar(),
-            sidebar_open: true,
+            sidebar_open: self.workspace.root().is_some(),
+            workspace_path: self.workspace.root().map(|p| p.display().to_string()).unwrap_or_default(),
         }
     }
 
@@ -182,7 +183,10 @@ impl AppRuntime {
     fn create_rust_node_at_view_center(&mut self) {
         let Some(window) = &self.window else { return; };
         let size = window.inner_size();
-        let world = self.viewport.screen_to_world(size.width as f32 * 0.5, size.height as f32 * 0.5);
+        // Centro del area de trabajo (no del screen completo)
+        let work_center_x = (size.width as f32 * 0.5).max(294.0 + 100.0);
+        let work_center_y = size.height as f32 * 0.5;
+        let world = self.viewport.screen_to_world(work_center_x, work_center_y);
 
         self.created_nodes += 1;
         let node_id = self.graph.add_node(
@@ -212,7 +216,9 @@ impl AppRuntime {
         let Some(window) = &self.window else { return; };
 
         let size = window.inner_size();
-        let world = self.viewport.screen_to_world(size.width as f32 * 0.5, size.height as f32 * 0.5);
+        let work_center_x = (size.width as f32 * 0.5).max(294.0 + 100.0);
+        let work_center_y = size.height as f32 * 0.5;
+        let world = self.viewport.screen_to_world(work_center_x, work_center_y);
         let color = Color32::from_rgb(template.color.0, template.color.1, template.color.2);
         let node_id = self.graph.add_node(
             format!("{} {}", template.icon, template.name),

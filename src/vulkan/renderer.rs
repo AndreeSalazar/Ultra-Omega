@@ -24,6 +24,7 @@ pub struct RenderState {
     pub toast_message: Option<String>,
     pub sidebar_entries: Vec<crate::app::workspace::SidebarEntry>,
     pub sidebar_open: bool,
+    pub workspace_path: String,
 }
 
 #[derive(Clone, Debug)]
@@ -137,7 +138,8 @@ impl Renderer {
         }
         if state.template_palette_open { self.push_template_palette(&mut verts, &mut text_verts, extent, &state, atlas); }
         self.push_activity_bar(&mut verts, extent);
-        self.push_sidebar(&mut verts, &mut text_verts, extent, &state.sidebar_entries, state.sidebar_open, atlas);
+        self.push_sidebar(&mut verts, &mut text_verts, extent, &state.sidebar_entries, state.sidebar_open, &state.workspace_path, atlas);
+        self.push_tab_bar(&mut verts, &mut text_verts, extent, state.code_editor_node, state.sidebar_open, atlas);
         if let Some(editor) = &state.code_editor { self.push_code_editor(&mut verts, &mut text_verts, extent, editor, &state.output, state.frame_counter, atlas); }
         self.push_workspace_badge(&mut verts, &mut text_verts, extent, &state.workspace_label, atlas);
         self.push_menu_bar(&mut verts, &mut text_verts, extent, state.open_menu, atlas);
@@ -307,10 +309,11 @@ impl Renderer {
 
     // ─── Grid estilo cuaderno de caligrafía ───
     fn push_grid(&self, verts: &mut Vec<Vertex>, extent: vk::Extent2D, vp: Viewport2D) {
-        // Limites del area de trabajo: empieza despues del sidebar (44 + 240 = 284px)
-        // y debajo del menu bar (32px) y arriba del status bar (24px)
-        const WORK_LEFT: f32 = 284.0;
-        const WORK_TOP: f32 = 32.0;
+        // Limites del area de trabajo: empieza despues del sidebar (44 + 250 = 294px)
+        // y debajo del menu bar (32px) o tab bar (32+28=60px si hay nodo activo)
+        // y arriba del status bar (24px)
+        const WORK_LEFT: f32 = 294.0;
+        const WORK_TOP: f32 = 32.0; // Default - sin tab bar
         const WORK_RIGHT_PAD: f32 = 0.0;
         const WORK_BOTTOM_PAD: f32 = 24.0;
 
@@ -384,7 +387,7 @@ impl Renderer {
             let to = pin_screen_center(tn, ta.kind, ta.slot, vp);
 
             // Clip: no dibujar fuera del area de trabajo
-            if from.0 < 284.0 && to.0 < 284.0 { continue; }
+            if from.0 < 294.0 && to.0 < 294.0 { continue; }
             if from.1 < 32.0 && to.1 < 32.0 { continue; }
 
             let link_c = THEME.link_default;
@@ -428,7 +431,7 @@ impl Renderer {
                 let b0 = u * u * u; let b1 = 3.0 * u * u * t; let b2 = 3.0 * u * t * t; let b3 = t * t * t;
                 let px = from.0 * b0 + c1.0 * b1 + c2.0 * b2 + to.0 * b3;
                 let py = from.1 * b0 + c1.1 * b1 + c2.1 * b2 + to.1 * b3;
-                if px > 284.0 && px < extent.width as f32 && py > 32.0 && py < extent.height as f32 - 24.0 {
+                if px > 294.0 && px < extent.width as f32 && py > 32.0 && py < extent.height as f32 - 24.0 {
                     let particle_r = vp.scale(4.0).max(2.5);
                     // Halo exterior (glow)
                     push_circle(verts, extent, px, py, particle_r * 2.5, [glow_c.r * 0.4, glow_c.g * 0.5, glow_c.b * 0.4]);
@@ -447,7 +450,7 @@ impl Renderer {
                 let b0 = u * u * u; let b1 = 3.0 * u * u * pulse_t; let b2 = 3.0 * u * pulse_t * pulse_t; let b3 = pulse_t * pulse_t * pulse_t;
                 let px = from.0 * b0 + c1.0 * b1 + c2.0 * b2 + to.0 * b3;
                 let py = from.1 * b0 + c1.1 * b1 + c2.1 * b2 + to.1 * b3;
-                if px > 284.0 && px < extent.width as f32 && py > 32.0 && py < extent.height as f32 - 24.0 {
+                if px > 294.0 && px < extent.width as f32 && py > 32.0 && py < extent.height as f32 - 24.0 {
                     let ring_r = vp.scale(6.0).max(3.0);
                     // Anillo exterior
                     push_circle(verts, extent, px, py, ring_r, [link_c.r * 0.5, link_c.g * 0.6, link_c.b * 0.5]);
@@ -777,21 +780,20 @@ impl Renderer {
 
     // ─── Toast notification con fade animation ───
     fn push_toast(&self, text_verts: &mut Vec<TextVertex>, extent: vk::Extent2D, msg: &str, frame: u64, atlas: Option<&FontAtlas>) {
+        let work_left = 294.0;
+        let work_w = extent.width as f32 - work_left;
         let tw = (msg.len() as f32) * 8.0 + 40.0;
-        let th = 36.0;
-        let tx = (extent.width as f32 - tw) * 0.5;
-        let ty = 60.0;
+        let th = 32.0;
+        let tx = work_left + (work_w - tw) * 0.5;
+        let ty = 70.0;
 
-        // Sutil fondo con alpha (solo outline)
-        // Skipping background for now - use only text shadow effect
-
-        // Texto
-        let color = [THEME.imperial_gold.r, THEME.imperial_gold.g, THEME.imperial_gold.b];
-        push_text_gpu(text_verts, extent, tx + 20.0, ty + 10.0, 1.5, color, msg, atlas);
-
-        // Sombra de texto (offset)
+        // Sombra de texto
         let shadow = [0.0, 0.0, 0.0];
         push_text_gpu(text_verts, extent, tx + 21.0, ty + 11.0, 1.5, shadow, msg, atlas);
+
+        // Texto dorado
+        let color = [THEME.imperial_gold.r, THEME.imperial_gold.g, THEME.imperial_gold.b];
+        push_text_gpu(text_verts, extent, tx + 20.0, ty + 10.0, 1.5, color, msg, atlas);
     }
 
     // ─── Activity Bar VSCode (iconos verticales izquierda) ───
@@ -801,151 +803,334 @@ impl Renderer {
         let ab_h = extent.height as f32 - 32.0 - 24.0;
 
         // Fondo
-        let ab_bg = [0.040, 0.034, 0.028]; // #0A0907
+        let ab_bg = [0.040, 0.050, 0.045]; // #0A0D0B - cyber dark
         push_rect(verts, extent, 0.0, ab_y, ACT_W, ab_h, ab_bg);
         // Borde derecho
-        push_rect(verts, extent, ACT_W, ab_y, 1.0, ab_h, [0.18, 0.15, 0.12]);
+        push_rect(verts, extent, ACT_W, ab_y, 1.0, ab_h, [0.18, 0.20, 0.19]);
 
         let gold = [THEME.imperial_gold.r, THEME.imperial_gold.g, THEME.imperial_gold.b];
-        let active = [0.20, 0.16, 0.12];
+        let active_bg = [0.18, 0.22, 0.19];
+        let icon_color = [0.45, 0.55, 0.48];
+        let neon = [0.0, 0.78, 0.50];
 
-        // Icon 1: Explorer (activo por defecto)
-        push_rect(verts, extent, 0.0, ab_y + 6.0, ACT_W, 40.0, active);
-        push_rect(verts, extent, 0.0, ab_y + 6.0, 2.0, 40.0, [gold[0], gold[1], gold[2]]);
+        // ── Icon 1: EXPLORER (activo por defecto) ──
+        let iy1 = ab_y + 8.0;
+        push_rect(verts, extent, 0.0, iy1, ACT_W, 38.0, active_bg);
+        // Indicador lateral izquierdo
+        push_rect(verts, extent, 0.0, iy1, 2.0, 38.0, neon);
+        // Icono de dos archivos apilados
+        let f1_x = 12.0;
+        let f1_y = iy1 + 8.0;
+        // Archivo 1 (atras)
+        push_rounded_rect(verts, extent, f1_x + 4.0, f1_y + 2.0, 18.0, 14.0, 2.0, [0.42, 0.48, 0.44]);
+        // Archivo 2 (frente, mas claro)
+        push_rounded_rect(verts, extent, f1_x, f1_y, 18.0, 14.0, 2.0, neon);
+        // Pequeño indicador de "abierto"
+        push_rect(verts, extent, f1_x, f1_y + 4.0, 18.0, 1.0, [0.0, 0.50, 0.32]);
+        push_rect(verts, extent, f1_x, f1_y + 9.0, 14.0, 1.0, [0.0, 0.50, 0.32]);
 
-        // Dibujar icono Explorer (2 carpetas stacked)
-        let ix = 14.0;
-        let iy = ab_y + 14.0;
-        push_rounded_rect(verts, extent, ix, iy, 16.0, 11.0, 2.0, [0.55, 0.42, 0.20]);
-        push_rounded_rect(verts, extent, ix + 3.0, iy + 13.0, 16.0, 11.0, 2.0, [0.65, 0.52, 0.30]);
-
-        // Icon 2: Search (lupa)
-        let iy2 = ab_y + 56.0;
-        push_circle(verts, extent, 18.0, iy2 + 8.0, 6.0, [0.40, 0.36, 0.30]);
-        push_circle(verts, extent, 18.0, iy2 + 8.0, 3.5, [0.040, 0.034, 0.028]);
+        // ── Icon 2: SEARCH ──
+        let iy2 = iy1 + 50.0;
+        // Lupa
+        push_circle(verts, extent, 17.0, iy2 + 8.0, 6.5, icon_color);
+        push_circle(verts, extent, 17.0, iy2 + 8.0, 3.5, [0.040, 0.050, 0.045]);
         // Mango de la lupa
-        push_line(verts, extent, (23.0, iy2 + 13.0), (27.0, iy2 + 17.0), 2.0, [0.40, 0.36, 0.30]);
+        push_rect(verts, extent, 22.5, iy2 + 13.0, 7.0, 2.0, icon_color);
+        push_rect(verts, extent, 22.5, iy2 + 13.0, 2.0, 5.0, icon_color);
 
-        // Icon 3: Source Control (rama)
-        let iy3 = ab_y + 96.0;
-        push_circle(verts, extent, 22.0, iy3 + 4.0, 3.0, [0.40, 0.36, 0.30]);
-        push_circle(verts, extent, 22.0, iy3 + 14.0, 3.0, [0.40, 0.36, 0.30]);
-        push_rect(verts, extent, 21.0, iy3 + 4.0, 2.0, 10.0, [0.40, 0.36, 0.30]);
+        // ── Icon 3: SOURCE CONTROL (rama con commits) ──
+        let iy3 = iy2 + 50.0;
+        // Linea vertical principal
+        push_rect(verts, extent, 21.0, iy3 + 2.0, 2.0, 22.0, icon_color);
+        // 3 commits (circulos)
+        push_circle(verts, extent, 22.0, iy3 + 4.0, 3.5, neon);
+        push_circle(verts, extent, 22.0, iy3 + 13.0, 3.5, icon_color);
+        push_circle(verts, extent, 22.0, iy3 + 22.0, 3.5, icon_color);
+        // Branch lateral
+        push_rect(verts, extent, 22.0, iy3 + 4.0, 10.0, 2.0, icon_color);
+        push_rect(verts, extent, 30.0, iy3 + 4.0, 2.0, 8.0, icon_color);
+        push_circle(verts, extent, 31.0, iy3 + 12.0, 2.5, icon_color);
 
-        // Icon 4: Extensions (cuadrado con 4 puntos)
-        let iy4 = ab_y + 136.0;
-        push_rect(verts, extent, 14.0, iy4 + 2.0, 16.0, 16.0, [0.40, 0.36, 0.30]);
-        // 4 puntos esquinas
-        for &(dx, dy) in &[(0.0, 0.0), (13.0, 0.0), (0.0, 13.0), (13.0, 13.0)] {
-            push_circle(verts, extent, 14.0 + dx + 2.0, iy4 + 2.0 + dy + 2.0, 1.5, [0.040, 0.034, 0.028]);
+        // ── Icon 4: RUN/DEBUG (play + bug) ──
+        let iy4 = iy3 + 50.0;
+        // Triangulo de play
+        let tri = [
+            (14.0, iy4 + 4.0),
+            (14.0, iy4 + 18.0),
+            (24.0, iy4 + 11.0),
+        ];
+        for i in 0..3 {
+            let a = tri[i];
+            let b = tri[(i + 1) % 3];
+            // Triangulo via lineas gruesas
+            push_rect(verts, extent, a.0, a.1, 1.0, 1.0, neon);
+        }
+        // Manera más facil: triangulo con lineas gruesas
+        push_line(verts, extent, (14.0, iy4 + 4.0), (14.0, iy4 + 18.0), 3.0, neon);
+        push_line(verts, extent, (14.0, iy4 + 18.0), (24.0, iy4 + 11.0), 3.0, neon);
+        push_line(verts, extent, (24.0, iy4 + 11.0), (14.0, iy4 + 4.0), 3.0, neon);
+        // Bug pequeno a la derecha
+        push_circle(verts, extent, 31.0, iy4 + 11.0, 4.0, icon_color);
+        push_circle(verts, extent, 31.0, iy4 + 11.0, 1.5, [0.040, 0.050, 0.045]);
+
+        // ── Icon 5: EXTENSIONS (cuadrado con 4 esquinas) ──
+        let iy5 = iy4 + 50.0;
+        // 4 piezas tipo lego
+        push_rect(verts, extent, 13.0, iy5 + 5.0, 8.0, 8.0, neon);
+        push_rect(verts, extent, 23.0, iy5 + 5.0, 8.0, 8.0, icon_color);
+        push_rect(verts, extent, 13.0, iy5 + 15.0, 8.0, 8.0, icon_color);
+        push_rect(verts, extent, 23.0, iy5 + 15.0, 8.0, 8.0, icon_color);
+        // Puntos en cada pieza
+        for &(px, py) in &[(17.0, 9.0), (27.0, 9.0), (17.0, 19.0), (27.0, 19.0)] {
+            push_circle(verts, extent, px, iy5 + py, 1.0, [0.040, 0.050, 0.045]);
         }
 
-        // Icon 5: Settings (engranaje simplificado) al final
-        let iy5 = ab_h - 40.0;
-        push_circle(verts, extent, 22.0, iy5 + 8.0, 7.0, [0.40, 0.36, 0.30]);
-        push_circle(verts, extent, 22.0, iy5 + 8.0, 3.0, [0.040, 0.034, 0.028]);
-        // Dientes del engranaje
-        for i in 0..6 {
-            let a = (i as f32) * std::f32::consts::TAU / 6.0;
-            let dx = 22.0 + (a.cos() * 8.0);
-            let dy = iy5 + 8.0 + (a.sin() * 8.0);
-            push_rect(verts, extent, dx - 1.5, dy - 1.5, 3.0, 3.0, [0.40, 0.36, 0.30]);
+        // ── Icon 6: SETTINGS (engranaje) al final ──
+        let iy6 = ab_h - 40.0;
+        // Engranaje
+        let sx = 22.0;
+        let sy = iy6 + 8.0;
+        // Dientes (8)
+        for i in 0..8 {
+            let a = (i as f32) * std::f32::consts::TAU / 8.0;
+            let dx = sx + (a.cos() * 9.0);
+            let dy = sy + (a.sin() * 9.0);
+            push_rect(verts, extent, dx - 1.5, dy - 1.5, 3.0, 3.0, icon_color);
         }
+        // Cuerpo del engranaje
+        push_circle(verts, extent, sx, sy, 7.0, icon_color);
+        // Hueco central
+        push_circle(verts, extent, sx, sy, 3.0, [0.040, 0.050, 0.045]);
     }
 
-    // ─── Sidebar VSCode (explorador de archivos + secciones) ───
-    fn push_sidebar(&self, verts: &mut Vec<Vertex>, text_verts: &mut Vec<TextVertex>, extent: vk::Extent2D, entries: &[crate::app::workspace::SidebarEntry], has_workspace: bool, atlas: Option<&FontAtlas>) {
+    // ─── Sidebar VSCode (explorador con lógica contextual) ───
+    fn push_sidebar(&self, verts: &mut Vec<Vertex>, text_verts: &mut Vec<TextVertex>, extent: vk::Extent2D, entries: &[crate::app::workspace::SidebarEntry], has_workspace: bool, workspace_path: &str, atlas: Option<&FontAtlas>) {
         const ACT_W: f32 = 44.0;
-        const SB_W: f32 = 240.0;
+        const SB_W: f32 = 250.0;
         let sb_x = ACT_W;
         let sb_y = 32.0;
         let sb_h = extent.height as f32 - 32.0 - 24.0;
 
+        // Sombra del sidebar (4px de degradado)
+        for i in 0..4 {
+            let shadow_alpha = (4 - i) as f32 * 0.05;
+            let shadow_color = [0.0, 0.0, 0.0];
+            push_rect(verts, extent, sb_x + SB_W + i as f32, sb_y, 1.0, sb_h, shadow_color);
+            let _ = shadow_alpha;
+        }
+
         // Fondo del sidebar
-        let sb_bg = [0.058, 0.048, 0.040]; // #0F0C0A
+        let sb_bg = [0.048, 0.058, 0.052]; // #0C0F0D - cyber dark
         push_rect(verts, extent, sb_x, sb_y, SB_W, sb_h, sb_bg);
-        // Borde derecho
-        let border = [0.20, 0.18, 0.15];
+        // Borde derecho más visible
+        let border = [0.15, 0.18, 0.16];
         push_rect(verts, extent, sb_x + SB_W, sb_y, 1.0, sb_h, border);
 
-        // Header del sidebar
-        let header_bg = [0.075, 0.062, 0.052];
-        push_rect(verts, extent, sb_x, sb_y, SB_W, 26.0, header_bg);
+        // ── HEADER del sidebar ──
+        let header_h = 32.0;
+        let header_bg = [0.060, 0.075, 0.065]; // #0F1310
+        push_rect(verts, extent, sb_x, sb_y, SB_W, header_h, header_bg);
         let gold = [THEME.imperial_gold.r, THEME.imperial_gold.g, THEME.imperial_gold.b];
-        let gold_dim = [gold[0]*0.5, gold[1]*0.5, gold[2]*0.5];
-        let title = if has_workspace { "EXPLORER" } else { "ULTRA-OMEGA" };
-        push_text_gpu(text_verts, extent, sb_x + 12.0, sb_y + 8.0, 1.3, gold, title, atlas);
+        let gold_dim = [gold[0]*0.4, gold[1]*0.4, gold[2]*0.4];
+        let title = if has_workspace { "EXPLORER" } else { "BIENVENIDO" };
+        let title_color = if has_workspace { gold } else { [THEME.imperial_gold.r, THEME.imperial_gold.g, THEME.imperial_gold.b] };
+        push_text_gpu(text_verts, extent, sb_x + 14.0, sb_y + 10.0, 1.4, title_color, title, atlas);
         // Botones de accion (decorativos)
-        push_text_gpu(text_verts, extent, sb_x + SB_W - 50.0, sb_y + 8.0, 1.5, [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b], "+", atlas);
-        push_text_gpu(text_verts, extent, sb_x + SB_W - 24.0, sb_y + 8.0, 1.5, [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b], "...", atlas);
+        let icon_color = [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b];
+        push_text_gpu(text_verts, extent, sb_x + SB_W - 60.0, sb_y + 10.0, 1.6, icon_color, "+", atlas);
+        push_text_gpu(text_verts, extent, sb_x + SB_W - 30.0, sb_y + 10.0, 1.4, icon_color, "...", atlas);
 
         // Separador bajo el header
-        push_rect(verts, extent, sb_x, sb_y + 26.0, SB_W, 1.0, gold_dim);
+        push_rect(verts, extent, sb_x, sb_y + header_h, SB_W, 1.0, gold_dim);
 
-        // Nombre del workspace si existe
-        let mut y = sb_y + 30.0;
-        let row_h = 20.0;
-        if has_workspace {
-            // Mostrar el path del workspace
-            let ws_color = [THEME.text_primary.r, THEME.text_primary.g, THEME.text_primary.b];
-            push_text_gpu(text_verts, extent, sb_x + 8.0, y + 4.0, 1.2, ws_color, "Workspace", atlas);
-            y += row_h;
-        }
-
-        // Tree recursivo
+        let mut y = sb_y + header_h + 6.0;
+        let row_h = 22.0;
         let max_y = sb_y + sb_h - 20.0;
-        for entry in entries.iter() {
-            if y + row_h > max_y { break; }
-            let indent = entry.depth as f32 * 12.0 + sb_x + 8.0;
-            if entry.is_dir {
-                let dir_bg = [0.082, 0.068, 0.058];
-                push_rect(verts, extent, sb_x, y, SB_W, row_h, dir_bg);
-            }
-            // Chevron para carpetas
-            if entry.is_dir {
-                let chev = if entry.is_expanded { "v" } else { ">" };
-                push_text_gpu(text_verts, extent, indent, y + 4.0, 1.0, [gold[0]*0.7, gold[1]*0.7, gold[2]*0.7], chev, atlas);
-            }
-            // Icono
-            let icon = if entry.is_dir { "[D]" } else { "[F]" };
-            let icon_color = if entry.is_dir { gold } else { [0.55, 0.50, 0.42] };
-            push_text_gpu(text_verts, extent, indent + 14.0, y + 4.0, 1.0, icon_color, icon, atlas);
-            // Nombre
-            let name_color = if entry.is_dir { [THEME.text_primary.r, THEME.text_primary.g, THEME.text_primary.b] } else { [THEME.text_secondary.r, THEME.text_secondary.g, THEME.text_secondary.b] };
-            push_text_gpu(text_verts, extent, indent + 38.0, y + 4.0, 1.2, name_color, &clip_text(&entry.name, 20), atlas);
-            y += row_h;
-        }
+        let neon_green = [0.0, 0.78, 0.50];
 
-        // Si no hay workspace, mostrar mensaje + sugerencias
-        if !has_workspace {
-            let empty_color = [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b];
-            push_text_gpu(text_verts, extent, sb_x + 12.0, y + 8.0, 1.2, empty_color, "Sin workspace", atlas);
-            y += row_h + 4.0;
-            push_text_gpu(text_verts, extent, sb_x + 12.0, y + 4.0, 1.0, empty_color, "Para empezar:", atlas);
-            y += row_h;
-            push_text_gpu(text_verts, extent, sb_x + 12.0, y + 4.0, 1.1, [gold[0], gold[1], gold[2]], "File > Open Folder", atlas);
-            y += row_h;
-            push_text_gpu(text_verts, extent, sb_x + 12.0, y + 4.0, 1.1, [gold[0], gold[1], gold[2]], "(o presiona O)", atlas);
-            y += row_h + 8.0;
+        if has_workspace {
+            // ── SECCIÓN: WORKSPACE PATH ──
+            // Header de seccion
+            push_text_gpu(text_verts, extent, sb_x + 14.0, y + 4.0, 1.0, [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b], "WORKSPACE", atlas);
+            // Path del workspace (truncado al ancho del sidebar)
+            let path_color = [THEME.text_primary.r, THEME.text_primary.g, THEME.text_primary.b];
+            let display_path = if workspace_path.len() > 18 {
+                // Mostrar solo el nombre de la carpeta final
+                let last_sep = workspace_path.rfind(['\\', '/']).unwrap_or(0);
+                let last_part = &workspace_path[last_sep..];
+                format!("...{}", last_part)
+            } else {
+                workspace_path.to_string()
+            };
+            push_text_gpu(text_verts, extent, sb_x + 14.0, y + 18.0, 1.2, path_color, &display_path, atlas);
+            y += row_h + 14.0;
+            // Separador
+            push_rect(verts, extent, sb_x + 8.0, y, SB_W - 16.0, 1.0, [0.10, 0.13, 0.11]);
+            y += 8.0;
 
-            // Seccion: Quick Start
-            y += 4.0;
-            push_text_gpu(text_verts, extent, sb_x + 12.0, y + 4.0, 1.2, gold, "QUICK START", atlas);
-            y += row_h + 4.0;
+            // ── SECCIÓN: ARCHIVOS ──
+            // Header de seccion
+            push_text_gpu(text_verts, extent, sb_x + 14.0, y + 4.0, 1.0, [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b], "ARCHIVOS", atlas);
+            y += row_h - 4.0;
+
+            // Tree recursivo
+            if entries.is_empty() {
+                let empty_color = [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b];
+                push_text_gpu(text_verts, extent, sb_x + 24.0, y + 4.0, 1.1, empty_color, "Carpeta vacía", atlas);
+            } else {
+                for entry in entries.iter() {
+                    if y + row_h > max_y { break; }
+                    let indent = entry.depth as f32 * 14.0 + sb_x + 14.0;
+                    // Fila con hover
+                    if entry.is_dir {
+                        let dir_bg = [0.068, 0.082, 0.072];
+                        push_rect(verts, extent, sb_x, y, SB_W, row_h, dir_bg);
+                    } else {
+                        // Fila alternada
+                        if entry.depth % 2 == 1 {
+                            push_rect(verts, extent, sb_x, y, SB_W, row_h, [0.042, 0.050, 0.045]);
+                        }
+                    }
+                    // Chevron para carpetas
+                    if entry.is_dir {
+                        let chev = if entry.is_expanded { "v" } else { ">" };
+                        push_text_gpu(text_verts, extent, indent - 4.0, y + 5.0, 1.1, [gold[0]*0.8, gold[1]*0.8, gold[2]*0.8], chev, atlas);
+                    }
+                    // Icono
+                    let icon = if entry.is_dir { "+" } else { "-" };
+                    let icon_color = if entry.is_dir { gold } else { [0.55, 0.65, 0.58] };
+                    push_text_gpu(text_verts, extent, indent + 10.0, y + 5.0, 1.4, icon_color, icon, atlas);
+                    // Nombre
+                    let name_color = if entry.is_dir { [THEME.text_primary.r, THEME.text_primary.g, THEME.text_primary.b] } else { [0.70, 0.75, 0.72] };
+                    push_text_gpu(text_verts, extent, indent + 28.0, y + 4.0, 1.3, name_color, &clip_text(&entry.name, 18), atlas);
+                    y += row_h;
+                }
+            }
+        } else {
+            // ── SECCIÓN: NO WORKSPACE ──
+            // Icono decorativo (carpeta con ?)
+            let icon_w = 60.0;
+            let icon_x = sb_x + (SB_W - icon_w) * 0.5;
+            push_rounded_rect(verts, extent, icon_x, y + 4.0, icon_w, 44.0, 8.0, [0.06, 0.10, 0.08]);
+            // Borde verde neon tenue
+            push_rect(verts, extent, icon_x, y + 4.0, icon_w, 1.0, [0.0, 0.78, 0.50]);
+            push_rect(verts, extent, icon_x, y + 47.0, icon_w, 1.0, [0.0, 0.39, 0.25]);
+            // "?" centrado
+            let q_x = icon_x + icon_w * 0.5 - 8.0;
+            let q_y = y + 14.0;
+            push_text_gpu(text_verts, extent, q_x, q_y, 2.2, gold, "?", atlas);
+            y += 56.0;
+
+            // Mensaje
+            let msg_color = [THEME.text_primary.r, THEME.text_primary.g, THEME.text_primary.b];
+            push_text_gpu(text_verts, extent, sb_x + 14.0, y + 4.0, 1.3, msg_color, "Sin workspace", atlas);
+            y += row_h;
+
+            // Descripcion
+            let desc_color = [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b];
+            push_text_gpu(text_verts, extent, sb_x + 14.0, y + 4.0, 1.0, desc_color, "Selecciona una carpeta", atlas);
+            push_text_gpu(text_verts, extent, sb_x + 14.0, y + 18.0, 1.0, desc_color, "para empezar.", atlas);
+            y += 36.0;
+
+            // Boton "Open Folder" - posicionado correctamente
+            let neon_green = [0.0, 0.78, 0.50];
+            let btn_pad = 14.0;
+            let btn_x = sb_x + btn_pad;
+            let btn_w = SB_W - btn_pad * 2.0;
+            let btn_h = 32.0;
+            let btn_color = [0.08, 0.14, 0.10];
+            push_rounded_rect(verts, extent, btn_x, y, btn_w, btn_h, 6.0, btn_color);
+            // Borde verde neon
+            push_rect(verts, extent, btn_x, y, btn_w, 1.0, neon_green);
+            push_rect(verts, extent, btn_x, y + btn_h - 1.0, btn_w, 1.0, [neon_green[0]*0.5, neon_green[1]*0.5, neon_green[2]*0.5]);
+            // Texto centrado
+            let btn_text = "Open Folder (O)";
+            let btn_text_w = btn_text.len() as f32 * 8.0;
+            let btn_text_x = btn_x + (btn_w - btn_text_w) * 0.5;
+            push_text_gpu(text_verts, extent, btn_text_x, y + 10.0, 1.3, neon_green, btn_text, atlas);
+            y += btn_h + 16.0;
+
+            // Separador
+            push_rect(verts, extent, sb_x + 8.0, y, SB_W - 16.0, 1.0, [0.10, 0.13, 0.11]);
+            y += 12.0;
+
+            // ── SECCIÓN: QUICK START ──
+            push_text_gpu(text_verts, extent, sb_x + 14.0, y + 4.0, 1.0, [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b], "ATAJOS", atlas);
+            y += row_h - 4.0;
+
             let shortcuts = [
                 ("Tab", "Templates"),
-                ("N", "New Rust node"),
-                ("F5", "Run code"),
-                ("O", "Open folder"),
-                ("R", "Reset view"),
+                ("N", "Nodo Rust"),
+                ("F5", "Ejecutar"),
+                ("Del", "Borrar"),
+                ("R", "Reset"),
             ];
             for (key, desc) in shortcuts.iter() {
-                let kc = [gold[0]*0.85, gold[1]*0.85, gold[2]*0.85];
-                push_text_gpu(text_verts, extent, sb_x + 12.0, y + 3.0, 1.1, kc, key, atlas);
-                push_text_gpu(text_verts, extent, sb_x + 52.0, y + 3.0, 1.0, empty_color, desc, atlas);
-                y += row_h - 4.0;
+                // Key con fondo
+                let key_bg = [0.075, 0.090, 0.080];
+                push_rounded_rect(verts, extent, sb_x + 14.0, y, 36.0, 18.0, 3.0, key_bg);
+                push_text_gpu(text_verts, extent, sb_x + 18.0, y + 3.0, 1.1, neon_green, key, atlas);
+                // Description
+                let d_color = [0.68, 0.74, 0.70];
+                push_text_gpu(text_verts, extent, sb_x + 60.0, y + 4.0, 1.1, d_color, desc, atlas);
+                y += row_h - 2.0;
+            }
+            y += 8.0;
+
+            // ── SECCIÓN: FEATURES ──
+            push_rect(verts, extent, sb_x + 8.0, y, SB_W - 16.0, 1.0, [0.10, 0.13, 0.11]);
+            y += 10.0;
+            push_text_gpu(text_verts, extent, sb_x + 14.0, y + 4.0, 1.0, [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b], "FEATURES", atlas);
+            y += row_h - 4.0;
+            let features = [
+                "Editor interactivo",
+                "F5 = Ejecutar codigo",
+                "Auto-save en nodos",
+                "Templates Rust (22)",
+                "Sistema de carpetas",
+            ];
+            for f in features.iter() {
+                push_text_gpu(text_verts, extent, sb_x + 18.0, y + 4.0, 1.0, [0.62, 0.68, 0.64], "* ", atlas);
+                push_text_gpu(text_verts, extent, sb_x + 30.0, y + 4.0, 1.0, [0.75, 0.80, 0.76], f, atlas);
+                y += row_h - 6.0;
             }
         }
+    }
+
+    // ─── Tab Bar estilo VSCode (debajo del menu bar) ───
+    fn push_tab_bar(&self, verts: &mut Vec<Vertex>, text_verts: &mut Vec<TextVertex>, extent: vk::Extent2D, active_node_id: Option<crate::core::NodeId>, has_workspace: bool, atlas: Option<&FontAtlas>) {
+        let tb_y = 32.0;
+        let tb_h = 28.0;
+        let tb_start_x = 294.0;
+        let tb_w = extent.width as f32 - tb_start_x;
+
+        if let Some(node_id) = active_node_id {
+            // Solo mostrar el bar cuando hay un nodo activo
+            let tb_bg = [0.035, 0.045, 0.040];
+            push_rect(verts, extent, tb_start_x, tb_y, tb_w, tb_h, tb_bg);
+            // Borde inferior
+            push_rect(verts, extent, tb_start_x, tb_y + tb_h - 1.0, tb_w, 1.0, [0.15, 0.18, 0.16]);
+
+            // Mostrar tab del nodo activo
+            let tab_x = tb_start_x;
+            let tab_w = 220.0;
+            let tab_color = [0.070, 0.090, 0.080];
+            push_rect(verts, extent, tab_x, tb_y, tab_w, tb_h, tab_color);
+            // Indicador activo (linea superior verde neon)
+            push_rect(verts, extent, tab_x, tb_y, tab_w, 2.0, [0.0, 0.78, 0.50]);
+            // Borde derecho
+            push_rect(verts, extent, tab_x + tab_w, tb_y + 2.0, 1.0, tb_h - 2.0, [0.15, 0.18, 0.16]);
+
+            let gold = [THEME.imperial_gold.r, THEME.imperial_gold.g, THEME.imperial_gold.b];
+            let node_label = format!("Node #{}", node_id.0);
+            push_text_gpu(text_verts, extent, tab_x + 12.0, tb_y + 8.0, 1.2, gold, &node_label, atlas);
+            // Indicador LIVE
+            let live_color = [0.0, 0.78, 0.50];
+            push_text_gpu(text_verts, extent, tab_x + 100.0, tb_y + 8.0, 1.0, live_color, "LIVE", atlas);
+            // Boton X para cerrar
+            push_text_gpu(text_verts, extent, tab_x + tab_w - 16.0, tb_y + 7.0, 1.4, [0.55, 0.60, 0.55], "X", atlas);
+        }
+        // Si no hay nodo activo, no se muestra el tab bar (ahorra espacio)
     }
 
     // ─── Status Bar inferior mejorada (VSCode-style) ───

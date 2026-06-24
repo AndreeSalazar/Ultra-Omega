@@ -164,7 +164,7 @@ impl NodeGraph {
         // Node 1: Base Rust (Sistemas)
         let sys_node_id = graph.add_node(
             "Base Rust (Sistemas)",
-            pos2(100.0, 100.0),
+            pos2(450.0, 150.0),
             Color32::from_rgb(194, 59, 34), // Vermillion
             &[],
             &["Codigo Fuente"],
@@ -177,7 +177,7 @@ impl NodeGraph {
         // Node 2: Base Rust
         let rust_node_id = graph.add_node(
             "Base Rust",
-            pos2(100.0, 300.0),
+            pos2(450.0, 400.0),
             Color32::from_rgb(194, 59, 34), // Vermillion
             &["Base"],
             &["Codigo Rust"],
