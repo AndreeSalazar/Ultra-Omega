@@ -5,6 +5,14 @@ use super::template_palette::{PaletteAction, TemplatePalette};
 use super::workspace::WorkspaceState;
 use crate::vulkan::context::VulkanContext;
 use crate::vulkan::renderer::{pin_screen_center, CodeEditorState, OutputPanel, RenderState, TemplatePaletteEntry, Viewport2D, NODE_HEIGHT, NODE_WIDTH, PIN_SIZE};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MenuKind {
+    File,
+    Edit,
+    View,
+    Run,
+}
 use winit::application::ApplicationHandler;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoop};
@@ -43,6 +51,9 @@ struct AppRuntime {
     editor_cursor_col: usize,
     output: OutputPanel,
     frame_counter: u64,
+    open_menu: Option<MenuKind>,
+    toast_message: Option<String>,
+    toast_until: u64,
 }
 
 impl AppRuntime {
@@ -66,6 +77,9 @@ impl AppRuntime {
             editor_cursor_col: 0,
             output: OutputPanel::default(),
             frame_counter: 0,
+            open_menu: None,
+            toast_message: None,
+            toast_until: 0,
         }
     }
 
@@ -120,6 +134,10 @@ impl AppRuntime {
             code_editor,
             output: self.output.clone(),
             frame_counter: self.frame_counter,
+            open_menu: self.open_menu,
+            toast_message: self.toast_message.clone(),
+            sidebar_entries: self.workspace.list_files_for_sidebar(),
+            sidebar_open: self.workspace.root().is_some(),
         }
     }
 
@@ -468,16 +486,27 @@ impl AppRuntime {
 
     fn select_workspace_folder(&mut self) {
         if self.workspace.select_folder().is_some() {
+            // Reset completo de estado
+            self.hovered_node = None;
+            self.selected_node = None;
+            self.active_editor_node = None;
+            self.dragging_node = None;
+            self.link_source_pin = None;
+            self.editor_cursor_line = 0;
+            self.editor_cursor_col = 0;
+            self.open_menu = None;
+            self.output = OutputPanel::default();
+
+            // Cargar grafo guardado si existe, sino crear demo
             if let Some(loaded) = self.workspace.load_graph() {
                 self.graph = loaded;
                 self.graph.recalculate_ids();
-                self.hovered_node = None;
-                self.selected_node = None;
-                self.active_editor_node = None;
-                self.dragging_node = None;
-                self.link_source_pin = None;
                 log::info!("Grafo cargado desde workspace");
+            } else {
+                self.graph = NodeGraph::demo();
+                log::info!("Nuevo workspace - cargando demo");
             }
+            self.show_toast(">> Workspace cargado");
         }
     }
 
@@ -614,6 +643,126 @@ impl AppRuntime {
             }
         }
     }
+
+    fn click_menu_bar(&mut self, pos: (f32, f32)) -> Option<MenuKind> {
+        // Solo si el click esta en la barra superior
+        if pos.1 > 32.0 { return None; }
+        let items = [("File", MenuKind::File, 152.0), ("Edit", MenuKind::Edit, 200.0), ("View", MenuKind::View, 248.0), ("Run", MenuKind::Run, 300.0)];
+        for (_label, kind, base_x) in items.iter() {
+            let label_w = match *kind {
+                MenuKind::File => 4.0 * 9.0 + 24.0,
+                MenuKind::Edit => 4.0 * 9.0 + 24.0,
+                MenuKind::View => 4.0 * 9.0 + 24.0,
+                MenuKind::Run => 3.0 * 9.0 + 24.0,
+            };
+            if pos.0 >= *base_x && pos.0 <= *base_x + label_w {
+                return Some(*kind);
+            }
+        }
+        None
+    }
+
+    fn menu_items(&self) -> Vec<(&'static str, &'static str)> {
+        match self.open_menu {
+            Some(MenuKind::File) => vec![
+                ("New Project", "Ctrl+N"),
+                ("Open Folder...", "Ctrl+O"),
+                ("Save", "Ctrl+S"),
+                ("Export Graph", ""),
+            ],
+            Some(MenuKind::Edit) => vec![
+                ("Delete Selected", "Del"),
+                ("Duplicate Node", "Ctrl+D"),
+                ("Select All", "Ctrl+A"),
+            ],
+            Some(MenuKind::View) => vec![
+                ("Reset Zoom", "R"),
+                ("Zoom In", "Ctrl++"),
+                ("Zoom Out", "Ctrl+-"),
+                ("Toggle Grid", "G"),
+            ],
+            Some(MenuKind::Run) => vec![
+                ("Run Active Node", "F5"),
+                ("Build Project", "Ctrl+B"),
+                ("Clean Build", ""),
+            ],
+            None => vec![],
+        }
+    }
+
+    fn try_click_menu_item(&self, pos: (f32, f32)) -> Option<usize> {
+        let menu = self.open_menu?;
+        // Calcular menu_x segun el menu activo
+        let menu_x = match menu {
+            MenuKind::File => 152.0,
+            MenuKind::Edit => 200.0,
+            MenuKind::View => 248.0,
+            MenuKind::Run => 300.0,
+        };
+        let menu_y = 32.0;
+        let mw = 240.0;
+        let items = self.menu_items();
+        for (i, _item) in items.iter().enumerate() {
+            let item_y = menu_y + 6.0 + i as f32 * 32.0;
+            if pos.0 >= menu_x && pos.0 <= menu_x + mw && pos.1 >= item_y && pos.1 <= item_y + 28.0 {
+                return Some(i);
+            }
+        }
+        None
+    }
+
+    fn execute_menu_action(&mut self, idx: usize) {
+        // Ejecutar la accion
+        match self.open_menu {
+            Some(MenuKind::File) => {
+                match idx {
+                    0 => { self.create_demo_graph(); self.show_toast(">> New Project"); }
+                    1 => { self.select_workspace_folder(); self.show_toast(">> Open Folder..."); }
+                    2 => { self.auto_save(); self.show_toast(">> Save"); }
+                    3 => { self.show_toast(">> Export Graph"); }
+                    _ => {}
+                }
+            }
+            Some(MenuKind::Edit) => {
+                match idx {
+                    0 => { self.delete_selected_node(); self.show_toast(">> Delete Selected"); }
+                    1 => { self.show_toast(">> Duplicate Node (TODO)"); }
+                    2 => { self.show_toast(">> Select All (TODO)"); }
+                    _ => {}
+                }
+            }
+            Some(MenuKind::View) => {
+                match idx {
+                    0 => { self.viewport = Viewport2D::default(); self.show_toast(">> Reset Zoom"); }
+                    1 => { self.viewport.zoom_by(2.0); self.show_toast(">> Zoom In"); }
+                    2 => { self.viewport.zoom_by(-2.0); self.show_toast(">> Zoom Out"); }
+                    3 => { self.show_toast(">> Toggle Grid (TODO)"); }
+                    _ => {}
+                }
+            }
+            Some(MenuKind::Run) => {
+                match idx {
+                    0 => { self.compile_and_run_active_node(); self.show_toast(">> Run Active Node"); }
+                    1 => { self.show_toast(">> Build Project (TODO)"); }
+                    2 => { self.show_toast(">> Clean Build (TODO)"); }
+                    _ => {}
+                }
+            }
+            None => {}
+        }
+    }
+
+    fn create_demo_graph(&mut self) {
+        self.graph = NodeGraph::demo();
+        self.hovered_node = None;
+        self.selected_node = None;
+        self.active_editor_node = None;
+    }
+
+    fn show_toast(&mut self, msg: &str) {
+        self.toast_message = Some(msg.to_string());
+        self.toast_until = self.frame_counter + 120; // 2 seconds at 60fps
+    }
 }
 
 impl ApplicationHandler for AppRuntime {
@@ -686,6 +835,26 @@ impl ApplicationHandler for AppRuntime {
                 } else if button == MouseButton::Right && state == ElementState::Pressed {
                     self.open_code_editor_at_cursor();
                 } else if button == MouseButton::Left && state == ElementState::Pressed {
+                    // Si hay un menu abierto, intentar clickear un item
+                    if self.open_menu.is_some() {
+                        if let Some(cursor) = self.last_cursor_position {
+                            if let Some(action) = self.try_click_menu_item(cursor) {
+                                self.execute_menu_action(action);
+                            }
+                            self.open_menu = None;
+                            return;
+                        }
+                    }
+                    // Si el click esta en la top bar, abrir menu
+                    if let Some(cursor) = self.last_cursor_position {
+                        if cursor.1 < 32.0 {
+                            if let Some(menu) = self.click_menu_bar(cursor) {
+                                self.open_menu = Some(menu);
+                                return;
+                            }
+                        }
+                    }
+                    // Logica normal de nodo/pin
                     if self.try_finish_link_from_hover() || self.try_start_link_from_hovered_pin() {
                         self.dragging_node = None;
                     } else {
@@ -745,6 +914,7 @@ impl ApplicationHandler for AppRuntime {
                     KeyCode::KeyN => self.create_rust_node_at_view_center(),
                     KeyCode::Delete => self.delete_selected_node(),
                     KeyCode::Escape => {
+                        self.open_menu = None;
                         self.selected_node = None;
                         self.active_editor_node = None;
                         self.dragging_node = None;
@@ -754,6 +924,15 @@ impl ApplicationHandler for AppRuntime {
                     KeyCode::KeyO => self.select_workspace_folder(),
                     KeyCode::KeyR => self.viewport = Viewport2D::default(),
                     KeyCode::KeyC => self.start_link_from_selected_node(),
+                    KeyCode::F5 => {
+                        // F5 funciona tambien con la seleccion si no hay editor
+                        if self.active_editor_node.is_none() {
+                            if let Some(sel) = self.selected_node {
+                                self.active_editor_node = Some(sel);
+                            }
+                        }
+                        self.compile_and_run_active_node();
+                    }
                     _ => {}
                 }
             }

@@ -20,6 +20,10 @@ pub struct RenderState {
     pub code_editor: Option<CodeEditorState>,
     pub output: OutputPanel,
     pub frame_counter: u64,
+    pub open_menu: Option<crate::app::runtime::MenuKind>,
+    pub toast_message: Option<String>,
+    pub sidebar_entries: Vec<crate::app::workspace::SidebarEntry>,
+    pub sidebar_open: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -132,8 +136,15 @@ impl Renderer {
             if verts.len() >= self.vertex_capacity { verts.truncate(self.vertex_capacity); break; }
         }
         if state.template_palette_open { self.push_template_palette(&mut verts, &mut text_verts, extent, &state, atlas); }
+        if state.sidebar_open {
+            self.push_sidebar(&mut verts, &mut text_verts, extent, &state.sidebar_entries, atlas);
+        }
         if let Some(editor) = &state.code_editor { self.push_code_editor(&mut verts, &mut text_verts, extent, editor, &state.output, state.frame_counter, atlas); }
         self.push_workspace_badge(&mut verts, &mut text_verts, extent, &state.workspace_label, atlas);
+        self.push_menu_bar(&mut verts, &mut text_verts, extent, state.open_menu, atlas);
+        if let Some(msg) = &state.toast_message {
+            self.push_toast(&mut text_verts, extent, msg, state.frame_counter, atlas);
+        }
 
         self.vertex_count = verts.len() as u32;
         if !verts.is_empty() {
@@ -575,26 +586,215 @@ impl Renderer {
         }
     }
 
-    fn push_workspace_badge(&self, verts: &mut Vec<Vertex>, text_verts: &mut Vec<TextVertex>, extent: vk::Extent2D, label: &str, atlas: Option<&FontAtlas>) {
-        let w = (label.chars().count() as f32 * 8.0 * 1.2 + 40.0).clamp(300.0, extent.width.saturating_sub(48) as f32);
-        let x = 24.0;
-        let y = extent.height.saturating_sub(48) as f32;
+    // ─── Top Menu Bar estilo VSCode ───
+    fn push_menu_bar(&self, verts: &mut Vec<Vertex>, text_verts: &mut Vec<TextVertex>, extent: vk::Extent2D, open_menu: Option<crate::app::runtime::MenuKind>, atlas: Option<&FontAtlas>) {
+        // Barra superior (32px de alto) con fondo más visible
+        let bar_bg = [0.055, 0.045, 0.038]; // #0E0B0A
+        push_rect(verts, extent, 0.0, 0.0, extent.width as f32, 32.0, bar_bg);
+        // Borde inferior dorado sutil
+        let gold = [THEME.imperial_gold.r, THEME.imperial_gold.g, THEME.imperial_gold.b];
+        push_rect(verts, extent, 0.0, 31.0, extent.width as f32, 1.0, [gold[0]*0.4, gold[1]*0.4, gold[2]*0.4]);
 
-        // Sombra
-        let shadow = [THEME.ink_black.r, THEME.ink_black.g, THEME.ink_black.b];
-        push_rounded_rect(verts, extent, x - 6.0, y - 6.0, w + 12.0, 34.0, 6.0, shadow);
+        // Logo a la izquierda
+        let logo_color = [gold[0], gold[1], gold[2]];
+        push_text_gpu(text_verts, extent, 16.0, 10.0, 1.7, logo_color, "Ultra-Omega", atlas);
 
-        // Fondo
-        let bg = [THEME.obsidian.r, THEME.obsidian.g, THEME.obsidian.b];
-        push_rounded_rect(verts, extent, x, y, w, 26.0, 4.0, bg);
+        // Separador vertical despues del logo
+        push_rect(verts, extent, 140.0, 6.0, 1.0, 20.0, [0.25, 0.22, 0.18]);
 
-        // Borde dorado
-        let gold = [THEME.border_gold.r, THEME.border_gold.g, THEME.border_gold.b];
-        push_rect(verts, extent, x, y, 3.0, 26.0, gold);
+        // Items del menu - empiezan DESPUES del separador
+        let items = [("File", crate::app::runtime::MenuKind::File),
+                     ("Edit", crate::app::runtime::MenuKind::Edit),
+                     ("View", crate::app::runtime::MenuKind::View),
+                     ("Run", crate::app::runtime::MenuKind::Run)];
+        let mut x = 152.0;
+        for (label, kind) in items.iter() {
+            let w = (label.len() as f32) * 9.0 + 24.0;
+            let is_active = open_menu == Some(*kind);
+            if is_active {
+                let active_bg = [0.18, 0.14, 0.10];
+                push_rect(verts, extent, x, 0.0, w, 32.0, active_bg);
+                // Indicador de bottom
+                push_rect(verts, extent, x, 30.0, w, 2.0, [gold[0]*0.7, gold[1]*0.7, gold[2]*0.7]);
+            }
+            let txt_color = if is_active { [1.0, 0.95, 0.85] } else { [0.78, 0.74, 0.66] };
+            push_text_gpu(text_verts, extent, x + 12.0, 10.0, 1.5, txt_color, label, atlas);
+            x += w;
+        }
+
+        // Indicador derecho
+        let right_txt = "Vulkan Puro | Rust";
+        let rw = (right_txt.len() as f32) * 7.5;
+        push_text_gpu(text_verts, extent, extent.width as f32 - rw - 16.0, 10.0, 1.3, [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b], right_txt, atlas);
+
+        // Dropdown menu si esta abierto
+        if let Some(menu) = open_menu {
+            // Calcular posicion X segun el menu activo
+            let menu_x = match menu {
+                crate::app::runtime::MenuKind::File => 152.0,
+                crate::app::runtime::MenuKind::Edit => 200.0,
+                crate::app::runtime::MenuKind::View => 248.0,
+                crate::app::runtime::MenuKind::Run => 300.0,
+            };
+            let my = 32.0;
+            let mw = 240.0;
+            let items_text: Vec<(&str, &str)> = match menu {
+                crate::app::runtime::MenuKind::File => vec![
+                    ("New Project", "Ctrl+N"),
+                    ("Open Folder...", "Ctrl+O"),
+                    ("Save", "Ctrl+S"),
+                    ("Export Graph", ""),
+                ],
+                crate::app::runtime::MenuKind::Edit => vec![
+                    ("Delete Selected", "Del"),
+                    ("Duplicate Node", "Ctrl+D"),
+                    ("Select All", "Ctrl+A"),
+                ],
+                crate::app::runtime::MenuKind::View => vec![
+                    ("Reset Zoom", "R"),
+                    ("Zoom In", "Ctrl++"),
+                    ("Zoom Out", "Ctrl+-"),
+                    ("Toggle Grid", "G"),
+                ],
+                crate::app::runtime::MenuKind::Run => vec![
+                    ("Run Active Node", "F5"),
+                    ("Build Project", "Ctrl+B"),
+                    ("Clean Build", ""),
+                ],
+            };
+            let mh = items_text.len() as f32 * 32.0 + 12.0;
+
+            // Sombra
+            push_rect(verts, extent, menu_x + 4.0, my + 4.0, mw, mh, [0.0, 0.0, 0.0]);
+            // Fondo del dropdown
+            let dd_bg = [0.082, 0.072, 0.062]; // #151210
+            push_rounded_rect(verts, extent, menu_x, my, mw, mh, 4.0, dd_bg);
+            // Borde dorado
+            push_rect(verts, extent, menu_x, my, mw, 1.0, [gold[0]*0.6, gold[1]*0.6, gold[2]*0.6]);
+            push_rect(verts, extent, menu_x, my + mh - 1.0, mw, 1.0, [gold[0]*0.4, gold[1]*0.4, gold[2]*0.4]);
+
+            // Items
+            for (i, (label, shortcut)) in items_text.iter().enumerate() {
+                let iy = my + 6.0 + i as f32 * 32.0;
+                // Hover background sutil
+                let item_bg = [0.13, 0.10, 0.08];
+                push_rect(verts, extent, menu_x + 4.0, iy, mw - 8.0, 28.0, item_bg);
+                // Label
+                let lbl_color = [THEME.text_primary.r, THEME.text_primary.g, THEME.text_primary.b];
+                push_text_gpu(text_verts, extent, menu_x + 16.0, iy + 7.0, 1.4, lbl_color, label, atlas);
+                // Shortcut
+                if !shortcut.is_empty() {
+                    let sc_color = [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b];
+                    let sc_w = (shortcut.len() as f32) * 7.0;
+                    push_text_gpu(text_verts, extent, menu_x + mw - sc_w - 16.0, iy + 7.0, 1.2, sc_color, shortcut, atlas);
+                }
+                // Separador sutil entre items
+                if i < items_text.len() - 1 {
+                    push_rect(verts, extent, menu_x + 12.0, iy + 28.0, mw - 24.0, 0.5, [0.18, 0.15, 0.12]);
+                }
+            }
+        }
+    }
+
+    // ─── Toast notification con fade animation ───
+    fn push_toast(&self, text_verts: &mut Vec<TextVertex>, extent: vk::Extent2D, msg: &str, frame: u64, atlas: Option<&FontAtlas>) {
+        let tw = (msg.len() as f32) * 8.0 + 40.0;
+        let th = 36.0;
+        let tx = (extent.width as f32 - tw) * 0.5;
+        let ty = 60.0;
+
+        // Sutil fondo con alpha (solo outline)
+        // Skipping background for now - use only text shadow effect
 
         // Texto
-        let tc = [THEME.text_gold.r, THEME.text_gold.g, THEME.text_gold.b];
-        push_text_gpu(text_verts, extent, x + 14.0, y + 8.0, 1.2, tc, label, atlas);
+        let color = [THEME.imperial_gold.r, THEME.imperial_gold.g, THEME.imperial_gold.b];
+        push_text_gpu(text_verts, extent, tx + 20.0, ty + 10.0, 1.5, color, msg, atlas);
+
+        // Sombra de texto (offset)
+        let shadow = [0.0, 0.0, 0.0];
+        push_text_gpu(text_verts, extent, tx + 21.0, ty + 11.0, 1.5, shadow, msg, atlas);
+    }
+
+    // ─── Sidebar estilo VSCode (explorador de archivos) ───
+    fn push_sidebar(&self, verts: &mut Vec<Vertex>, text_verts: &mut Vec<TextVertex>, extent: vk::Extent2D, entries: &[crate::app::workspace::SidebarEntry], atlas: Option<&FontAtlas>) {
+        const SIDEBAR_W: f32 = 240.0;
+        let sb_y = 32.0; // debajo del menu bar
+        let sb_h = extent.height as f32 - 32.0 - 24.0; // menos status bar
+
+        // Fondo del sidebar
+        let sb_bg = [0.058, 0.048, 0.040]; // #0F0C0A
+        push_rect(verts, extent, 0.0, sb_y, SIDEBAR_W, sb_h, sb_bg);
+        // Borde derecho
+        let border = [0.20, 0.18, 0.15];
+        push_rect(verts, extent, SIDEBAR_W, sb_y, 1.0, sb_h, border);
+
+        // Header del sidebar
+        let header_bg = [0.075, 0.062, 0.052];
+        push_rect(verts, extent, 0.0, sb_y, SIDEBAR_W, 26.0, header_bg);
+        let gold = [THEME.imperial_gold.r, THEME.imperial_gold.g, THEME.imperial_gold.b];
+        let gold_dim = [gold[0]*0.5, gold[1]*0.5, gold[2]*0.5];
+        push_text_gpu(text_verts, extent, 12.0, sb_y + 8.0, 1.3, gold, "EXPLORER", atlas);
+        // Botones de accion (decorativos)
+        push_text_gpu(text_verts, extent, SIDEBAR_W - 50.0, sb_y + 8.0, 1.5, [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b], "+", atlas);
+        push_text_gpu(text_verts, extent, SIDEBAR_W - 24.0, sb_y + 8.0, 1.5, [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b], "...", atlas);
+
+        // Separador bajo el header
+        push_rect(verts, extent, 0.0, sb_y + 26.0, SIDEBAR_W, 1.0, gold_dim);
+
+        // Listar archivos
+        let mut y = sb_y + 30.0;
+        let row_h = 20.0;
+        let max_y = sb_y + sb_h - 20.0;
+        for entry in entries.iter() {
+            if y + row_h > max_y { break; }
+            let indent = entry.depth as f32 * 12.0 + 8.0;
+            // Hover/selected (en este caso, highlight sutil para directorios)
+            if entry.is_dir {
+                let dir_bg = [0.082, 0.068, 0.058];
+                push_rect(verts, extent, 0.0, y, SIDEBAR_W, row_h, dir_bg);
+            }
+            // Icono
+            let icon = if entry.is_dir { "[D]" } else { " . " };
+            let icon_color = if entry.is_dir { gold } else { [THEME.text_secondary.r, THEME.text_secondary.g, THEME.text_secondary.b] };
+            push_text_gpu(text_verts, extent, indent, y + 4.0, 1.1, icon_color, icon, atlas);
+            // Nombre
+            let name_color = if entry.is_dir { [THEME.text_primary.r, THEME.text_primary.g, THEME.text_primary.b] } else { [THEME.text_secondary.r, THEME.text_secondary.g, THEME.text_secondary.b] };
+            push_text_gpu(text_verts, extent, indent + 28.0, y + 4.0, 1.2, name_color, &clip_text(&entry.name, 22), atlas);
+            y += row_h;
+        }
+
+        // Si no hay entradas
+        if entries.is_empty() {
+            let empty_color = [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b];
+            push_text_gpu(text_verts, extent, 12.0, sb_y + 60.0, 1.1, empty_color, "Carpeta vacia", atlas);
+        }
+    }
+
+    // ─── Status Bar inferior mejorada (VSCode-style) ───
+    fn push_workspace_badge(&self, verts: &mut Vec<Vertex>, text_verts: &mut Vec<TextVertex>, extent: vk::Extent2D, label: &str, atlas: Option<&FontAtlas>) {
+        // Barra de status inferior (24px de alto)
+        let status_y = extent.height.saturating_sub(24) as f32;
+        let status_bg = [0.090, 0.078, 0.067];
+        push_rect(verts, extent, 0.0, status_y, extent.width as f32, 24.0, status_bg);
+        // Borde superior
+        push_rect(verts, extent, 0.0, status_y, extent.width as f32, 1.0, [0.20, 0.18, 0.15]);
+
+        // Lado izquierdo: workspace
+        let _w = 240.0;
+        let gold = [THEME.imperial_gold.r, THEME.imperial_gold.g, THEME.imperial_gold.b];
+        let gold_dark = [gold[0]*0.6, gold[1]*0.6, gold[2]*0.6];
+        push_rect(verts, extent, 0.0, status_y + 1.0, 3.0, 22.0, gold_dark);
+        let lbl_color = [THEME.text_gold.r, THEME.text_gold.g, THEME.text_gold.b];
+        push_text_gpu(text_verts, extent, 12.0, status_y + 6.0, 1.2, lbl_color, label, atlas);
+
+        // Lado derecho: hints
+        let hint = "F5: Run  |  Del: Delete  |  Tab: Templates  |  O: Open folder";
+        let hw = (hint.len() as f32) * 6.5;
+        let hint_color = [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b];
+        push_text_gpu(text_verts, extent, extent.width as f32 - hw - 12.0, status_y + 6.0, 1.2, hint_color, hint, atlas);
+
+        // Centro: indicador vacio (por ahora)
+        // push_text_gpu(text_verts, extent, w + 20.0, status_y + 6.0, 1.2, lbl_color, "Listo", atlas);
     }
 
     // ─── Pins estilo perla circular ───

@@ -47,13 +47,50 @@ pub struct FontAtlas {
 }
 
 impl FontAtlas {
+    /// Compat: crea atlas con la fuente de UI (Segoe UI) por defecto
     pub fn new(
         device: &ash::Device,
         instance: &ash::Instance,
         physical_device: vk::PhysicalDevice,
         descriptor_set_layout: vk::DescriptorSetLayout,
     ) -> Option<Self> {
-        let font_data = Self::load_font_data()?;
+        // Priorizar UI font (mas nitida)
+        if let Some(atlas) = Self::new_ui(device, instance, physical_device, descriptor_set_layout) {
+            return Some(atlas);
+        }
+        // Fallback: code font
+        Self::new_code(device, instance, physical_device, descriptor_set_layout)
+    }
+
+    /// Crea el atlas de código (monospace - CascadiaCode)
+    pub fn new_code(
+        device: &ash::Device,
+        instance: &ash::Instance,
+        physical_device: vk::PhysicalDevice,
+        descriptor_set_layout: vk::DescriptorSetLayout,
+    ) -> Option<Self> {
+        let font_data = Self::load_font_data_code()?;
+        Self::new_internal(device, instance, physical_device, descriptor_set_layout, font_data)
+    }
+
+    /// Crea el atlas de UI (sans-serif - Segoe UI)
+    pub fn new_ui(
+        device: &ash::Device,
+        instance: &ash::Instance,
+        physical_device: vk::PhysicalDevice,
+        descriptor_set_layout: vk::DescriptorSetLayout,
+    ) -> Option<Self> {
+        let font_data = Self::load_font_data_ui()?;
+        Self::new_internal(device, instance, physical_device, descriptor_set_layout, font_data)
+    }
+
+    fn new_internal(
+        device: &ash::Device,
+        instance: &ash::Instance,
+        physical_device: vk::PhysicalDevice,
+        descriptor_set_layout: vk::DescriptorSetLayout,
+        font_data: Vec<u8>,
+    ) -> Option<Self> {
         let font = FontArc::try_from_vec(font_data).ok()?;
         let scaled_font = font.as_scaled(ATLAS_FONT_SIZE);
 
@@ -164,9 +201,8 @@ impl FontAtlas {
         })
     }
 
-    fn load_font_data() -> Option<Vec<u8>> {
+    fn load_font_data_code() -> Option<Vec<u8>> {
         let paths = [
-            // High-quality monospace fonts (actual Windows filenames)
             r"C:\Windows\Fonts\CascadiaCode.ttf",
             r"C:\Windows\Fonts\CascadiaMono.ttf",
             r"C:\Windows\Fonts\consola.ttf",
@@ -178,12 +214,36 @@ impl FontAtlas {
         ];
         for path in &paths {
             if let Ok(data) = std::fs::read(path) {
-                log::info!("Font loaded: {}", path);
+                log::info!("Code font loaded: {}", path);
                 return Some(data);
             }
         }
-        log::warn!("No font found - text will not render");
+        log::warn!("No code font found");
         None
+    }
+
+    fn load_font_data_ui() -> Option<Vec<u8>> {
+        let paths = [
+            r"C:\Windows\Fonts\segoeui.ttf",
+            r"C:\Windows\Fonts\arial.ttf",
+            r"C:\Windows\Fonts\verdana.ttf",
+            r"C:\Windows\Fonts\tahoma.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/usr/share/fonts/TTF/DejaVuSans.ttf",
+        ];
+        for path in &paths {
+            if let Ok(data) = std::fs::read(path) {
+                log::info!("UI font loaded: {}", path);
+                return Some(data);
+            }
+        }
+        log::warn!("No UI font found");
+        None
+    }
+
+    fn load_font_data() -> Option<Vec<u8>> {
+        // Mantener compatibilidad
+        Self::load_font_data_code()
     }
 
     pub fn space_advance(&self) -> f32 {
@@ -525,4 +585,80 @@ fn find_memory_type(
         }
     }
     None
+}
+
+// ─── FontSet: par de atlas (UI + Code) ───
+// NOTA: Mantenemos compat con FontAtlas::new. La nueva estructura permite UI sans + Code mono.
+pub struct FontSet {
+    pub code: Option<FontAtlas>,
+    pub ui: Option<FontAtlas>,
+}
+
+impl FontSet {
+    #[allow(dead_code)]
+    pub fn new(
+        device: &ash::Device,
+        instance: &ash::Instance,
+        physical_device: vk::PhysicalDevice,
+        command_pool: vk::CommandPool,
+        graphics_queue: vk::Queue,
+        descriptor_set_layout: vk::DescriptorSetLayout,
+    ) -> Self {
+        let code = FontAtlas::new_code(device, instance, physical_device, descriptor_set_layout);
+        let ui = FontAtlas::new_ui(device, instance, physical_device, descriptor_set_layout);
+        for atlas_opt in [&code, &ui] {
+            if let Some(atlas) = atlas_opt {
+                let cmd_alloc_info = vk::CommandBufferAllocateInfo {
+                    command_pool,
+                    level: vk::CommandBufferLevel::PRIMARY,
+                    command_buffer_count: 1,
+                    ..Default::default()
+                };
+                let cmd_buf = unsafe { device.allocate_command_buffers(&cmd_alloc_info).unwrap() }[0];
+                let begin_info = vk::CommandBufferBeginInfo {
+                    flags: vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT,
+                    ..Default::default()
+                };
+                unsafe {
+                    device.begin_command_buffer(cmd_buf, &begin_info).unwrap();
+                    let barrier = vk::ImageMemoryBarrier {
+                        old_layout: vk::ImageLayout::UNDEFINED,
+                        new_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                        src_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+                        dst_queue_family_index: vk::QUEUE_FAMILY_IGNORED,
+                        image: atlas.texture,
+                        subresource_range: vk::ImageSubresourceRange {
+                            aspect_mask: vk::ImageAspectFlags::COLOR,
+                            base_mip_level: 0,
+                            level_count: 1,
+                            base_array_layer: 0,
+                            layer_count: 1,
+                        },
+                        src_access_mask: vk::AccessFlags::empty(),
+                        dst_access_mask: vk::AccessFlags::SHADER_READ,
+                        ..Default::default()
+                    };
+                    device.cmd_pipeline_barrier(
+                        cmd_buf,
+                        vk::PipelineStageFlags::TOP_OF_PIPE,
+                        vk::PipelineStageFlags::FRAGMENT_SHADER,
+                        vk::DependencyFlags::empty(),
+                        &[],
+                        &[],
+                        &[barrier],
+                    );
+                    device.end_command_buffer(cmd_buf).unwrap();
+                    let submit_info = vk::SubmitInfo {
+                        command_buffer_count: 1,
+                        p_command_buffers: &cmd_buf,
+                        ..Default::default()
+                    };
+                    device.queue_submit(graphics_queue, &[submit_info], vk::Fence::null()).unwrap();
+                    device.queue_wait_idle(graphics_queue).unwrap();
+                    device.free_command_buffers(command_pool, &[cmd_buf]);
+                }
+            }
+        }
+        Self { code, ui }
+    }
 }
