@@ -444,6 +444,7 @@ impl ApplicationHandler for AppRuntime {
                 Window::default_attributes()
                     .with_title("Ultra-Omega | Node Editor (Vulkan Puro)")
                     .with_inner_size(winit::dpi::LogicalSize::new(1280.0, 720.0))
+                    .with_decorations(false)
             ).unwrap();
 
             self.vulkan_ctx = Some(VulkanContext::new(&window));
@@ -534,6 +535,10 @@ impl ApplicationHandler for AppRuntime {
                                 self.open_menu = Some(menu);
                                 return;
                             }
+                            if let Some(window) = &self.window {
+                                let _ = window.drag_window();
+                            }
+                            return;
                         }
                     }
 
