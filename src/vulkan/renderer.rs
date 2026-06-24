@@ -20,9 +20,9 @@ pub struct RenderState {
     pub code_editor: Option<CodeEditorState>,
     pub output: OutputPanel,
     pub frame_counter: u64,
-    pub open_menu: Option<crate::app::runtime::MenuKind>,
+    pub open_menu: Option<crate::app::menu::MenuKind>,
     pub toast_message: Option<String>,
-    pub sidebar_entries: Vec<crate::app::workspace::SidebarEntry>,
+    pub sidebar_entries: Vec<crate::app::sidebar::SidebarEntry>,
     pub sidebar_open: bool,
     pub workspace_path: String,
 }
@@ -669,7 +669,7 @@ impl Renderer {
     }
 
     // ─── Top Menu Bar estilo VSCode ───
-    fn push_menu_bar(&self, verts: &mut Vec<Vertex>, text_verts: &mut Vec<TextVertex>, extent: vk::Extent2D, open_menu: Option<crate::app::runtime::MenuKind>, atlas: Option<&FontAtlas>) {
+    fn push_menu_bar(&self, verts: &mut Vec<Vertex>, text_verts: &mut Vec<TextVertex>, extent: vk::Extent2D, open_menu: Option<crate::app::menu::MenuKind>, atlas: Option<&FontAtlas>) {
         // Barra superior (32px de alto) con fondo más visible
         let bar_bg = [0.055, 0.045, 0.038]; // #0E0B0A
         push_rect(verts, extent, 0.0, 0.0, extent.width as f32, 32.0, bar_bg);
@@ -685,10 +685,10 @@ impl Renderer {
         push_rect(verts, extent, 140.0, 6.0, 1.0, 20.0, [0.25, 0.22, 0.18]);
 
         // Items del menu - empiezan DESPUES del separador
-        let items = [("File", crate::app::runtime::MenuKind::File),
-                     ("Edit", crate::app::runtime::MenuKind::Edit),
-                     ("View", crate::app::runtime::MenuKind::View),
-                     ("Run", crate::app::runtime::MenuKind::Run)];
+        let items = [("File", crate::app::menu::MenuKind::File),
+                     ("Edit", crate::app::menu::MenuKind::Edit),
+                     ("View", crate::app::menu::MenuKind::View),
+                     ("Run", crate::app::menu::MenuKind::Run)];
         let mut x = 152.0;
         for (label, kind) in items.iter() {
             let w = (label.len() as f32) * 9.0 + 24.0;
@@ -713,32 +713,32 @@ impl Renderer {
         if let Some(menu) = open_menu {
             // Calcular posicion X segun el menu activo
             let menu_x = match menu {
-                crate::app::runtime::MenuKind::File => 152.0,
-                crate::app::runtime::MenuKind::Edit => 200.0,
-                crate::app::runtime::MenuKind::View => 248.0,
-                crate::app::runtime::MenuKind::Run => 300.0,
+                crate::app::menu::MenuKind::File => 152.0,
+                crate::app::menu::MenuKind::Edit => 200.0,
+                crate::app::menu::MenuKind::View => 248.0,
+                crate::app::menu::MenuKind::Run => 300.0,
             };
             let my = 32.0;
             let mw = 240.0;
             let items_text: Vec<(&str, &str)> = match menu {
-                crate::app::runtime::MenuKind::File => vec![
+                crate::app::menu::MenuKind::File => vec![
                     ("New Project", "Ctrl+N"),
                     ("Open Folder...", "Ctrl+O"),
                     ("Save", "Ctrl+S"),
                     ("Export Graph", ""),
                 ],
-                crate::app::runtime::MenuKind::Edit => vec![
+                crate::app::menu::MenuKind::Edit => vec![
                     ("Delete Selected", "Del"),
                     ("Duplicate Node", "Ctrl+D"),
                     ("Select All", "Ctrl+A"),
                 ],
-                crate::app::runtime::MenuKind::View => vec![
+                crate::app::menu::MenuKind::View => vec![
                     ("Reset Zoom", "R"),
                     ("Zoom In", "Ctrl++"),
                     ("Zoom Out", "Ctrl+-"),
                     ("Toggle Grid", "G"),
                 ],
-                crate::app::runtime::MenuKind::Run => vec![
+                crate::app::menu::MenuKind::Run => vec![
                     ("Run Active Node", "F5"),
                     ("Build Project", "Ctrl+B"),
                     ("Clean Build", ""),
@@ -904,7 +904,7 @@ impl Renderer {
     }
 
     // ─── Sidebar VSCode (explorador con lógica contextual) ───
-    fn push_sidebar(&self, verts: &mut Vec<Vertex>, text_verts: &mut Vec<TextVertex>, extent: vk::Extent2D, entries: &[crate::app::workspace::SidebarEntry], has_workspace: bool, workspace_path: &str, atlas: Option<&FontAtlas>) {
+    fn push_sidebar(&self, verts: &mut Vec<Vertex>, text_verts: &mut Vec<TextVertex>, extent: vk::Extent2D, entries: &[crate::app::sidebar::SidebarEntry], has_workspace: bool, workspace_path: &str, atlas: Option<&FontAtlas>) {
         const ACT_W: f32 = 44.0;
         const SB_W: f32 = 250.0;
         let sb_x = ACT_W;

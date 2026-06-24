@@ -1,30 +1,20 @@
 use crate::core::{NodeGraph, NodeId};
-use crate::core::node_graph::{NodeLanguage, PinKind};
+use crate::core::node_graph::NodeLanguage;
 use crate::core::types::{pos2, Color32};
 use super::template_palette::{PaletteAction, TemplatePalette};
 use super::workspace::WorkspaceState;
+use super::editor::EditorState;
+use super::menu::{MenuKind, MenuBar};
+use super::interaction::{self, HitPin};
+use crate::config::AppConfig;
 use crate::vulkan::context::VulkanContext;
-use crate::vulkan::renderer::{pin_screen_center, CodeEditorState, OutputPanel, RenderState, TemplatePaletteEntry, Viewport2D, NODE_HEIGHT, NODE_WIDTH, PIN_SIZE};
+use crate::vulkan::renderer::{CodeEditorState, OutputPanel, RenderState, TemplatePaletteEntry, Viewport2D, NODE_HEIGHT, NODE_WIDTH};
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum MenuKind {
-    File,
-    Edit,
-    View,
-    Run,
-}
 use winit::application::ApplicationHandler;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{Window, WindowId};
-
-#[derive(Clone, Copy, Debug)]
-struct HitPin {
-    node_id: NodeId,
-    kind: PinKind,
-    slot: usize,
-}
 
 pub fn run() {
     let event_loop = EventLoop::new().unwrap();
@@ -47,8 +37,8 @@ struct AppRuntime {
     created_nodes: u32,
     template_palette: TemplatePalette,
     workspace: WorkspaceState,
-    editor_cursor_line: usize,
-    editor_cursor_col: usize,
+    config: AppConfig,
+    editor: EditorState,
     output: OutputPanel,
     frame_counter: u64,
     open_menu: Option<MenuKind>,
@@ -58,10 +48,26 @@ struct AppRuntime {
 
 impl AppRuntime {
     fn new() -> Self {
+        let config = AppConfig::load();
+
+        let mut workspace = WorkspaceState::default();
+        let mut graph = NodeGraph::demo();
+        if let Some(ref wp) = config.workspace_path {
+            let path = std::path::PathBuf::from(wp);
+            if path.is_dir() {
+                workspace.open_path(path);
+                if let Some(loaded) = workspace.load_graph() {
+                    graph = loaded;
+                    graph.recalculate_ids();
+                    log::info!("Grafo restaurado desde workspace");
+                }
+            }
+        }
+
         Self {
             window: None,
             vulkan_ctx: None,
-            graph: NodeGraph::demo(),
+            graph,
             viewport: Viewport2D::default(),
             is_panning: false,
             last_cursor_position: None,
@@ -72,9 +78,9 @@ impl AppRuntime {
             link_source_pin: None,
             created_nodes: 0,
             template_palette: TemplatePalette::new(),
-            workspace: WorkspaceState::default(),
-            editor_cursor_line: 0,
-            editor_cursor_col: 0,
+            workspace,
+            config,
+            editor: EditorState::default(),
             output: OutputPanel::default(),
             frame_counter: 0,
             open_menu: None,
@@ -114,8 +120,8 @@ impl AppRuntime {
                     language: NodeGraph::language_display_name(node.language).to_string(),
                     code_path: node.code_path.clone().unwrap_or_else(|| "memoria".to_string()),
                     lines,
-                    cursor_line: self.editor_cursor_line,
-                    cursor_col: self.editor_cursor_col,
+                    cursor_line: self.editor.cursor_line,
+                    cursor_col: self.editor.cursor_col,
                     is_active: true,
                 }
             })
@@ -142,48 +148,9 @@ impl AppRuntime {
         }
     }
 
-    fn node_at_screen_position(&self, screen: (f32, f32)) -> Option<NodeId> {
-        let world = self.viewport.screen_to_world(screen.0, screen.1);
-        self.graph
-            .nodes()
-            .iter()
-            .rev()
-            .find(|node| {
-                world.0 >= node.position.x
-                    && world.0 <= node.position.x + NODE_WIDTH
-                    && world.1 >= node.position.y
-                    && world.1 <= node.position.y + NODE_HEIGHT
-            })
-            .map(|node| node.id)
-    }
-
-    fn pin_at_screen_position(&self, screen: (f32, f32)) -> Option<HitPin> {
-        let radius = (PIN_SIZE * self.viewport.zoom).max(8.0);
-        let radius_sq = radius * radius;
-
-        for node in self.graph.nodes().iter().rev() {
-            for (slot, _) in node.outputs.iter().enumerate() {
-                let center = pin_screen_center(node, PinKind::Output, slot, self.viewport);
-                if distance_sq(screen, center) <= radius_sq {
-                    return Some(HitPin { node_id: node.id, kind: PinKind::Output, slot });
-                }
-            }
-
-            for (slot, _) in node.inputs.iter().enumerate() {
-                let center = pin_screen_center(node, PinKind::Input, slot, self.viewport);
-                if distance_sq(screen, center) <= radius_sq {
-                    return Some(HitPin { node_id: node.id, kind: PinKind::Input, slot });
-                }
-            }
-        }
-
-        None
-    }
-
     fn create_rust_node_at_view_center(&mut self) {
         let Some(window) = &self.window else { return; };
         let size = window.inner_size();
-        // Centro del area de trabajo (no del screen completo)
         let work_center_x = (size.width as f32 * 0.5).max(294.0 + 100.0);
         let work_center_y = size.height as f32 * 0.5;
         let world = self.viewport.screen_to_world(work_center_x, work_center_y);
@@ -192,7 +159,7 @@ impl AppRuntime {
         let node_id = self.graph.add_node(
             format!("Rust Node {}", self.created_nodes),
             pos2(world.0 - NODE_WIDTH * 0.5, world.1 - NODE_HEIGHT * 0.5),
-            Color32::from_rgb(194, 59, 34), // Vermillion
+            Color32::from_rgb(194, 59, 34),
             &["in"],
             &["out"],
             NodeLanguage::Rust,
@@ -240,52 +207,6 @@ impl AppRuntime {
         self.auto_save();
     }
 
-    fn try_finish_link_from_hover(&mut self) -> bool {
-        let Some(source_pin) = self.link_source_pin else { return false; };
-        let Some(cursor) = self.last_cursor_position else { return false; };
-        let Some(target_pin) = self.pin_at_screen_position(cursor) else { return false; };
-
-        if source_pin.node_id == target_pin.node_id || target_pin.kind != PinKind::Input {
-            return false;
-        }
-
-        let Some(from_pin) = self.graph.pin_id(source_pin.node_id, PinKind::Output, source_pin.slot) else {
-            self.link_source_pin = None;
-            return false;
-        };
-        let Some(to_pin) = self.graph.pin_id(target_pin.node_id, PinKind::Input, target_pin.slot) else {
-            self.link_source_pin = None;
-            return false;
-        };
-
-        self.graph.add_link(from_pin, to_pin, Color32::from_rgb(168, 112, 62)); // Copper
-        self.selected_node = Some(target_pin.node_id);
-        self.link_source_pin = None;
-        self.auto_save();
-        true
-    }
-
-    fn try_start_link_from_hovered_pin(&mut self) -> bool {
-        let Some(screen) = self.last_cursor_position else { return false; };
-        let Some(pin) = self.pin_at_screen_position(screen) else { return false; };
-
-        if pin.kind != PinKind::Output {
-            return false;
-        }
-
-        self.selected_node = Some(pin.node_id);
-        self.link_source_pin = Some(pin);
-        true
-    }
-
-    fn start_link_from_selected_node(&mut self) {
-        self.link_source_pin = self.selected_node.map(|node_id| HitPin {
-            node_id,
-            kind: PinKind::Output,
-            slot: 0,
-        });
-    }
-
     fn delete_selected_node(&mut self) {
         if let Some(node_id) = self.selected_node.take() {
             self.graph.remove_node(node_id);
@@ -309,210 +230,36 @@ impl AppRuntime {
         }
     }
 
-    fn toggle_template_palette(&mut self) {
-        self.template_palette.toggle();
-    }
-
-    fn open_code_editor_at_cursor(&mut self) -> bool {
-        let Some(node_id) = self.hovered_node else {
-            self.active_editor_node = None;
-            return false;
-        };
-
-        self.selected_node = Some(node_id);
-        self.active_editor_node = Some(node_id);
-        self.dragging_node = None;
-        self.link_source_pin = None;
-        self.template_palette.close();
-
-        // Posicionar cursor al final del código
-        if let Some(node) = self.graph.node(node_id) {
-            let lines: Vec<&str> = node.code.lines().collect();
-            self.editor_cursor_line = lines.len().saturating_sub(1);
-            self.editor_cursor_col = lines.last().map_or(0, |l| l.len());
-        }
-        true
-    }
-
-    fn insert_editor_text(&mut self, text: &str) {
-        let Some(node_id) = self.active_editor_node else { return; };
-        let mut changed = false;
-
-        if let Some(node) = self.graph.node_mut(node_id) {
-            for ch in text.chars() {
-                if ch == '\r' { continue; }
-                if ch == '\n' {
-                    // Insertar nueva línea en la posición del cursor
-                    let lines: Vec<String> = node.code.lines().map(str::to_string).collect();
-                    let line = self.editor_cursor_line.min(lines.len().saturating_sub(1).max(0));
-                    let col = self.editor_cursor_col.min(lines.get(line).map_or(0, |l| l.len()));
-                    let before: String = lines.get(line).map_or(String::new(), |l| l[..col].to_string());
-                    let after: String = lines.get(line).map_or(String::new(), |l| l[col..].to_string());
-                    let mut new_lines: Vec<String> = lines[..line].to_vec();
-                    new_lines.push(before);
-                    new_lines.push(after);
-                    node.code = new_lines.join("\n");
-                    self.editor_cursor_line = (line + 1).min(new_lines.len().saturating_sub(1));
-                    self.editor_cursor_col = 0;
-                    changed = true;
-                } else if !ch.is_control() {
-                    // Insertar carácter en la posición del cursor
-                    let lines: Vec<String> = node.code.lines().map(str::to_string).collect();
-                    let line = self.editor_cursor_line.min(lines.len().saturating_sub(1).max(0));
-                    let col = self.editor_cursor_col.min(lines.get(line).map_or(0, |l| l.len()));
-                    let mut new_lines = lines;
-                    if let Some(l) = new_lines.get_mut(line) {
-                        l.insert(col, ch);
-                    }
-                    node.code = new_lines.join("\n");
-                    self.editor_cursor_col += ch.len_utf8();
-                    changed = true;
-                }
-            }
-        }
-
-        if changed {
-            self.auto_save();
-        }
-    }
-
-    fn handle_code_editor_key(&mut self, key: KeyCode) -> bool {
-        let Some(node_id) = self.active_editor_node else { return false; };
-
-        match key {
-            KeyCode::Escape => {
-                self.active_editor_node = None;
-                true
-            }
-            KeyCode::Backspace => {
-                let mut changed = false;
-                if let Some(node) = self.graph.node_mut(node_id) {
-                    let lines: Vec<String> = node.code.lines().map(str::to_string).collect();
-                    if self.editor_cursor_col > 0 {
-                        let line = self.editor_cursor_line.min(lines.len().saturating_sub(1).max(0));
-                        let col = self.editor_cursor_col;
-                        let mut new_lines = lines;
-                        if let Some(l) = new_lines.get_mut(line) {
-                            if col <= l.len() {
-                                let byte_idx = l.char_indices().nth(col.saturating_sub(1)).map_or(l.len(), |(i, _)| i);
-                                l.remove(byte_idx);
-                                changed = true;
-                                self.editor_cursor_col -= 1;
-                            }
-                        }
-                        if changed { node.code = new_lines.join("\n"); }
-                    } else if self.editor_cursor_line > 0 {
-                        // Unir con la línea anterior
-                        let prev_line_len = lines.get(self.editor_cursor_line.saturating_sub(1)).map_or(0, |l| l.len());
-                        let mut new_lines = lines;
-                        if self.editor_cursor_line < new_lines.len() {
-                            let current = new_lines.remove(self.editor_cursor_line);
-                            if let Some(prev) = new_lines.last_mut() {
-                                prev.push_str(&current);
-                            }
-                            node.code = new_lines.join("\n");
-                            self.editor_cursor_line -= 1;
-                            self.editor_cursor_col = prev_line_len;
-                            changed = true;
-                        }
-                    }
-                }
-                if changed { self.auto_save(); }
-                true
-            }
-            KeyCode::Enter => {
-                self.insert_editor_text("\n");
-                true
-            }
-            KeyCode::Tab => {
-                self.insert_editor_text("    ");
-                true
-            }
-            KeyCode::ArrowLeft => {
-                if self.editor_cursor_col > 0 {
-                    self.editor_cursor_col -= 1;
-                } else if self.editor_cursor_line > 0 {
-                    self.editor_cursor_line -= 1;
-                    if let Some(node) = self.graph.node(node_id) {
-                        let lines: Vec<&str> = node.code.lines().collect();
-                        self.editor_cursor_col = lines.get(self.editor_cursor_line).map_or(0, |l| l.len());
-                    }
-                }
-                true
-            }
-            KeyCode::ArrowRight => {
-                if let Some(node) = self.graph.node(node_id) {
-                    let lines: Vec<&str> = node.code.lines().collect();
-                    let max_col = lines.get(self.editor_cursor_line).map_or(0, |l| l.len());
-                    if self.editor_cursor_col < max_col {
-                        self.editor_cursor_col += 1;
-                    } else if self.editor_cursor_line + 1 < lines.len() {
-                        self.editor_cursor_line += 1;
-                        self.editor_cursor_col = 0;
-                    }
-                }
-                true
-            }
-            KeyCode::ArrowUp => {
-                if self.editor_cursor_line > 0 {
-                    self.editor_cursor_line -= 1;
-                    if let Some(node) = self.graph.node(node_id) {
-                        let lines: Vec<&str> = node.code.lines().collect();
-                        let max_col = lines.get(self.editor_cursor_line).map_or(0, |l| l.len());
-                        self.editor_cursor_col = self.editor_cursor_col.min(max_col);
-                    }
-                }
-                true
-            }
-            KeyCode::ArrowDown => {
-                if let Some(node) = self.graph.node(node_id) {
-                    let lines: Vec<&str> = node.code.lines().collect();
-                    if self.editor_cursor_line + 1 < lines.len() {
-                        self.editor_cursor_line += 1;
-                        let max_col = lines.get(self.editor_cursor_line).map_or(0, |l| l.len());
-                        self.editor_cursor_col = self.editor_cursor_col.min(max_col);
-                    }
-                }
-                true
-            }
-            KeyCode::Home => {
-                self.editor_cursor_col = 0;
-                true
-            }
-            KeyCode::End => {
-                if let Some(node) = self.graph.node(node_id) {
-                    let lines: Vec<&str> = node.code.lines().collect();
-                    self.editor_cursor_col = lines.get(self.editor_cursor_line).map_or(0, |l| l.len());
-                }
-                true
-            }
-            _ => true,
-        }
-    }
-
     fn select_workspace_folder(&mut self) {
         if self.workspace.select_folder().is_some() {
-            // Reset completo de estado
-            self.hovered_node = None;
-            self.selected_node = None;
-            self.active_editor_node = None;
-            self.dragging_node = None;
-            self.link_source_pin = None;
-            self.editor_cursor_line = 0;
-            self.editor_cursor_col = 0;
-            self.open_menu = None;
-            self.output = OutputPanel::default();
+            self.reset_workspace_state();
 
-            // Cargar grafo guardado si existe, sino crear demo
-            if let Some(loaded) = self.workspace.load_graph() {
-                self.graph = loaded;
-                self.graph.recalculate_ids();
-                log::info!("Grafo cargado desde workspace");
-            } else {
-                self.graph = NodeGraph::demo();
-                log::info!("Nuevo workspace - cargando demo");
+            if let Some(path) = self.workspace.root() {
+                self.config.workspace_path = Some(path.display().to_string());
+                let _ = self.config.save();
             }
+
             self.show_toast(">> Workspace cargado");
+        }
+    }
+
+    fn reset_workspace_state(&mut self) {
+        self.hovered_node = None;
+        self.selected_node = None;
+        self.active_editor_node = None;
+        self.dragging_node = None;
+        self.link_source_pin = None;
+        self.editor = EditorState::default();
+        self.open_menu = None;
+        self.output = OutputPanel::default();
+
+        if let Some(loaded) = self.workspace.load_graph() {
+            self.graph = loaded;
+            self.graph.recalculate_ids();
+            log::info!("Grafo cargado desde workspace");
+        } else {
+            self.graph = NodeGraph::demo();
+            log::info!("Nuevo workspace - cargando demo");
         }
     }
 
@@ -527,7 +274,6 @@ impl AppRuntime {
             node.code.clone()
         };
 
-        // Escribir a archivo temporal
         let tmp_dir = std::env::temp_dir();
         let tmp_rs = tmp_dir.join(format!("ultra_omega_play_{}.rs", node_id.0));
         let tmp_exe = tmp_dir.join(format!("ultra_omega_play_{}.exe", node_id.0));
@@ -542,20 +288,18 @@ impl AppRuntime {
             return;
         }
 
-        // Compilar con rustc
         let compile_result = std::process::Command::new("rustc")
             .arg(&tmp_rs)
             .arg("-o")
             .arg(&tmp_exe)
             .arg("--edition")
             .arg("2021")
-            .arg("-O") // Optimización para velocidad
+            .arg("-O")
             .output();
 
         match compile_result {
             Ok(out) => {
                 if out.status.success() {
-                    // Ejecutar el binario
                     let run_result = std::process::Command::new(&tmp_exe).output();
                     match run_result {
                         Ok(r) => {
@@ -591,13 +335,11 @@ impl AppRuntime {
                         }
                     }
                 } else {
-                    // Error de compilación
                     let stderr = String::from_utf8_lossy(&out.stderr);
                     let mut lines: Vec<String> = vec![">>> Error de compilación:".to_string()];
                     let mut error_line: Option<usize> = None;
                     for l in stderr.lines() {
                         lines.push(l.to_string());
-                        // Parsear "linea X" del error de rustc
                         if error_line.is_none() {
                             if let Some(pos) = l.find("-->") {
                                 let after = &l[pos+3..];
@@ -607,7 +349,6 @@ impl AppRuntime {
                                     }
                                 }
                             }
-                            // Formato alternativo: "tmp.rs:5:"
                             if let Some(colon_pos) = l.find(':') {
                                 let after = &l[colon_pos+1..];
                                 if let Some(colon2) = after.find(':') {
@@ -650,80 +391,12 @@ impl AppRuntime {
         }
     }
 
-    fn click_menu_bar(&mut self, pos: (f32, f32)) -> Option<MenuKind> {
-        // Solo si el click esta en la barra superior
-        if pos.1 > 32.0 { return None; }
-        let items = [("File", MenuKind::File, 152.0), ("Edit", MenuKind::Edit, 200.0), ("View", MenuKind::View, 248.0), ("Run", MenuKind::Run, 300.0)];
-        for (_label, kind, base_x) in items.iter() {
-            let label_w = match *kind {
-                MenuKind::File => 4.0 * 9.0 + 24.0,
-                MenuKind::Edit => 4.0 * 9.0 + 24.0,
-                MenuKind::View => 4.0 * 9.0 + 24.0,
-                MenuKind::Run => 3.0 * 9.0 + 24.0,
-            };
-            if pos.0 >= *base_x && pos.0 <= *base_x + label_w {
-                return Some(*kind);
-            }
-        }
-        None
-    }
-
-    fn menu_items(&self) -> Vec<(&'static str, &'static str)> {
-        match self.open_menu {
-            Some(MenuKind::File) => vec![
-                ("New Project", "Ctrl+N"),
-                ("Open Folder...", "Ctrl+O"),
-                ("Save", "Ctrl+S"),
-                ("Export Graph", ""),
-            ],
-            Some(MenuKind::Edit) => vec![
-                ("Delete Selected", "Del"),
-                ("Duplicate Node", "Ctrl+D"),
-                ("Select All", "Ctrl+A"),
-            ],
-            Some(MenuKind::View) => vec![
-                ("Reset Zoom", "R"),
-                ("Zoom In", "Ctrl++"),
-                ("Zoom Out", "Ctrl+-"),
-                ("Toggle Grid", "G"),
-            ],
-            Some(MenuKind::Run) => vec![
-                ("Run Active Node", "F5"),
-                ("Build Project", "Ctrl+B"),
-                ("Clean Build", ""),
-            ],
-            None => vec![],
-        }
-    }
-
-    fn try_click_menu_item(&self, pos: (f32, f32)) -> Option<usize> {
-        let menu = self.open_menu?;
-        // Calcular menu_x segun el menu activo
-        let menu_x = match menu {
-            MenuKind::File => 152.0,
-            MenuKind::Edit => 200.0,
-            MenuKind::View => 248.0,
-            MenuKind::Run => 300.0,
-        };
-        let menu_y = 32.0;
-        let mw = 240.0;
-        let items = self.menu_items();
-        for (i, _item) in items.iter().enumerate() {
-            let item_y = menu_y + 6.0 + i as f32 * 32.0;
-            if pos.0 >= menu_x && pos.0 <= menu_x + mw && pos.1 >= item_y && pos.1 <= item_y + 28.0 {
-                return Some(i);
-            }
-        }
-        None
-    }
-
     fn execute_menu_action(&mut self, idx: usize) {
-        // Ejecutar la accion
         match self.open_menu {
             Some(MenuKind::File) => {
                 match idx {
-                    0 => { self.create_demo_graph(); self.show_toast(">> New Project"); }
-                    1 => { self.select_workspace_folder(); self.show_toast(">> Open Folder..."); }
+                    0 => { self.graph = NodeGraph::demo(); self.hovered_node = None; self.selected_node = None; self.active_editor_node = None; self.show_toast(">> New Project"); }
+                    1 => { self.select_workspace_folder(); }
                     2 => { self.auto_save(); self.show_toast(">> Save"); }
                     3 => { self.show_toast(">> Export Graph"); }
                     _ => {}
@@ -758,16 +431,9 @@ impl AppRuntime {
         }
     }
 
-    fn create_demo_graph(&mut self) {
-        self.graph = NodeGraph::demo();
-        self.hovered_node = None;
-        self.selected_node = None;
-        self.active_editor_node = None;
-    }
-
     fn show_toast(&mut self, msg: &str) {
         self.toast_message = Some(msg.to_string());
-        self.toast_until = self.frame_counter + 120; // 2 seconds at 60fps
+        self.toast_until = self.frame_counter + 120;
     }
 }
 
@@ -833,39 +499,68 @@ impl ApplicationHandler for AppRuntime {
                 }
 
                 self.last_cursor_position = Some(current);
-                self.hovered_node = self.node_at_screen_position(current);
+                self.hovered_node = interaction::node_at_screen(&self.graph, self.viewport, current);
             }
             WindowEvent::MouseInput { state, button, .. } => {
                 if button == MouseButton::Middle {
                     self.is_panning = state == ElementState::Pressed;
                 } else if button == MouseButton::Right && state == ElementState::Pressed {
-                    self.open_code_editor_at_cursor();
+                    if let Some(node_id) = self.hovered_node {
+                        self.editor.open_at_cursor(
+                            node_id,
+                            &self.graph,
+                            &mut self.active_editor_node,
+                            &mut self.selected_node,
+                            &mut self.dragging_node,
+                            &mut self.link_source_pin,
+                            &mut self.template_palette,
+                        );
+                    } else {
+                        self.active_editor_node = None;
+                    }
                 } else if button == MouseButton::Left && state == ElementState::Pressed {
-                    // Si hay un menu abierto, intentar clickear un item
                     if self.open_menu.is_some() {
                         if let Some(cursor) = self.last_cursor_position {
-                            if let Some(action) = self.try_click_menu_item(cursor) {
+                            if let Some(action) = MenuBar::hit_test(cursor, self.open_menu) {
                                 self.execute_menu_action(action);
                             }
                             self.open_menu = None;
                             return;
                         }
                     }
-                    // Si el click esta en la top bar, abrir menu
                     if let Some(cursor) = self.last_cursor_position {
                         if cursor.1 < 32.0 {
-                            if let Some(menu) = self.click_menu_bar(cursor) {
+                            if let Some(menu) = MenuBar::click(cursor) {
                                 self.open_menu = Some(menu);
                                 return;
                             }
                         }
                     }
-                    // Logica normal de nodo/pin
-                    if self.try_finish_link_from_hover() || self.try_start_link_from_hovered_pin() {
-                        self.dragging_node = None;
+
+                    let (linked, new_source) = interaction::try_finish_link(
+                        &mut self.graph,
+                        self.link_source_pin,
+                        self.last_cursor_position,
+                        self.viewport,
+                        &mut self.selected_node,
+                    );
+                    self.link_source_pin = new_source;
+
+                    if !linked {
+                        if let Some(pin) = interaction::try_start_link(
+                            &self.graph,
+                            self.viewport,
+                            self.last_cursor_position,
+                            &mut self.selected_node,
+                        ) {
+                            self.link_source_pin = Some(pin);
+                            self.dragging_node = None;
+                        } else {
+                            self.selected_node = self.hovered_node;
+                            self.dragging_node = self.hovered_node;
+                        }
                     } else {
-                        self.selected_node = self.hovered_node;
-                        self.dragging_node = self.hovered_node;
+                        self.dragging_node = None;
                     }
                 } else if button == MouseButton::Left && state == ElementState::Released {
                     self.dragging_node = None;
@@ -897,14 +592,18 @@ impl ApplicationHandler for AppRuntime {
                         KeyCode::Escape | KeyCode::Backspace | KeyCode::Enter | KeyCode::Tab
                         | KeyCode::ArrowLeft | KeyCode::ArrowRight | KeyCode::ArrowUp | KeyCode::ArrowDown
                         | KeyCode::Home | KeyCode::End => {
-                            self.handle_code_editor_key(key);
+                            let node_id = self.active_editor_node.unwrap();
+                            let changed = self.editor.handle_key(key, node_id, &mut self.graph, &mut self.active_editor_node);
+                            if changed { self.auto_save(); }
                         }
                         KeyCode::F5 => {
                             self.compile_and_run_active_node();
                         }
                         _ => {
                             if let Some(text) = event.text {
-                                self.insert_editor_text(&text);
+                                let node_id = self.active_editor_node.unwrap();
+                                let changed = self.editor.insert_text(&text, node_id, &mut self.graph);
+                                if changed { self.auto_save(); }
                             }
                         }
                     }
@@ -916,7 +615,7 @@ impl ApplicationHandler for AppRuntime {
                 }
 
                 match key {
-                    KeyCode::Tab => self.toggle_template_palette(),
+                    KeyCode::Tab => self.template_palette.toggle(),
                     KeyCode::KeyN => self.create_rust_node_at_view_center(),
                     KeyCode::Delete => self.delete_selected_node(),
                     KeyCode::Escape => {
@@ -929,9 +628,10 @@ impl ApplicationHandler for AppRuntime {
                     }
                     KeyCode::KeyO => self.select_workspace_folder(),
                     KeyCode::KeyR => self.viewport = Viewport2D::default(),
-                    KeyCode::KeyC => self.start_link_from_selected_node(),
+                    KeyCode::KeyC => {
+                        self.link_source_pin = interaction::start_link_from_selected(self.selected_node);
+                    }
                     KeyCode::F5 => {
-                        // F5 funciona tambien con la seleccion si no hay editor
                         if self.active_editor_node.is_none() {
                             if let Some(sel) = self.selected_node {
                                 self.active_editor_node = Some(sel);
@@ -945,12 +645,6 @@ impl ApplicationHandler for AppRuntime {
             _ => {}
         }
     }
-}
-
-fn distance_sq(a: (f32, f32), b: (f32, f32)) -> f32 {
-    let dx = a.0 - b.0;
-    let dy = a.1 - b.1;
-    dx * dx + dy * dy
 }
 
 fn quick_slot_label(index: usize) -> String {
