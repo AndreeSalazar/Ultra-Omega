@@ -136,9 +136,8 @@ impl Renderer {
             if verts.len() >= self.vertex_capacity { verts.truncate(self.vertex_capacity); break; }
         }
         if state.template_palette_open { self.push_template_palette(&mut verts, &mut text_verts, extent, &state, atlas); }
-        if state.sidebar_open {
-            self.push_sidebar(&mut verts, &mut text_verts, extent, &state.sidebar_entries, atlas);
-        }
+        self.push_activity_bar(&mut verts, extent);
+        self.push_sidebar(&mut verts, &mut text_verts, extent, &state.sidebar_entries, state.sidebar_open, atlas);
         if let Some(editor) = &state.code_editor { self.push_code_editor(&mut verts, &mut text_verts, extent, editor, &state.output, state.frame_counter, atlas); }
         self.push_workspace_badge(&mut verts, &mut text_verts, extent, &state.workspace_label, atlas);
         self.push_menu_bar(&mut verts, &mut text_verts, extent, state.open_menu, atlas);
@@ -715,58 +714,157 @@ impl Renderer {
         push_text_gpu(text_verts, extent, tx + 21.0, ty + 11.0, 1.5, shadow, msg, atlas);
     }
 
-    // ─── Sidebar estilo VSCode (explorador de archivos) ───
-    fn push_sidebar(&self, verts: &mut Vec<Vertex>, text_verts: &mut Vec<TextVertex>, extent: vk::Extent2D, entries: &[crate::app::workspace::SidebarEntry], atlas: Option<&FontAtlas>) {
-        const SIDEBAR_W: f32 = 240.0;
-        let sb_y = 32.0; // debajo del menu bar
-        let sb_h = extent.height as f32 - 32.0 - 24.0; // menos status bar
+    // ─── Activity Bar VSCode (iconos verticales izquierda) ───
+    fn push_activity_bar(&self, verts: &mut Vec<Vertex>, extent: vk::Extent2D) {
+        const ACT_W: f32 = 44.0;
+        let ab_y = 32.0;
+        let ab_h = extent.height as f32 - 32.0 - 24.0;
+
+        // Fondo
+        let ab_bg = [0.040, 0.034, 0.028]; // #0A0907
+        push_rect(verts, extent, 0.0, ab_y, ACT_W, ab_h, ab_bg);
+        // Borde derecho
+        push_rect(verts, extent, ACT_W, ab_y, 1.0, ab_h, [0.18, 0.15, 0.12]);
+
+        let gold = [THEME.imperial_gold.r, THEME.imperial_gold.g, THEME.imperial_gold.b];
+        let active = [0.20, 0.16, 0.12];
+
+        // Icon 1: Explorer (activo por defecto)
+        push_rect(verts, extent, 0.0, ab_y + 6.0, ACT_W, 40.0, active);
+        push_rect(verts, extent, 0.0, ab_y + 6.0, 2.0, 40.0, [gold[0], gold[1], gold[2]]);
+
+        // Dibujar icono Explorer (2 carpetas stacked)
+        let ix = 14.0;
+        let iy = ab_y + 14.0;
+        push_rounded_rect(verts, extent, ix, iy, 16.0, 11.0, 2.0, [0.55, 0.42, 0.20]);
+        push_rounded_rect(verts, extent, ix + 3.0, iy + 13.0, 16.0, 11.0, 2.0, [0.65, 0.52, 0.30]);
+
+        // Icon 2: Search (lupa)
+        let iy2 = ab_y + 56.0;
+        push_circle(verts, extent, 18.0, iy2 + 8.0, 6.0, [0.40, 0.36, 0.30]);
+        push_circle(verts, extent, 18.0, iy2 + 8.0, 3.5, [0.040, 0.034, 0.028]);
+        // Mango de la lupa
+        push_line(verts, extent, (23.0, iy2 + 13.0), (27.0, iy2 + 17.0), 2.0, [0.40, 0.36, 0.30]);
+
+        // Icon 3: Source Control (rama)
+        let iy3 = ab_y + 96.0;
+        push_circle(verts, extent, 22.0, iy3 + 4.0, 3.0, [0.40, 0.36, 0.30]);
+        push_circle(verts, extent, 22.0, iy3 + 14.0, 3.0, [0.40, 0.36, 0.30]);
+        push_rect(verts, extent, 21.0, iy3 + 4.0, 2.0, 10.0, [0.40, 0.36, 0.30]);
+
+        // Icon 4: Extensions (cuadrado con 4 puntos)
+        let iy4 = ab_y + 136.0;
+        push_rect(verts, extent, 14.0, iy4 + 2.0, 16.0, 16.0, [0.40, 0.36, 0.30]);
+        // 4 puntos esquinas
+        for &(dx, dy) in &[(0.0, 0.0), (13.0, 0.0), (0.0, 13.0), (13.0, 13.0)] {
+            push_circle(verts, extent, 14.0 + dx + 2.0, iy4 + 2.0 + dy + 2.0, 1.5, [0.040, 0.034, 0.028]);
+        }
+
+        // Icon 5: Settings (engranaje simplificado) al final
+        let iy5 = ab_h - 40.0;
+        push_circle(verts, extent, 22.0, iy5 + 8.0, 7.0, [0.40, 0.36, 0.30]);
+        push_circle(verts, extent, 22.0, iy5 + 8.0, 3.0, [0.040, 0.034, 0.028]);
+        // Dientes del engranaje
+        for i in 0..6 {
+            let a = (i as f32) * std::f32::consts::TAU / 6.0;
+            let dx = 22.0 + (a.cos() * 8.0);
+            let dy = iy5 + 8.0 + (a.sin() * 8.0);
+            push_rect(verts, extent, dx - 1.5, dy - 1.5, 3.0, 3.0, [0.40, 0.36, 0.30]);
+        }
+    }
+
+    // ─── Sidebar VSCode (explorador de archivos + secciones) ───
+    fn push_sidebar(&self, verts: &mut Vec<Vertex>, text_verts: &mut Vec<TextVertex>, extent: vk::Extent2D, entries: &[crate::app::workspace::SidebarEntry], has_workspace: bool, atlas: Option<&FontAtlas>) {
+        const ACT_W: f32 = 44.0;
+        const SB_W: f32 = 240.0;
+        let sb_x = ACT_W;
+        let sb_y = 32.0;
+        let sb_h = extent.height as f32 - 32.0 - 24.0;
 
         // Fondo del sidebar
         let sb_bg = [0.058, 0.048, 0.040]; // #0F0C0A
-        push_rect(verts, extent, 0.0, sb_y, SIDEBAR_W, sb_h, sb_bg);
+        push_rect(verts, extent, sb_x, sb_y, SB_W, sb_h, sb_bg);
         // Borde derecho
         let border = [0.20, 0.18, 0.15];
-        push_rect(verts, extent, SIDEBAR_W, sb_y, 1.0, sb_h, border);
+        push_rect(verts, extent, sb_x + SB_W, sb_y, 1.0, sb_h, border);
 
         // Header del sidebar
         let header_bg = [0.075, 0.062, 0.052];
-        push_rect(verts, extent, 0.0, sb_y, SIDEBAR_W, 26.0, header_bg);
+        push_rect(verts, extent, sb_x, sb_y, SB_W, 26.0, header_bg);
         let gold = [THEME.imperial_gold.r, THEME.imperial_gold.g, THEME.imperial_gold.b];
         let gold_dim = [gold[0]*0.5, gold[1]*0.5, gold[2]*0.5];
-        push_text_gpu(text_verts, extent, 12.0, sb_y + 8.0, 1.3, gold, "EXPLORER", atlas);
+        let title = if has_workspace { "EXPLORER" } else { "ULTRA-OMEGA" };
+        push_text_gpu(text_verts, extent, sb_x + 12.0, sb_y + 8.0, 1.3, gold, title, atlas);
         // Botones de accion (decorativos)
-        push_text_gpu(text_verts, extent, SIDEBAR_W - 50.0, sb_y + 8.0, 1.5, [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b], "+", atlas);
-        push_text_gpu(text_verts, extent, SIDEBAR_W - 24.0, sb_y + 8.0, 1.5, [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b], "...", atlas);
+        push_text_gpu(text_verts, extent, sb_x + SB_W - 50.0, sb_y + 8.0, 1.5, [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b], "+", atlas);
+        push_text_gpu(text_verts, extent, sb_x + SB_W - 24.0, sb_y + 8.0, 1.5, [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b], "...", atlas);
 
         // Separador bajo el header
-        push_rect(verts, extent, 0.0, sb_y + 26.0, SIDEBAR_W, 1.0, gold_dim);
+        push_rect(verts, extent, sb_x, sb_y + 26.0, SB_W, 1.0, gold_dim);
 
-        // Listar archivos
+        // Nombre del workspace si existe
         let mut y = sb_y + 30.0;
         let row_h = 20.0;
-        let max_y = sb_y + sb_h - 20.0;
-        for entry in entries.iter() {
-            if y + row_h > max_y { break; }
-            let indent = entry.depth as f32 * 12.0 + 8.0;
-            // Hover/selected (en este caso, highlight sutil para directorios)
-            if entry.is_dir {
-                let dir_bg = [0.082, 0.068, 0.058];
-                push_rect(verts, extent, 0.0, y, SIDEBAR_W, row_h, dir_bg);
-            }
-            // Icono
-            let icon = if entry.is_dir { "[D]" } else { " . " };
-            let icon_color = if entry.is_dir { gold } else { [THEME.text_secondary.r, THEME.text_secondary.g, THEME.text_secondary.b] };
-            push_text_gpu(text_verts, extent, indent, y + 4.0, 1.1, icon_color, icon, atlas);
-            // Nombre
-            let name_color = if entry.is_dir { [THEME.text_primary.r, THEME.text_primary.g, THEME.text_primary.b] } else { [THEME.text_secondary.r, THEME.text_secondary.g, THEME.text_secondary.b] };
-            push_text_gpu(text_verts, extent, indent + 28.0, y + 4.0, 1.2, name_color, &clip_text(&entry.name, 22), atlas);
+        if has_workspace {
+            // Mostrar el path del workspace
+            let ws_color = [THEME.text_primary.r, THEME.text_primary.g, THEME.text_primary.b];
+            push_text_gpu(text_verts, extent, sb_x + 8.0, y + 4.0, 1.2, ws_color, "Workspace", atlas);
             y += row_h;
         }
 
-        // Si no hay entradas
-        if entries.is_empty() {
+        // Tree recursivo
+        let max_y = sb_y + sb_h - 20.0;
+        for entry in entries.iter() {
+            if y + row_h > max_y { break; }
+            let indent = entry.depth as f32 * 12.0 + sb_x + 8.0;
+            if entry.is_dir {
+                let dir_bg = [0.082, 0.068, 0.058];
+                push_rect(verts, extent, sb_x, y, SB_W, row_h, dir_bg);
+            }
+            // Chevron para carpetas
+            if entry.is_dir {
+                let chev = if entry.is_expanded { "v" } else { ">" };
+                push_text_gpu(text_verts, extent, indent, y + 4.0, 1.0, [gold[0]*0.7, gold[1]*0.7, gold[2]*0.7], chev, atlas);
+            }
+            // Icono
+            let icon = if entry.is_dir { "[D]" } else { "[F]" };
+            let icon_color = if entry.is_dir { gold } else { [0.55, 0.50, 0.42] };
+            push_text_gpu(text_verts, extent, indent + 14.0, y + 4.0, 1.0, icon_color, icon, atlas);
+            // Nombre
+            let name_color = if entry.is_dir { [THEME.text_primary.r, THEME.text_primary.g, THEME.text_primary.b] } else { [THEME.text_secondary.r, THEME.text_secondary.g, THEME.text_secondary.b] };
+            push_text_gpu(text_verts, extent, indent + 38.0, y + 4.0, 1.2, name_color, &clip_text(&entry.name, 20), atlas);
+            y += row_h;
+        }
+
+        // Si no hay workspace, mostrar mensaje + sugerencias
+        if !has_workspace {
             let empty_color = [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b];
-            push_text_gpu(text_verts, extent, 12.0, sb_y + 60.0, 1.1, empty_color, "Carpeta vacia", atlas);
+            push_text_gpu(text_verts, extent, sb_x + 12.0, y + 8.0, 1.2, empty_color, "Sin workspace", atlas);
+            y += row_h + 4.0;
+            push_text_gpu(text_verts, extent, sb_x + 12.0, y + 4.0, 1.0, empty_color, "Para empezar:", atlas);
+            y += row_h;
+            push_text_gpu(text_verts, extent, sb_x + 12.0, y + 4.0, 1.1, [gold[0], gold[1], gold[2]], "File > Open Folder", atlas);
+            y += row_h;
+            push_text_gpu(text_verts, extent, sb_x + 12.0, y + 4.0, 1.1, [gold[0], gold[1], gold[2]], "(o presiona O)", atlas);
+            y += row_h + 8.0;
+
+            // Seccion: Quick Start
+            y += 4.0;
+            push_text_gpu(text_verts, extent, sb_x + 12.0, y + 4.0, 1.2, gold, "QUICK START", atlas);
+            y += row_h + 4.0;
+            let shortcuts = [
+                ("Tab", "Templates"),
+                ("N", "New Rust node"),
+                ("F5", "Run code"),
+                ("O", "Open folder"),
+                ("R", "Reset view"),
+            ];
+            for (key, desc) in shortcuts.iter() {
+                let kc = [gold[0]*0.85, gold[1]*0.85, gold[2]*0.85];
+                push_text_gpu(text_verts, extent, sb_x + 12.0, y + 3.0, 1.1, kc, key, atlas);
+                push_text_gpu(text_verts, extent, sb_x + 52.0, y + 3.0, 1.0, empty_color, desc, atlas);
+                y += row_h - 4.0;
+            }
         }
     }
 

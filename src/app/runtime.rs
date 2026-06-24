@@ -137,7 +137,7 @@ impl AppRuntime {
             open_menu: self.open_menu,
             toast_message: self.toast_message.clone(),
             sidebar_entries: self.workspace.list_files_for_sidebar(),
-            sidebar_open: self.workspace.root().is_some(),
+            sidebar_open: true,
         }
     }
 
