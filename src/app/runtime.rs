@@ -6,12 +6,14 @@ use super::workspace::WorkspaceState;
 use super::editor::EditorState;
 use super::menu::{MenuKind, MenuBar};
 use super::interaction::{self, HitPin};
+use super::command_palette::{CommandPalette, CommandAction};
 use crate::config::AppConfig;
 use crate::vulkan::context::VulkanContext;
 use crate::vulkan::renderer::{CodeEditorState, OutputPanel, RenderState, TemplatePaletteEntry, Viewport2D, NODE_HEIGHT, NODE_WIDTH};
 
 use winit::application::ApplicationHandler;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
+use winit::keyboard::ModifiersState;
 use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{Window, WindowId};
@@ -44,6 +46,8 @@ struct AppRuntime {
     open_menu: Option<MenuKind>,
     toast_message: Option<String>,
     toast_until: u64,
+    command_palette: CommandPalette,
+    modifiers: ModifiersState,
 }
 
 impl AppRuntime {
@@ -86,6 +90,8 @@ impl AppRuntime {
             open_menu: None,
             toast_message: None,
             toast_until: 0,
+            command_palette: CommandPalette::new(),
+            modifiers: ModifiersState::empty(),
         }
     }
 
@@ -145,6 +151,21 @@ impl AppRuntime {
             sidebar_entries: self.workspace.list_files_for_sidebar(),
             sidebar_open: self.workspace.root().is_some(),
             workspace_path: self.workspace.root().map(|p| p.display().to_string()).unwrap_or_default(),
+            node_count: self.graph.nodes().len(),
+            link_count: self.graph.links().len(),
+            zoom_percent: (self.viewport.zoom * 100.0) as u32,
+            command_palette: if self.command_palette.open {
+                let entries = self.command_palette.filtered().map(|(_, c)| {
+                    format!("{} [{}]", c.name, c.shortcut)
+                }).collect();
+                Some(crate::vulkan::renderer::CommandPaletteState {
+                    query: self.command_palette.query.clone(),
+                    selected: self.command_palette.selected,
+                    entries,
+                })
+            } else {
+                None
+            },
         }
     }
 
@@ -431,6 +452,23 @@ impl AppRuntime {
         }
     }
 
+    fn execute_command_action(&mut self, action: CommandAction) {
+        match action {
+            CommandAction::NewNode => { self.create_rust_node_at_view_center(); self.show_toast(">> New Rust Node"); }
+            CommandAction::OpenFolder => { self.select_workspace_folder(); }
+            CommandAction::Save => { self.auto_save(); self.show_toast(">> Save"); }
+            CommandAction::RunNode => { self.compile_and_run_active_node(); self.show_toast(">> Run Active Node"); }
+            CommandAction::DeleteNode => { self.delete_selected_node(); self.show_toast(">> Delete Selected"); }
+            CommandAction::ZoomIn => { self.viewport.zoom_by(2.0); self.show_toast(">> Zoom In"); }
+            CommandAction::ZoomOut => { self.viewport.zoom_by(-2.0); self.show_toast(">> Zoom Out"); }
+            CommandAction::ResetZoom => { self.viewport = Viewport2D::default(); self.show_toast(">> Reset Zoom"); }
+            CommandAction::ToggleTemplates => { self.template_palette.toggle(); }
+            CommandAction::ExportGraph => { self.show_toast(">> Export Graph (TODO)"); }
+            CommandAction::BuildProject => { self.show_toast(">> Build Project (TODO)"); }
+            CommandAction::CleanBuild => { self.show_toast(">> Clean Build (TODO)"); }
+        }
+    }
+
     fn show_toast(&mut self, msg: &str) {
         self.toast_message = Some(msg.to_string());
         self.toast_until = self.frame_counter + 120;
@@ -583,6 +621,9 @@ impl ApplicationHandler for AppRuntime {
                     self.viewport.zoom_by(steps);
                 }
             }
+            WindowEvent::ModifiersChanged(modifiers) => {
+                self.modifiers = modifiers.state();
+            }
             WindowEvent::KeyboardInput { event, .. } => {
                 if event.state != ElementState::Pressed {
                     return;
@@ -591,6 +632,35 @@ impl ApplicationHandler for AppRuntime {
                 let PhysicalKey::Code(key) = event.physical_key else {
                     return;
                 };
+
+                // Ctrl+Shift+P: Command Palette
+                if self.modifiers.control_key() && self.modifiers.shift_key() && key == KeyCode::KeyP {
+                    self.command_palette.toggle();
+                    return;
+                }
+
+                // Command palette mode
+                if self.command_palette.open {
+                    match key {
+                        KeyCode::Escape => { self.command_palette.close(); }
+                        KeyCode::ArrowUp => { self.command_palette.move_selection(-1); }
+                        KeyCode::ArrowDown => { self.command_palette.move_selection(1); }
+                        KeyCode::Enter => {
+                            if let Some(action) = self.command_palette.execute_selected() {
+                                self.execute_command_action(action);
+                            }
+                            self.command_palette.close();
+                        }
+                        _ => {
+                            if let Some(text) = event.text {
+                                for ch in text.chars() {
+                                    self.command_palette.append_char(ch);
+                                }
+                            }
+                        }
+                    }
+                    return;
+                }
 
                 if self.active_editor_node.is_some() {
                     match key {

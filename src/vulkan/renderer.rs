@@ -25,12 +25,23 @@ pub struct RenderState {
     pub sidebar_entries: Vec<crate::app::sidebar::SidebarEntry>,
     pub sidebar_open: bool,
     pub workspace_path: String,
+    pub node_count: usize,
+    pub link_count: usize,
+    pub zoom_percent: u32,
+    pub command_palette: Option<CommandPaletteState>,
 }
 
 #[derive(Clone, Debug)]
 pub struct TemplatePaletteEntry {
     pub label: String,
     pub color: [f32; 3],
+}
+
+#[derive(Clone, Debug)]
+pub struct CommandPaletteState {
+    pub query: String,
+    pub selected: usize,
+    pub entries: Vec<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -141,10 +152,13 @@ impl Renderer {
         self.push_sidebar(&mut verts, &mut text_verts, extent, &state.sidebar_entries, state.sidebar_open, &state.workspace_path, atlas);
         self.push_tab_bar(&mut verts, &mut text_verts, extent, state.code_editor_node, state.sidebar_open, atlas);
         if let Some(editor) = &state.code_editor { self.push_code_editor(&mut verts, &mut text_verts, extent, editor, &state.output, state.frame_counter, atlas); }
-        self.push_workspace_badge(&mut verts, &mut text_verts, extent, &state.workspace_label, atlas);
+        self.push_workspace_badge(&mut verts, &mut text_verts, extent, &state, atlas);
         self.push_menu_bar(&mut verts, &mut text_verts, extent, state.open_menu, atlas);
         if let Some(msg) = &state.toast_message {
             self.push_toast(&mut text_verts, extent, msg, state.frame_counter, atlas);
+        }
+        if let Some(cp) = &state.command_palette {
+            self.push_command_palette(&mut verts, &mut text_verts, extent, cp, atlas);
         }
 
         self.vertex_count = verts.len() as u32;
@@ -796,6 +810,70 @@ impl Renderer {
         push_text_gpu(text_verts, extent, tx + 20.0, ty + 10.0, 1.5, color, msg, atlas);
     }
 
+    fn push_command_palette(&self, verts: &mut Vec<Vertex>, text_verts: &mut Vec<TextVertex>, extent: vk::Extent2D, cp: &CommandPaletteState, atlas: Option<&FontAtlas>) {
+        let work_left = 294.0;
+        let pw = 420.0;
+        let px = work_left + (extent.width as f32 - work_left - pw) * 0.5;
+        let py = 80.0;
+
+        // Backdrop
+        let backdrop_color = [0.0, 0.0, 0.0];
+        push_rect(verts, extent, 0.0, 32.0, extent.width as f32, extent.height as f32 - 56.0, [0.0, 0.0, 0.0]);
+
+        // Panel background
+        let panel_bg = [0.10, 0.11, 0.10];
+        push_rect(verts, extent, px, py, pw, 300.0, panel_bg);
+
+        // Border
+        let border = [THEME.imperial_gold.r, THEME.imperial_gold.g, THEME.imperial_gold.b];
+        push_rect(verts, extent, px, py, pw, 1.0, border);
+        push_rect(verts, extent, px, py + 300.0, pw, 1.0, border);
+        push_rect(verts, extent, px, py, 1.0, 300.0, border);
+        push_rect(verts, extent, px + pw, py, 1.0, 300.0, border);
+
+        // Title
+        let title = "COMMAND PALETTE";
+        let title_color = [THEME.imperial_gold.r, THEME.imperial_gold.g, THEME.imperial_gold.b];
+        push_text_gpu(text_verts, extent, px + 12.0, py + 8.0, 1.2, title_color, title, atlas);
+
+        // Query line
+        let query_bg = [0.14, 0.15, 0.14];
+        push_rect(verts, extent, px + 8.0, py + 28.0, pw - 16.0, 24.0, query_bg);
+        let query_border = [0.25, 0.28, 0.26];
+        push_rect(verts, extent, px + 8.0, py + 28.0, pw - 16.0, 1.0, query_border);
+        push_rect(verts, extent, px + 8.0, py + 51.0, pw - 16.0, 1.0, query_border);
+
+        // Query text
+        let query_display = if cp.query.is_empty() { "> " } else { &format!("> {}", cp.query) };
+        let query_color = [1.0, 1.0, 1.0];
+        push_text_gpu(text_verts, extent, px + 14.0, py + 34.0, 1.3, query_color, query_display, atlas);
+
+        // Entries
+        let entry_y_start = py + 58.0;
+        let entry_h = 24.0;
+        let max_entries = 10;
+        for (i, entry) in cp.entries.iter().take(max_entries).enumerate() {
+            let ey = entry_y_start + i as f32 * entry_h;
+            if i == cp.selected {
+                let sel_bg = [THEME.jade_green.r * 0.3, THEME.jade_green.g * 0.3, THEME.jade_green.b * 0.3];
+                push_rect(verts, extent, px + 8.0, ey, pw - 16.0, entry_h, sel_bg);
+                let sel_bar = [THEME.jade_green.r, THEME.jade_green.g, THEME.jade_green.b];
+                push_rect(verts, extent, px + 8.0, ey, 2.0, entry_h, sel_bar);
+            }
+            let text_color = if i == cp.selected {
+                [1.0, 1.0, 1.0]
+            } else {
+                [0.7, 0.75, 0.72]
+            };
+            push_text_gpu(text_verts, extent, px + 16.0, ey + 6.0, 1.2, text_color, entry, atlas);
+        }
+
+        // Hints at bottom
+        let hint = "↑↓ Navigate  |  Enter Select  |  Esc Close";
+        let hint_color = [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b];
+        push_text_gpu(text_verts, extent, px + 12.0, py + 284.0, 1.0, hint_color, hint, atlas);
+    }
+
     // ─── Activity Bar VSCode (iconos verticales izquierda) ───
     fn push_activity_bar(&self, verts: &mut Vec<Vertex>, extent: vk::Extent2D) {
         const ACT_W: f32 = 44.0;
@@ -1134,30 +1212,64 @@ impl Renderer {
     }
 
     // ─── Status Bar inferior mejorada (VSCode-style) ───
-    fn push_workspace_badge(&self, verts: &mut Vec<Vertex>, text_verts: &mut Vec<TextVertex>, extent: vk::Extent2D, label: &str, atlas: Option<&FontAtlas>) {
-        // Barra de status inferior (24px de alto)
+    fn push_workspace_badge(&self, verts: &mut Vec<Vertex>, text_verts: &mut Vec<TextVertex>, extent: vk::Extent2D, state: &RenderState, atlas: Option<&FontAtlas>) {
         let status_y = extent.height.saturating_sub(24) as f32;
         let status_bg = [0.090, 0.078, 0.067];
         push_rect(verts, extent, 0.0, status_y, extent.width as f32, 24.0, status_bg);
-        // Borde superior
         push_rect(verts, extent, 0.0, status_y, extent.width as f32, 1.0, [0.20, 0.18, 0.15]);
 
-        // Lado izquierdo: workspace
-        let _w = 240.0;
         let gold = [THEME.imperial_gold.r, THEME.imperial_gold.g, THEME.imperial_gold.b];
         let gold_dark = [gold[0]*0.6, gold[1]*0.6, gold[2]*0.6];
         push_rect(verts, extent, 0.0, status_y + 1.0, 3.0, 22.0, gold_dark);
+
         let lbl_color = [THEME.text_gold.r, THEME.text_gold.g, THEME.text_gold.b];
-        push_text_gpu(text_verts, extent, 12.0, status_y + 6.0, 1.2, lbl_color, label, atlas);
-
-        // Lado derecho: hints
-        let hint = "F5: Run  |  Del: Delete  |  Tab: Templates  |  O: Open folder";
-        let hw = (hint.len() as f32) * 6.5;
         let hint_color = [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b];
-        push_text_gpu(text_verts, extent, extent.width as f32 - hw - 12.0, status_y + 6.0, 1.2, hint_color, hint, atlas);
+        let green = [THEME.jade_green.r, THEME.jade_green.g, THEME.jade_green.b];
 
-        // Centro: indicador vacio (por ahora)
-        // push_text_gpu(text_verts, extent, w + 20.0, status_y + 6.0, 1.2, lbl_color, "Listo", atlas);
+        // Left: workspace
+        push_text_gpu(text_verts, extent, 12.0, status_y + 6.0, 1.2, lbl_color, &state.workspace_label, atlas);
+
+        // Right side items
+        let mut rx = extent.width as f32 - 12.0;
+
+        // Hints
+        let hints = ["F5:Run", "Del:Delete", "Tab:Templates", "O:Open", "Ctrl+Shift+P:Commands"];
+        for hint in hints.iter().rev() {
+            let hw = (hint.len() as f32) * 6.5;
+            rx -= hw;
+            push_text_gpu(text_verts, extent, rx, status_y + 6.0, 1.1, hint_color, hint, atlas);
+            rx -= 10.0;
+        }
+
+        // Separator
+        rx -= 8.0;
+        push_rect(verts, extent, rx, status_y + 4.0, 1.0, 16.0, [0.20, 0.18, 0.15]);
+        rx -= 12.0;
+
+        // Zoom
+        let zoom_str = format!("{}%", state.zoom_percent);
+        let zw = (zoom_str.len() as f32) * 6.5;
+        rx -= zw;
+        push_text_gpu(text_verts, extent, rx, status_y + 6.0, 1.1, green, &zoom_str, atlas);
+        rx -= 10.0;
+
+        // Separator
+        rx -= 8.0;
+        push_rect(verts, extent, rx, status_y + 4.0, 1.0, 16.0, [0.20, 0.18, 0.15]);
+        rx -= 12.0;
+
+        // Links count
+        let links_str = format!("{} links", state.link_count);
+        let lw = (links_str.len() as f32) * 6.5;
+        rx -= lw;
+        push_text_gpu(text_verts, extent, rx, status_y + 6.0, 1.1, green, &links_str, atlas);
+        rx -= 10.0;
+
+        // Nodes count
+        let nodes_str = format!("{} nodes", state.node_count);
+        let nw = (nodes_str.len() as f32) * 6.5;
+        rx -= nw;
+        push_text_gpu(text_verts, extent, rx, status_y + 6.0, 1.1, green, &nodes_str, atlas);
     }
 
     // ─── Pins estilo perla circular ───

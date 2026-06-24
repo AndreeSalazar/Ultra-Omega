@@ -169,10 +169,12 @@ impl GraphicsPipeline {
 }
 
 pub unsafe fn create_shader_module(device: &ash::Device, code: &[u8]) -> vk::ShaderModule {
-    let code_u32 = std::slice::from_raw_parts(code.as_ptr() as *const u32, code.len() / 4);
+    let aligned: Vec<u32> = code.chunks_exact(4)
+        .map(|c| u32::from_ne_bytes([c[0], c[1], c[2], c[3]]))
+        .collect();
     let create_info = vk::ShaderModuleCreateInfo {
-        code_size: code_u32.len() * 4,
-        p_code: code_u32.as_ptr(),
+        code_size: aligned.len() * 4,
+        p_code: aligned.as_ptr(),
         ..Default::default()
     };
     device.create_shader_module(&create_info, None).unwrap()
