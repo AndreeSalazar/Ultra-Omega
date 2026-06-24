@@ -108,20 +108,21 @@ pub struct UltraOmegaTheme {
     pub grid_axis: Color,
     pub grid_dot: Color,
 
-    // ── Conexiones (tinta) ──
+    // ── Conexiones (tinta + neon cyberpunk) ──
     pub link_default: Color,
     pub link_active: Color,
     pub link_hover: Color,
+    pub link_glow: Color,
 }
 
 impl Default for UltraOmegaTheme {
     fn default() -> Self {
         Self {
-            // ── Fondos cálidos estilo Houdini (no azulados) ──
-            ink_black:      Color::from_rgb(22, 19, 17),       // #161311 - tinta cálida
-            ink_deep:       Color::from_rgb(30, 26, 23),       // #1E1A17 - laca oscura
-            ink_medium:     Color::from_rgb(42, 37, 32),       // #2A2520 - piedra cálida
-            porcelain:      Color::from_rgb(226, 218, 199),    // #E2DAC7 - porcelana cálida
+            // ── Fondos muy oscuros cyber (negro con tinte verde) ──
+            ink_black:      Color::from_rgb(8, 12, 10),         // #080C0A - negro cyber
+            ink_deep:       Color::from_rgb(14, 18, 15),        // #0E120F
+            ink_medium:     Color::from_rgb(22, 28, 24),        // #161C18
+            porcelain:      Color::from_rgb(228, 222, 210),    // #E4DED2 - porcelana cálida
             porcelain_warm: Color::from_rgb(214, 203, 181),    // #D6CBB5 - arroz y seda
             silk_cream:     Color::from_rgb(194, 181, 153),    // #C2B599 - seda envejecida
 
@@ -180,10 +181,11 @@ impl Default for UltraOmegaTheme {
             grid_axis: Color::from_rgb(52, 46, 38),            // #342E26
             grid_dot:  Color::from_rgb(42, 38, 33),            // #2A2621
 
-            // ── Conexiones tipo tinta antigua (cobre apagado) ──
-            link_default: Color::from_rgb(120, 75, 38),       // cobre antiguo
-            link_active:  Color::from_rgb(118, 38, 28),        // rojo chino oscuro
-            link_hover:   Color::from_rgb(178, 142, 52),       // oro apagado
+            // ── Conexiones cyberpunk neon (estilo Blueprint/Matrix) ──
+            link_default: Color::from_rgb(0, 220, 140),       // #00DC8C - verde neon cyber
+            link_active:  Color::from_rgb(0, 255, 180),        // #00FFB4 - verde electrico
+            link_hover:   Color::from_rgb(120, 255, 200),      // #78FFC8 - verde claro hover
+            link_glow:    Color::from_rgb(0, 180, 100),       // #00B464 - verde oscuro para glow
         }
     }
 }

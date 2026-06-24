@@ -394,7 +394,7 @@ impl VulkanContext {
         }
 
         let clear_values = [vk::ClearValue {
-            color: vk::ClearColorValue { float32: [0.086, 0.075, 0.067, 1.0] }, // #161311 warm ink
+            color: vk::ClearColorValue { float32: [0.025, 0.035, 0.028, 1.0] }, // #070908 - negro cyber verde
         }];
 
         let render_pass_begin_info = vk::RenderPassBeginInfo {

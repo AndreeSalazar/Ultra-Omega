@@ -130,7 +130,7 @@ impl Renderer {
         let mut text_verts = Vec::with_capacity(graph.nodes().len() * 64);
 
         self.push_grid(&mut verts, extent, viewport);
-        self.push_links(&mut verts, graph, extent, viewport);
+        self.push_links(&mut verts, graph, extent, viewport, state.frame_counter);
         for node in graph.nodes() {
             self.push_node(&mut verts, &mut text_verts, node, extent, viewport, &state, atlas);
             if verts.len() >= self.vertex_capacity { verts.truncate(self.vertex_capacity); break; }
@@ -307,17 +307,27 @@ impl Renderer {
 
     // ─── Grid estilo cuaderno de caligrafía ───
     fn push_grid(&self, verts: &mut Vec<Vertex>, extent: vk::Extent2D, vp: Viewport2D) {
-        let tl = vp.screen_to_world(0.0, 0.0);
-        let br = vp.screen_to_world(extent.width as f32, extent.height as f32);
+        // Limites del area de trabajo: empieza despues del sidebar (44 + 240 = 284px)
+        // y debajo del menu bar (32px) y arriba del status bar (24px)
+        const WORK_LEFT: f32 = 284.0;
+        const WORK_TOP: f32 = 32.0;
+        const WORK_RIGHT_PAD: f32 = 0.0;
+        const WORK_BOTTOM_PAD: f32 = 24.0;
+
+        let work_w = extent.width as f32 - WORK_LEFT - WORK_RIGHT_PAD;
+        let work_h = extent.height as f32 - WORK_TOP - WORK_BOTTOM_PAD;
+        if work_w <= 0.0 || work_h <= 0.0 { return; }
+
+        let tl = vp.screen_to_world(WORK_LEFT, WORK_TOP);
+        let br = vp.screen_to_world(WORK_LEFT + work_w, WORK_TOP + work_h);
         let min_x = tl.0.min(br.0); let max_x = tl.0.max(br.0);
-        let min_y = tl.1.min(br.1); let max_y = tl.1.max(br.1);
+        let min_y = tl.1.min(br.1); let max_y = tl.1.max(br.0); // <- fix: usar br.1
 
         let sx = (min_x / GRID_SPACING).floor() as i32 - 1;
         let ex = (max_x / GRID_SPACING).ceil() as i32 + 1;
         let sy = (min_y / GRID_SPACING).floor() as i32 - 1;
         let ey = (max_y / GRID_SPACING).ceil() as i32 + 1;
 
-        // Líneas principales (ejes)
         let axis_c = [THEME.grid_axis.r, THEME.grid_axis.g, THEME.grid_axis.b];
         let line_c = [THEME.grid_line.r, THEME.grid_line.g, THEME.grid_line.b];
 
@@ -326,24 +336,36 @@ impl Renderer {
             let from = vp.world_to_screen(wx, min_y - GRID_SPACING);
             let to = vp.world_to_screen(wx, max_y + GRID_SPACING);
             let (c, t) = if gx == 0 { (axis_c, 2.0) } else { (line_c, 0.8) };
-            push_line(verts, extent, from, to, t, c);
+            // Clip al area de trabajo
+            if from.0 >= WORK_LEFT - 20.0 && from.0 <= WORK_LEFT + work_w + 20.0 {
+                push_line(verts, extent,
+                    (from.0.max(WORK_LEFT), from.1.max(WORK_TOP)),
+                    (to.0.max(WORK_LEFT), to.1.min(WORK_TOP + work_h)),
+                    t, c);
+            }
         }
         for gy in sy..=ey {
             let wy = gy as f32 * GRID_SPACING;
             let from = vp.world_to_screen(min_x - GRID_SPACING, wy);
             let to = vp.world_to_screen(max_x + GRID_SPACING, wy);
             let (c, t) = if gy == 0 { (axis_c, 2.0) } else { (line_c, 0.8) };
-            push_line(verts, extent, from, to, t, c);
+            if from.1 >= WORK_TOP - 20.0 && from.1 <= WORK_TOP + work_h + 20.0 {
+                push_line(verts, extent,
+                    (from.0.max(WORK_LEFT), from.1),
+                    (to.0.min(WORK_LEFT + work_w), to.1),
+                    t, c);
+            }
         }
 
-        // Puntos en intersecciones (estilo puntos de tinta)
+        // Puntos en intersecciones
         if vp.zoom > 0.6 {
             let dot_c = [THEME.grid_dot.r, THEME.grid_dot.g, THEME.grid_dot.b];
             let dot_sz = vp.scale(2.0).max(1.0);
             for gx in sx..=ex {
                 for gy in sy..=ey {
                     let (sx2, sy2) = vp.world_to_screen(gx as f32 * GRID_SPACING, gy as f32 * GRID_SPACING);
-                    if sx2 > -20.0 && sx2 < extent.width as f32 + 20.0 && sy2 > -20.0 && sy2 < extent.height as f32 + 20.0 {
+                    if sx2 >= WORK_LEFT - 10.0 && sx2 <= WORK_LEFT + work_w + 10.0
+                       && sy2 >= WORK_TOP - 10.0 && sy2 <= WORK_TOP + work_h + 10.0 {
                         push_rect(verts, extent, sx2 - dot_sz * 0.5, sy2 - dot_sz * 0.5, dot_sz, dot_sz, dot_c);
                     }
                 }
@@ -351,8 +373,8 @@ impl Renderer {
         }
     }
 
-    // ─── Conexiones estilo tinta con curva Bezier y glow sutil ───
-    fn push_links(&self, verts: &mut Vec<Vertex>, graph: &NodeGraph, extent: vk::Extent2D, vp: Viewport2D) {
+    // ─── Conexiones cyberpunk neon (Blueprint/Matrix style) ───
+    fn push_links(&self, verts: &mut Vec<Vertex>, graph: &NodeGraph, extent: vk::Extent2D, vp: Viewport2D, frame_counter: u64) {
         for link in graph.links() {
             let Some(fa) = graph.locate_pin(link.from) else { continue; };
             let Some(ta) = graph.locate_pin(link.to) else { continue; };
@@ -361,20 +383,78 @@ impl Renderer {
             let from = pin_screen_center(fn_, fa.kind, fa.slot, vp);
             let to = pin_screen_center(tn, ta.kind, ta.slot, vp);
 
-            let link_c = THEME.link_default;
-            let color = [link_c.r, link_c.g, link_c.b];
+            // Clip: no dibujar fuera del area de trabajo
+            if from.0 < 284.0 && to.0 < 284.0 { continue; }
+            if from.1 < 32.0 && to.1 < 32.0 { continue; }
 
-            // Glow sutil (más estrecho y oscuro)
-            let glow = [link_c.r * 0.4, link_c.g * 0.4, link_c.b * 0.3];
-            push_bezier(verts, extent, from, to, vp.scale(8.0).max(2.5), glow);
-            // Sombra oscura (profundidad)
-            let shadow_c = [THEME.ink_black.r, THEME.ink_black.g, THEME.ink_black.b];
-            push_bezier(verts, extent, from, to, vp.scale(4.5).max(1.5), shadow_c);
-            // Línea principal (más delgada, más elegante)
-            push_bezier(verts, extent, from, to, vp.scale(2.2).max(0.8), color);
-            // Highlight sutil
-            let highlight = [link_c.r * 1.25, link_c.g * 1.25, link_c.b * 1.25];
-            push_bezier(verts, extent, from, to, vp.scale(0.8).max(0.3), highlight);
+            let link_c = THEME.link_default;
+            let glow_c = THEME.link_glow;
+            let active_c = THEME.link_active;
+
+            // ── CAPA 1: Glow exterior amplio (efecto bloom cyber) ──
+            let outer_glow = [glow_c.r * 0.3, glow_c.g * 0.5, glow_c.b * 0.4];
+            push_bezier(verts, extent, from, to, vp.scale(18.0).max(5.0), outer_glow);
+
+            // ── CAPA 2: Glow medio ──
+            let mid_glow = [glow_c.r * 0.5, glow_c.g * 0.7, glow_c.b * 0.5];
+            push_bezier(verts, extent, from, to, vp.scale(10.0).max(3.0), mid_glow);
+
+            // ── CAPA 3: Sombra oscura para profundidad ──
+            let shadow_c = [0.0, 0.0, 0.0];
+            push_bezier(verts, extent, from, to, vp.scale(5.0).max(1.8), shadow_c);
+
+            // ── CAPA 4: Linea exterior verde neon ──
+            push_bezier(verts, extent, from, to, vp.scale(3.5).max(1.2), [link_c.r * 0.6, link_c.g * 0.6, link_c.b * 0.6]);
+
+            // ── CAPA 5: Linea principal verde brillante ──
+            push_bezier(verts, extent, from, to, vp.scale(2.2).max(0.8), [link_c.r, link_c.g, link_c.b]);
+
+            // ── CAPA 6: Core blanco-verde brillante ──
+            let core_color = [active_c.r, active_c.g, active_c.b];
+            push_bezier(verts, extent, from, to, vp.scale(0.9).max(0.3), core_color);
+
+            // ── CAPA 7: Particulas fluyendo (data packets) ──
+            let h = (to.0 - from.0).abs().max(120.0);
+            let co = h * 0.42;
+            let c1 = (from.0 + co, from.1);
+            let c2 = (to.0 - co, to.1);
+
+            // 6 particulas con timing escalonado
+            let num_particles = 6;
+            let anim_speed = 0.006;
+            for i in 0..num_particles {
+                let t = ((frame_counter as f32 * anim_speed + i as f32 / num_particles as f32) % 1.0) as f32;
+                let u = 1.0 - t;
+                let b0 = u * u * u; let b1 = 3.0 * u * u * t; let b2 = 3.0 * u * t * t; let b3 = t * t * t;
+                let px = from.0 * b0 + c1.0 * b1 + c2.0 * b2 + to.0 * b3;
+                let py = from.1 * b0 + c1.1 * b1 + c2.1 * b2 + to.1 * b3;
+                if px > 284.0 && px < extent.width as f32 && py > 32.0 && py < extent.height as f32 - 24.0 {
+                    let particle_r = vp.scale(4.0).max(2.5);
+                    // Halo exterior (glow)
+                    push_circle(verts, extent, px, py, particle_r * 2.5, [glow_c.r * 0.4, glow_c.g * 0.5, glow_c.b * 0.4]);
+                    // Halo medio
+                    push_circle(verts, extent, px, py, particle_r * 1.6, [glow_c.r * 0.7, glow_c.g * 0.8, glow_c.b * 0.7]);
+                    // Nucleo blanco brillante
+                    push_circle(verts, extent, px, py, particle_r * 0.6, [1.0, 1.0, 1.0]);
+                }
+            }
+
+            // ── CAPA 8: Nodos de energia pulsantes (anillos concentricos en 1/3 y 2/3) ──
+            for &phase in &[0.33, 0.66] {
+                let pulse_t = phase + (frame_counter as f32 * 0.01).sin() * 0.05;
+                let pulse_t = pulse_t.clamp(0.0, 1.0);
+                let u = 1.0 - pulse_t;
+                let b0 = u * u * u; let b1 = 3.0 * u * u * pulse_t; let b2 = 3.0 * u * pulse_t * pulse_t; let b3 = pulse_t * pulse_t * pulse_t;
+                let px = from.0 * b0 + c1.0 * b1 + c2.0 * b2 + to.0 * b3;
+                let py = from.1 * b0 + c1.1 * b1 + c2.1 * b2 + to.1 * b3;
+                if px > 284.0 && px < extent.width as f32 && py > 32.0 && py < extent.height as f32 - 24.0 {
+                    let ring_r = vp.scale(6.0).max(3.0);
+                    // Anillo exterior
+                    push_circle(verts, extent, px, py, ring_r, [link_c.r * 0.5, link_c.g * 0.6, link_c.b * 0.5]);
+                    // Anillo interior hueco (simulado con circulo mas pequeño del fondo)
+                    push_circle(verts, extent, px, py, ring_r * 0.7, [0.025, 0.035, 0.028]);
+                }
+            }
         }
     }
 
