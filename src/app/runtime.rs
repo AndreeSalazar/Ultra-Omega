@@ -4,7 +4,7 @@ use crate::core::types::{pos2, Color32};
 use super::template_palette::{PaletteAction, TemplatePalette};
 use super::workspace::WorkspaceState;
 use crate::vulkan::context::VulkanContext;
-use crate::vulkan::renderer::{pin_screen_center, CodeEditorState, RenderState, TemplatePaletteEntry, Viewport2D, NODE_HEIGHT, NODE_WIDTH, PIN_SIZE};
+use crate::vulkan::renderer::{pin_screen_center, CodeEditorState, OutputPanel, RenderState, TemplatePaletteEntry, Viewport2D, NODE_HEIGHT, NODE_WIDTH, PIN_SIZE};
 use winit::application::ApplicationHandler;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoop};
@@ -41,6 +41,8 @@ struct AppRuntime {
     workspace: WorkspaceState,
     editor_cursor_line: usize,
     editor_cursor_col: usize,
+    output: OutputPanel,
+    frame_counter: u64,
 }
 
 impl AppRuntime {
@@ -62,6 +64,8 @@ impl AppRuntime {
             workspace: WorkspaceState::default(),
             editor_cursor_line: 0,
             editor_cursor_col: 0,
+            output: OutputPanel::default(),
+            frame_counter: 0,
         }
     }
 
@@ -114,6 +118,8 @@ impl AppRuntime {
             template_entries,
             workspace_label: self.workspace.label(),
             code_editor,
+            output: self.output.clone(),
+            frame_counter: self.frame_counter,
         }
     }
 
@@ -475,6 +481,130 @@ impl AppRuntime {
         }
     }
 
+    fn compile_and_run_active_node(&mut self) {
+        let Some(node_id) = self.active_editor_node else { return; };
+        let Some(node) = self.graph.node(node_id) else { return; };
+
+        let node_title = node.title.clone();
+        let code = if node.code.trim().is_empty() {
+            "fn main() { println!(\"vacio\"); }".to_string()
+        } else {
+            node.code.clone()
+        };
+
+        // Escribir a archivo temporal
+        let tmp_dir = std::env::temp_dir();
+        let tmp_rs = tmp_dir.join(format!("ultra_omega_play_{}.rs", node_id.0));
+        let tmp_exe = tmp_dir.join(format!("ultra_omega_play_{}.exe", node_id.0));
+
+        if let Err(e) = std::fs::write(&tmp_rs, &code) {
+            self.output = OutputPanel {
+                lines: vec![format!("Error escribiendo archivo: {}", e)],
+                is_error: true,
+                has_run: true,
+                error_line: None,
+            };
+            return;
+        }
+
+        // Compilar con rustc
+        let compile_result = std::process::Command::new("rustc")
+            .arg(&tmp_rs)
+            .arg("-o")
+            .arg(&tmp_exe)
+            .arg("--edition")
+            .arg("2021")
+            .arg("-O") // Optimización para velocidad
+            .output();
+
+        match compile_result {
+            Ok(out) => {
+                if out.status.success() {
+                    // Ejecutar el binario
+                    let run_result = std::process::Command::new(&tmp_exe).output();
+                    match run_result {
+                        Ok(r) => {
+                            let stdout = String::from_utf8_lossy(&r.stdout);
+                            let stderr = String::from_utf8_lossy(&r.stderr);
+                            let mut lines: Vec<String> = Vec::new();
+                            lines.push(format!(">>> Ejecutando: {}", node_title));
+                            if !stdout.is_empty() {
+                                for l in stdout.lines() { lines.push(l.to_string()); }
+                            }
+                            if !stderr.is_empty() {
+                                lines.push("[stderr]".to_string());
+                                for l in stderr.lines() { lines.push(l.to_string()); }
+                            }
+                            if lines.len() == 1 {
+                                lines.push("(sin salida)".to_string());
+                            }
+                            lines.push(format!("<<< exit code: {}", r.status.code().unwrap_or(-1)));
+                            self.output = OutputPanel {
+                                lines,
+                                is_error: !r.status.success(),
+                                has_run: true,
+                                error_line: None,
+                            };
+                        }
+                        Err(e) => {
+                            self.output = OutputPanel {
+                                lines: vec![format!("Error ejecutando: {}", e)],
+                                is_error: true,
+                                has_run: true,
+                                error_line: None,
+                            };
+                        }
+                    }
+                } else {
+                    // Error de compilación
+                    let stderr = String::from_utf8_lossy(&out.stderr);
+                    let mut lines: Vec<String> = vec![">>> Error de compilación:".to_string()];
+                    let mut error_line: Option<usize> = None;
+                    for l in stderr.lines() {
+                        lines.push(l.to_string());
+                        // Parsear "linea X" del error de rustc
+                        if error_line.is_none() {
+                            if let Some(pos) = l.find("-->") {
+                                let after = &l[pos+3..];
+                                if let Some(colon_pos) = after.find(':') {
+                                    if let Ok(n) = after[..colon_pos].trim().parse::<usize>() {
+                                        error_line = Some(n.saturating_sub(1));
+                                    }
+                                }
+                            }
+                            // Formato alternativo: "tmp.rs:5:"
+                            if let Some(colon_pos) = l.find(':') {
+                                let after = &l[colon_pos+1..];
+                                if let Some(colon2) = after.find(':') {
+                                    if let Ok(n) = after[..colon2].trim().parse::<usize>() {
+                                        if n < 10000 { error_line = Some(n.saturating_sub(1)); }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    self.output = OutputPanel {
+                        lines,
+                        is_error: true,
+                        has_run: true,
+                        error_line,
+                    };
+                }
+            }
+            Err(e) => {
+                self.output = OutputPanel {
+                    lines: vec![
+                        format!("Error: rustc no encontrado ({})", e),
+                        "Asegurate de tener Rust instalado (https://rustup.rs)".to_string(),
+                    ],
+                    is_error: true,
+                    has_run: true,
+                    error_line: None,
+                };
+            }
+        }
+    }
+
     fn handle_template_palette_key(&mut self, key: KeyCode) -> bool {
         match self.template_palette.handle_key(key) {
             PaletteAction::None => true,
@@ -505,6 +635,7 @@ impl ApplicationHandler for AppRuntime {
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::RedrawRequested => {
+                self.frame_counter = self.frame_counter.wrapping_add(1);
                 let state = self.render_state();
                 if let (Some(window), Some(ctx)) = (&self.window, &mut self.vulkan_ctx) {
                     ctx.draw_frame(window, &self.graph, self.viewport, state);
@@ -592,6 +723,9 @@ impl ApplicationHandler for AppRuntime {
                         | KeyCode::ArrowLeft | KeyCode::ArrowRight | KeyCode::ArrowUp | KeyCode::ArrowDown
                         | KeyCode::Home | KeyCode::End => {
                             self.handle_code_editor_key(key);
+                        }
+                        KeyCode::F5 => {
+                            self.compile_and_run_active_node();
                         }
                         _ => {
                             if let Some(text) = event.text {

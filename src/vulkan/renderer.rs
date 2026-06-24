@@ -18,6 +18,8 @@ pub struct RenderState {
     pub template_entries: Vec<TemplatePaletteEntry>,
     pub workspace_label: String,
     pub code_editor: Option<CodeEditorState>,
+    pub output: OutputPanel,
+    pub frame_counter: u64,
 }
 
 #[derive(Clone, Debug)]
@@ -36,6 +38,14 @@ pub struct CodeEditorState {
     pub cursor_line: usize,
     pub cursor_col: usize,
     pub is_active: bool,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct OutputPanel {
+    pub lines: Vec<String>,
+    pub is_error: bool,
+    pub has_run: bool,
+    pub error_line: Option<usize>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -122,7 +132,7 @@ impl Renderer {
             if verts.len() >= self.vertex_capacity { verts.truncate(self.vertex_capacity); break; }
         }
         if state.template_palette_open { self.push_template_palette(&mut verts, &mut text_verts, extent, &state, atlas); }
-        if let Some(editor) = &state.code_editor { self.push_code_editor(&mut verts, &mut text_verts, extent, editor, atlas); }
+        if let Some(editor) = &state.code_editor { self.push_code_editor(&mut verts, &mut text_verts, extent, editor, &state.output, state.frame_counter, atlas); }
         self.push_workspace_badge(&mut verts, &mut text_verts, extent, &state.workspace_label, atlas);
 
         self.vertex_count = verts.len() as u32;
@@ -418,10 +428,13 @@ impl Renderer {
     }
 
     // ─── Editor de código con cursor y coloring de sintaxis ───
-    fn push_code_editor(&self, verts: &mut Vec<Vertex>, text_verts: &mut Vec<TextVertex>, extent: vk::Extent2D, editor: &CodeEditorState, atlas: Option<&FontAtlas>) {
+    fn push_code_editor(&self, verts: &mut Vec<Vertex>, text_verts: &mut Vec<TextVertex>, extent: vk::Extent2D, editor: &CodeEditorState, output: &OutputPanel, frame_counter: u64, atlas: Option<&FontAtlas>) {
         let margin = 32.0;
         let pw = (extent.width as f32 * 0.42).clamp(420.0, 720.0);
-        let ph = (extent.height as f32 - margin * 2.0).clamp(400.0, 800.0);
+        let total_h = (extent.height as f32 - margin * 2.0).clamp(400.0, 820.0);
+        // Altura dividida: 60% editor, 40% output
+        let out_h = if output.has_run { 220.0 } else { 0.0 };
+        let ph = total_h - out_h - 10.0;
         let px = (extent.width as f32 - pw - margin).max(margin);
         let py = margin;
 
@@ -441,7 +454,12 @@ impl Renderer {
 
         let primary = [THEME.text_primary.r, THEME.text_primary.g, THEME.text_primary.b];
         push_text_gpu(text_verts, extent, px + 20.0, py + 24.0, 2.2, primary, "NODE CODE EDITOR", atlas);
-        push_text_gpu(text_verts, extent, px + pw - 140.0, py + 28.0, 1.4, gold, "LIVE", atlas);
+        // Indicador F5
+        push_text_gpu(text_verts, extent, px + pw - 230.0, py + 28.0, 1.2, [THEME.text_secondary.r, THEME.text_secondary.g, THEME.text_secondary.b], "F5 = play", atlas);
+        // Indicador LIVE o estado
+        let status_label = if output.has_run { if output.is_error { "ERROR" } else { "OK" } } else { "LIVE" };
+        let status_color = if output.has_run { if output.is_error { gold } else { [THEME.jade_green.r, THEME.jade_green.g, THEME.jade_green.b] } } else { gold };
+        push_text_gpu(text_verts, extent, px + pw - 140.0, py + 28.0, 1.4, status_color, status_label, atlas);
 
         let title = format!("{}  [{}]", editor.title, editor.language);
         push_text_gpu(text_verts, extent, px + 22.0, py + 92.0, 1.5, gold, &clip_text(&title, 54), atlas);
@@ -459,6 +477,7 @@ impl Renderer {
         let keyword_color = [THEME.copper.r, THEME.copper.g, THEME.copper.b];
         let string_color = [THEME.jade_green.r, THEME.jade_green.g, THEME.jade_green.b];
         let comment_color = [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b];
+        let error_highlight = [0.45, 0.18, 0.15]; // rojo oscuro translucido
 
         for screen_line in 0..max_lines.min(total_lines) {
             let line_idx = scroll_offset + screen_line;
@@ -472,6 +491,13 @@ impl Renderer {
             // Highlight de línea actual
             if editor.is_active && line_idx == editor.cursor_line {
                 push_rect(verts, extent, px + 16.0, y - 4.0, pw - 32.0, line_h, [THEME.jade_dark.r + 0.04, THEME.jade_dark.g + 0.04, THEME.jade_dark.b + 0.04]);
+            }
+
+            // Highlight de línea de error (del output panel)
+            if let Some(err_line) = output.error_line {
+                if err_line == line_idx + 1 {
+                    push_rect(verts, extent, px + 16.0, y - 4.0, pw - 32.0, line_h, error_highlight);
+                }
             }
 
             // Separador visual
@@ -492,8 +518,8 @@ impl Renderer {
             push_text_gpu(text_verts, extent, code_x + 48.0, y + 10.0, 1.2, text_color, &clip_text(text_str, 68), atlas);
         }
 
-        // Cursor parpadeante
-        if editor.is_active {
+        // Cursor parpadeante (parpadea cada 30 frames)
+        if editor.is_active && (frame_counter / 30) % 2 == 0 {
             let cursor_line_idx = editor.cursor_line.saturating_sub(scroll_offset);
             if cursor_line_idx < max_lines {
                 let cursor_y = code_y + cursor_line_idx as f32 * line_h;
@@ -506,8 +532,47 @@ impl Renderer {
             }
         }
 
-        let hint = "Right click node to open | type live | Enter newline | Backspace | Esc close";
+        let hint = "F5 = compilar+ejecutar | flechas = navegar | Esc = cerrar";
         push_text_gpu(text_verts, extent, px + 20.0, py + ph - 24.0, 1.05, [THEME.text_jade.r, THEME.text_jade.g, THEME.text_jade.b], hint, atlas);
+
+        // ── PANEL DE OUTPUT (debajo del editor) ──
+        if output.has_run {
+            let opy = py + ph + 10.0;
+            let op_h = out_h;
+
+            let op_shade = [THEME.ink_black.r * 0.78, THEME.ink_black.g * 0.78, THEME.ink_black.b * 0.78];
+            push_rounded_rect(verts, extent, px - 8.0, opy - 8.0, pw + 16.0, op_h + 16.0, 12.0, op_shade);
+
+            let op_bg = [THEME.obsidian.r, THEME.obsidian.g, THEME.obsidian.b];
+            push_rounded_rect(verts, extent, px, opy, pw, op_h, 8.0, op_bg);
+
+            // Header del output
+            let op_hdr_color = if output.is_error { [0.35, 0.18, 0.16] } else { [0.18, 0.28, 0.22] };
+            push_rect(verts, extent, px, opy, pw, 28.0, op_hdr_color);
+
+            let op_title = if output.is_error { "OUTPUT (ERROR)" } else { "OUTPUT (OK)" };
+            let op_title_color = if output.is_error { [0.95, 0.65, 0.45] } else { [0.55, 0.85, 0.65] };
+            push_text_gpu(text_verts, extent, px + 14.0, opy + 8.0, 1.5, op_title_color, op_title, atlas);
+
+            // Líneas del output
+            let op_y_start = opy + 36.0;
+            let op_line_h = 18.0;
+            let op_max_lines = ((op_h - 50.0) / op_line_h).max(1.0) as usize;
+            let op_total = output.lines.len();
+            let op_scroll = if op_total > op_max_lines { op_total - op_max_lines } else { 0 };
+
+            let op_text_color = if output.is_error { [0.95, 0.75, 0.55] } else { [0.75, 0.85, 0.72] };
+
+            for sline in 0..op_max_lines.min(op_total) {
+                let line_idx = op_scroll + sline;
+                let line = output.lines.get(line_idx).map(|s| s.as_str()).unwrap_or("");
+                let ly = op_y_start + sline as f32 * op_line_h;
+                if sline % 2 == 0 {
+                    push_rect(verts, extent, px + 8.0, ly - 2.0, pw - 16.0, op_line_h, [THEME.ink_black.r, THEME.ink_black.g, THEME.ink_black.b]);
+                }
+                push_text_gpu(text_verts, extent, px + 16.0, ly + 4.0, 1.1, op_text_color, &clip_text(line, 82), atlas);
+            }
+        }
     }
 
     fn push_workspace_badge(&self, verts: &mut Vec<Vertex>, text_verts: &mut Vec<TextVertex>, extent: vk::Extent2D, label: &str, atlas: Option<&FontAtlas>) {
