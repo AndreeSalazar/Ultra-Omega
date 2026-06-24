@@ -29,6 +29,7 @@ pub struct RenderState {
     pub link_count: usize,
     pub zoom_percent: u32,
     pub command_palette: Option<CommandPaletteState>,
+    pub is_maximized: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -153,7 +154,7 @@ impl Renderer {
         self.push_tab_bar(&mut verts, &mut text_verts, extent, state.code_editor_node, state.sidebar_open, atlas);
         if let Some(editor) = &state.code_editor { self.push_code_editor(&mut verts, &mut text_verts, extent, editor, &state.output, state.frame_counter, atlas); }
         self.push_workspace_badge(&mut verts, &mut text_verts, extent, &state, atlas);
-        self.push_menu_bar(&mut verts, &mut text_verts, extent, state.open_menu, atlas);
+        self.push_menu_bar(&mut verts, &mut text_verts, extent, &state, atlas);
         if let Some(msg) = &state.toast_message {
             self.push_toast(&mut text_verts, extent, msg, state.frame_counter, atlas);
         }
@@ -683,7 +684,8 @@ impl Renderer {
     }
 
     // ─── Top Menu Bar estilo VSCode ───
-    fn push_menu_bar(&self, verts: &mut Vec<Vertex>, text_verts: &mut Vec<TextVertex>, extent: vk::Extent2D, open_menu: Option<crate::app::menu::MenuKind>, atlas: Option<&FontAtlas>) {
+    fn push_menu_bar(&self, verts: &mut Vec<Vertex>, text_verts: &mut Vec<TextVertex>, extent: vk::Extent2D, state: &RenderState, atlas: Option<&FontAtlas>) {
+        let open_menu = state.open_menu;
         // Barra superior (32px de alto) con fondo más visible
         let bar_bg = [0.055, 0.045, 0.038]; // #0E0B0A
         push_rect(verts, extent, 0.0, 0.0, extent.width as f32, 32.0, bar_bg);
@@ -710,7 +712,6 @@ impl Renderer {
             if is_active {
                 let active_bg = [0.18, 0.14, 0.10];
                 push_rect(verts, extent, x, 0.0, w, 32.0, active_bg);
-                // Indicador de bottom
                 push_rect(verts, extent, x, 30.0, w, 2.0, [gold[0]*0.7, gold[1]*0.7, gold[2]*0.7]);
             }
             let txt_color = if is_active { [1.0, 0.95, 0.85] } else { [0.78, 0.74, 0.66] };
@@ -718,10 +719,58 @@ impl Renderer {
             x += w;
         }
 
+        // ── Window control buttons (right side) ──
+        let btn_size = 32.0;
+        let btn_y = 0.0;
+
+        // Close button (red)
+        let close_x = extent.width as f32 - btn_size;
+        let close_color = [0.75, 0.22, 0.17];
+        push_rect(verts, extent, close_x, btn_y, btn_size, 32.0, close_color);
+        // X icon
+        let cx = close_x + 10.0;
+        let cy = btn_y + 10.0;
+        push_rect(verts, extent, cx, cy, 12.0, 2.0, [1.0, 1.0, 1.0]);
+        push_rect(verts, extent, cx + 5.0, cy, 2.0, 12.0, [1.0, 1.0, 1.0]);
+
+        // Maximize/Restore button
+        let max_x = close_x - btn_size;
+        let max_color = if state.is_maximized { [0.12, 0.12, 0.14] } else { [0.08, 0.08, 0.10] };
+        push_rect(verts, extent, max_x, btn_y, btn_size, 32.0, max_color);
+        // Icon
+        let mx = max_x + 9.0;
+        let my = btn_y + 9.0;
+        if state.is_maximized {
+            // Restore icon (two overlapping squares)
+            push_rect(verts, extent, mx + 3.0, my, 8.0, 8.0, [0.0, 0.0, 0.0]);
+            push_rect(verts, extent, mx + 3.0, my, 8.0, 8.0, [0.7, 0.7, 0.7]);
+            push_rect(verts, extent, mx + 3.0, my, 8.0, 1.0, [0.7, 0.7, 0.7]);
+            push_rect(verts, extent, mx + 3.0, my, 1.0, 8.0, [0.7, 0.7, 0.7]);
+            push_rect(verts, extent, mx, my + 3.0, 8.0, 8.0, [0.0, 0.0, 0.0]);
+            push_rect(verts, extent, mx, my + 3.0, 8.0, 8.0, [0.7, 0.7, 0.7]);
+            push_rect(verts, extent, mx, my + 3.0, 8.0, 1.0, [0.7, 0.7, 0.7]);
+            push_rect(verts, extent, mx, my + 3.0, 1.0, 8.0, [0.7, 0.7, 0.7]);
+        } else {
+            // Maximize icon (single square)
+            push_rect(verts, extent, mx, my, 10.0, 10.0, [0.0, 0.0, 0.0]);
+            push_rect(verts, extent, mx, my, 10.0, 1.0, [0.7, 0.7, 0.7]);
+            push_rect(verts, extent, mx, my, 1.0, 10.0, [0.7, 0.7, 0.7]);
+            push_rect(verts, extent, mx + 9.0, my, 1.0, 10.0, [0.7, 0.7, 0.7]);
+            push_rect(verts, extent, mx, my + 9.0, 10.0, 1.0, [0.7, 0.7, 0.7]);
+        }
+
+        // Minimize button
+        let min_x = max_x - btn_size;
+        let min_color = [0.08, 0.08, 0.10];
+        push_rect(verts, extent, min_x, btn_y, btn_size, 32.0, min_color);
+        // Horizontal line icon
+        let line_y = btn_y + 15.0;
+        push_rect(verts, extent, min_x + 9.0, line_y, 12.0, 2.0, [0.7, 0.7, 0.7]);
+
         // Indicador derecho
         let right_txt = "Vulkan Puro | Rust";
         let rw = (right_txt.len() as f32) * 7.5;
-        push_text_gpu(text_verts, extent, extent.width as f32 - rw - 16.0, 10.0, 1.3, [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b], right_txt, atlas);
+        push_text_gpu(text_verts, extent, min_x - rw - 16.0, 10.0, 1.3, [THEME.text_muted.r, THEME.text_muted.g, THEME.text_muted.b], right_txt, atlas);
 
         // Dropdown menu si esta abierto
         if let Some(menu) = open_menu {

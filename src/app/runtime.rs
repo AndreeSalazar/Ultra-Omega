@@ -48,6 +48,7 @@ struct AppRuntime {
     toast_until: u64,
     command_palette: CommandPalette,
     modifiers: ModifiersState,
+    is_maximized: bool,
 }
 
 impl AppRuntime {
@@ -92,6 +93,7 @@ impl AppRuntime {
             toast_until: 0,
             command_palette: CommandPalette::new(),
             modifiers: ModifiersState::empty(),
+            is_maximized: false,
         }
     }
 
@@ -166,6 +168,7 @@ impl AppRuntime {
             } else {
                 None
             },
+            is_maximized: self.is_maximized,
         }
     }
 
@@ -572,6 +575,34 @@ impl ApplicationHandler for AppRuntime {
                             if let Some(menu) = MenuBar::click(cursor) {
                                 self.open_menu = Some(menu);
                                 return;
+                            }
+                            // Window control buttons (right side)
+                            if let Some(window) = &self.window {
+                                let ww = window.inner_size().width as f32;
+                                let btn_size = 32.0;
+                                // Close button
+                                if cursor.0 >= ww - btn_size {
+                                    event_loop.exit();
+                                    return;
+                                }
+                                // Maximize/Restore button
+                                if cursor.0 >= ww - btn_size * 2.0 && cursor.0 < ww - btn_size {
+                                    if self.is_maximized {
+                                        let _ = window.set_maximized(false);
+                                        self.is_maximized = false;
+                                    } else {
+                                        let _ = window.set_maximized(true);
+                                        self.is_maximized = true;
+                                    }
+                                    self.open_menu = None;
+                                    return;
+                                }
+                                // Minimize button
+                                if cursor.0 >= ww - btn_size * 3.0 && cursor.0 < ww - btn_size * 2.0 {
+                                    let _ = window.set_minimized(true);
+                                    self.open_menu = None;
+                                    return;
+                                }
                             }
                             if let Some(window) = &self.window {
                                 let _ = window.drag_window();
